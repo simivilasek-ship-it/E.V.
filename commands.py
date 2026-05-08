@@ -335,12 +335,103 @@ class CommandExecutor:
             return f"Chyba: {e}"
 
     def _cmd_clear_history(self) -> str:
-        """Vymaže historii (implementováno v hlavním engine)"""
         return "ok"
 
     def _cmd_answer(self) -> str:
-        """Jen odpověď bez akce"""
         return "ok"
+
+    def _cmd_vscode_open(self, path: str = "") -> str:
+        path = os.path.expanduser(path)
+        subprocess.Popen(f"code {path!r}", shell=True)
+        return f"Otevřeno ve VSCode: {path}"
+
+    def _cmd_vscode_new_file(self) -> str:
+        time.sleep(0.5)
+        pyautogui.hotkey("ctrl", "n")
+        return "ok"
+
+    def _cmd_weather(self, city: str = "") -> str:
+        from urllib.parse import quote as _q
+        url = f"https://wttr.in/{_q(city)}?format=3" if city else "https://wttr.in/?format=3"
+        try:
+            resp = __import__("requests").get(url, timeout=8, headers={"User-Agent": "curl/7.0"})
+            return resp.text.strip()
+        except Exception as e:
+            return f"Chyba počasí: {e}"
+
+    def _cmd_set_brightness(self, level: int = 50) -> str:
+        level = max(1, min(100, int(level)))
+        if self.is_linux:
+            if subprocess.run(["which", "brightnessctl"], capture_output=True).returncode == 0:
+                subprocess.run(["brightnessctl", "set", f"{level}%"], capture_output=True)
+            else:
+                displays = subprocess.check_output(
+                    "xrandr | grep ' connected' | awk '{print $1}'", shell=True, text=True
+                ).strip().split("\n")
+                for d in displays:
+                    subprocess.run(["xrandr", "--output", d, "--brightness", str(level / 100)])
+        return f"Jas: {level}%"
+
+    def _cmd_sleep_pc(self) -> str:
+        if self.is_windows:
+            subprocess.run(["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"], check=False)
+        else:
+            subprocess.run(["systemctl", "suspend"], check=False)
+        return "ok"
+
+    def _cmd_update_system(self) -> str:
+        if self.is_linux:
+            subprocess.Popen(["pkexec", "bash", "-c", "apt update && apt upgrade -y"])
+        return "Spouštím aktualizaci..."
+
+    def _cmd_create_folder(self, path: str = "") -> str:
+        path = os.path.expanduser(path)
+        os.makedirs(path, exist_ok=True)
+        return f"Složka vytvořena: {path}"
+
+    def _cmd_create_file(self, path: str = "") -> str:
+        path = os.path.expanduser(path)
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        open(path, "a").close()
+        return f"Soubor vytvořen: {path}"
+
+    def _cmd_delete_file(self, path: str = "") -> str:
+        path = os.path.expanduser(path)
+        result = subprocess.run(["gio", "trash", path], capture_output=True)
+        if result.returncode == 0:
+            return f"Přesunuto do koše: {path}"
+        if os.path.isfile(path):
+            os.remove(path)
+        elif os.path.isdir(path):
+            import shutil as _sh
+            _sh.rmtree(path)
+        return f"Smazáno: {path}"
+
+    def _cmd_move_file(self, src: str = "", dst: str = "") -> str:
+        import shutil as _sh
+        _sh.move(os.path.expanduser(src), os.path.expanduser(dst))
+        return f"Přesunuto: {src} → {dst}"
+
+    def _cmd_find_files(self, name: str = "", path: str = "~") -> str:
+        path = os.path.expanduser(path)
+        result = subprocess.run(
+            ["find", path, "-iname", f"*{name}*", "-maxdepth", "6"],
+            capture_output=True, text=True, timeout=10,
+        )
+        files = [f for f in result.stdout.strip().split("\n") if f][:10]
+        return "\n".join(files) if files else "Nic nenalezeno."
+
+    def _cmd_install_app(self, name: str = "") -> str:
+        subprocess.Popen(["pkexec", "apt", "install", "-y", name])
+        return f"Instaluji: {name}"
+
+    def _cmd_uninstall_app(self, name: str = "") -> str:
+        subprocess.Popen(["pkexec", "apt", "remove", "-y", name])
+        return f"Odinstaluji: {name}"
+
+    def _cmd_run_script(self, path: str = "") -> str:
+        subprocess.Popen(["bash", os.path.expanduser(path)])
+        return f"Spouštím: {path}"
 
     def _find_app(self, name: str) -> Optional[str]:
         """Najde příkaz pro aplikaci"""
