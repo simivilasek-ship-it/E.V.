@@ -7,6 +7,12 @@ import os
 import json
 from typing import Dict, Any
 
+AVAILABLE_OLLAMA_MODELS = [
+    "llama3.1:8b",
+    "llama3.2:3b",
+    "mistral:7b",
+]
+
 DEFAULT_CONFIG = {
     "ollama_url": "http://localhost:11434/api/chat",
     "ollama_model": "llama3.1:8b",
@@ -56,6 +62,14 @@ def _validate_config(config: Dict[str, Any]) -> None:
 
     if config["tts_rate"] < 50 or config["tts_rate"] > 400:
         raise ValueError("tts_rate musí být mezi 50-400")
+
+
+def save_config(config: Dict[str, Any]) -> None:
+    """Uloží aktuální konfiguraci do config.json."""
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+
 
 # Globální konfigurace
 CONFIG = load_config()

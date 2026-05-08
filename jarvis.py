@@ -11,7 +11,7 @@ import time
 from typing import Optional
 
 # Import modulů
-from config import CONFIG
+from config import CONFIG, AVAILABLE_OLLAMA_MODELS, save_config
 from stt import STTEngine
 from tts import TTSEngine
 from llm import LLMEngine
@@ -33,6 +33,7 @@ BG = "#0f0d0a"
 BG2 = "#1a1510"
 FG = "#f0ead8"
 MUTED = "#888888"
+APP_VERSION = "2.0"
 
 # ══════════════════════════════════════════════════════
 #  HLAVNÍ APLIKACE
@@ -93,7 +94,7 @@ class JarvisApp:
         ctk.set_default_color_theme("dark-blue")
 
         self.root = ctk.CTk()
-        self.root.title("JARVIS v2.0")
+        self.root.title(f"JARVIS v{APP_VERSION}")
         self.root.geometry(CONFIG["window_size"])
         self.root.minsize(420, 580)
         self.root.configure(fg_color=BG)
@@ -151,6 +152,44 @@ class JarvisApp:
 
         self._vol_lbl = ctk.CTkLabel(tb, text="", font=("DM Sans", 11), text_color=MUTED)
         self._vol_lbl.pack(side="right", padx=12)
+
+        # Model selection
+        model_choices = list(AVAILABLE_OLLAMA_MODELS)
+        if CONFIG["ollama_model"] not in model_choices:
+            model_choices.insert(0, CONFIG["ollama_model"])
+
+        model_frame = ctk.CTkFrame(self.root, fg_color=BG2, corner_radius=0, height=40)
+        model_frame.pack(fill="x", padx=14, pady=(8, 0))
+        model_frame.pack_propagate(False)
+
+        ctk.CTkLabel(
+            model_frame,
+            text="Model:",
+            font=("DM Sans", 11),
+            text_color=FG,
+        ).pack(side="left", padx=(0, 8))
+
+        self.model_option = ctk.CTkOptionMenu(
+            model_frame,
+            values=model_choices,
+            command=self._on_model_change,
+            fg_color=BG,
+            button_color="#333",
+            button_hover_color="#444",
+            text_color=FG,
+            dropdown_text_color=FG,
+            width=220,
+        )
+        self.model_option.set(CONFIG["ollama_model"])
+        self.model_option.pack(side="left")
+
+        self._selected_model_lbl = ctk.CTkLabel(
+            model_frame,
+            text="Změna se uloží do config.json.",
+            font=("DM Sans", 10),
+            text_color=MUTED,
+        )
+        self._selected_model_lbl.pack(side="right")
 
         # Divider
         ctk.CTkFrame(self.root, fg_color=GOLD, height=1, corner_radius=0).pack(fill="x")
@@ -251,6 +290,20 @@ class JarvisApp:
         """Vymaže historii konverzace"""
         self.llm.clear_history()
         self._log("Paměť rozhovoru vymazána.", "muted")
+
+    def _on_model_change(self, value: str):
+        """Změní model a uloží konfiguraci."""
+        if not value or value == CONFIG.get("ollama_model"):
+            return
+
+        CONFIG["ollama_model"] = value
+        self.llm.model = value
+        try:
+            save_config(CONFIG)
+            self._log(f"Model přepnut na {value}", "success")
+        except Exception as e:
+            logger.error(f"Chyba při ukládání konfigurace: {e}")
+            self._log(f"Nelze uložit model do config.json: {e}", "error")
 
     def _set_status(self, text: str, color: str = MUTED):
         """Nastaví status"""

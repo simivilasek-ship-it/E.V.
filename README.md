@@ -2,6 +2,8 @@
 
 Lokální AI asistent poháněný Ollama. Ovládá PC hlasem nebo textem, mluví kvalitním českým hlasem.
 
+**Verze:** 2.0
+
 ## Rychlý start
 
 ### Linux
@@ -89,6 +91,8 @@ cp jarvis.desktop ~/Plocha/   # nebo ~/Desktop/
 | Obecné otázky | Ollama AI odpověď |
 
 ## Konfigurace (`config.json`)
+
+Model `ollama_model` lze upravit přímo v uživatelském rozhraní pomocí výběru v horní části okna, konfigurace se uloží automaticky do `config.json`.
 
 ```json
 {
@@ -203,11 +207,15 @@ pip install -r requirements.txt
 
 ## Požadavky
 
-- Python 3.10+
+- Python 3.11+ (doporučeno)
 - [Ollama](https://ollama.com) — `ollama serve`
 - Model — `ollama pull llama3.1:8b`
 - ffplay (Linux TTS) — `sudo apt install ffmpeg`
 - brightnessctl (jas) — `sudo apt install brightnessctl`
+
+## Logování
+
+Aplikace zapisuje logy do souboru `jarvis.log` v kořenovém adresáři projektu.
 
 ## Struktura projektu
 
