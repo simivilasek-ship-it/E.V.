@@ -8,14 +8,14 @@ pyautogui>=0.9.54
 psutil>=5.9.0
 Pillow>=10.0.0
 
-# Hlasové ovládání (mikrofon)
+# TTS — kvalitní český hlas (potřebuje internet)
+edge-tts>=7.0.0
+
+# Hlasové ovládání (mikrofon) — volitelné
 SpeechRecognition>=3.10.0
 PyAudio>=0.2.13
 
-# Text-to-Speech (JARVIS mluví)
-pyttsx3>=2.90
-
-# Schránka — potřeba pro správné psaní českých znaků
+# Schránka — správné psaní českých znaků
 pyperclip>=1.8.2
 
 # Přesné nastavení hlasitosti (pouze Windows, volitelné)

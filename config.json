@@ -2,7 +2,7 @@
   "ollama_url":   "http://localhost:11434/api/chat",
   "ollama_model": "llama3.1:8b",
   "tts_enabled":  true,
-  "tts_rate":     170,
+  "tts_voice":    "cs-CZ-AntoninNeural",
   "history_size": 20,
-  "window_size":  "560x760"
+  "window_size":  "600x820"
 }
