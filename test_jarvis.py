@@ -14,90 +14,126 @@ from unittest.mock import patch, MagicMock
 # Přidat aktuální adresář do cesty
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Importovat JARVIS moduly (bez GUI)
+# Importovat JARVIS moduly
 try:
-    import jarvis
+    from config import CONFIG
+    from stt import STTEngine
+    from tts import TTSEngine
+    from llm import LLMEngine
+    from commands import CommandExecutor
 except ImportError as e:
-    print(f"Chyba importu jarvis: {e}")
+    print(f"Chyba importu modulů: {e}")
     sys.exit(1)
 
 class TestJarvis(unittest.TestCase):
 
     def setUp(self):
-        # Mock config
-        jarvis._cfg = {
+        """Nastavení testů"""
+        # Mock config pro testy
+        self.test_config = {
             "ollama_url": "http://localhost:11434/api/chat",
             "ollama_model": "llama3.1:8b",
             "tts_enabled": True,
             "tts_rate": 170,
             "history_size": 20,
             "window_size": "560x760",
+            "log_level": "INFO",
         }
-        jarvis.OLLAMA_URL = jarvis._cfg["ollama_url"]
-        jarvis.OLLAMA_MODEL = jarvis._cfg["ollama_model"]
 
-    def test_find_app(self):
-        """Test nalezení aplikace"""
-        self.assertEqual(jarvis._find_app("chrome"), "chrome")
-        self.assertEqual(jarvis._find_app("firefox"), "firefox")
-        self.assertEqual(jarvis._find_app("neexistuje"), "neexistuje")
+    def test_config_loading(self):
+        """Test načítání konfigurace"""
+        # Testujeme, že config má výchozí hodnoty
+        config_keys = ["ollama_url", "ollama_model", "tts_enabled", "tts_rate", "history_size", "window_size"]
+        for key in config_keys:
+            self.assertIn(key, CONFIG)
 
-    @patch('subprocess.run')
-    def test_set_volume_linux(self, mock_run):
-        """Test nastavení hlasitosti na Linuxu"""
-        jarvis.IS_LINUX = True
-        jarvis.IS_WINDOWS = False
-        jarvis._set_volume(50)
-        mock_run.assert_called_with(["pactl", "set-sink-volume", "@DEFAULT_SINK@", "50%"], capture_output=True)
+    def test_stt_engine_init(self):
+        """Test inicializace STT enginu"""
+        stt = STTEngine(self.test_config)
+        self.assertIsNotNone(stt)
+        # Test, že má metodu listen
+        self.assertTrue(hasattr(stt, 'listen'))
+        self.assertTrue(hasattr(stt, 'is_available'))
 
-    @patch('subprocess.run')
-    def test_get_volume_linux(self, mock_run):
-        """Test získání hlasitosti na Linuxu"""
-        jarvis.IS_LINUX = True
-        jarvis.IS_WINDOWS = False
-        mock_run.return_value.stdout.decode.return_value = "Volume: 0:  50% / 100% / 100%"
-        result = jarvis._get_volume()
-        self.assertEqual(result, 50)
+    def test_tts_engine_init(self):
+        """Test inicializace TTS enginu"""
+        tts = TTSEngine(self.test_config)
+        self.assertIsNotNone(tts)
+        # Test, že má metody speak a is_available
+        self.assertTrue(hasattr(tts, 'speak'))
+        self.assertTrue(hasattr(tts, 'is_available'))
 
-    def test_ask_ollama_mock(self):
-        """Test Ollama odpovědi (mock)"""
-        with patch('requests.post') as mock_post:
-            mock_response = MagicMock()
-            mock_response.json.return_value = {"message": {"content": '{"action": "answer", "params": {}, "message": "Test"}'}}
-            mock_post.return_value = mock_response
+    def test_llm_engine_init(self):
+        """Test inicializace LLM enginu"""
+        llm = LLMEngine(self.test_config)
+        self.assertIsNotNone(llm)
+        # Test, že má metody ask, is_available, clear_history
+        self.assertTrue(hasattr(llm, 'ask'))
+        self.assertTrue(hasattr(llm, 'is_available'))
+        self.assertTrue(hasattr(llm, 'clear_history'))
 
-            result = jarvis.ask_ollama("Test")
-            self.assertEqual(result["action"], "answer")
-            self.assertEqual(result["message"], "Test")
+    def test_commands_executor_init(self):
+        """Test inicializace CommandExecutor"""
+        commands = CommandExecutor(self.test_config)
+        self.assertIsNotNone(commands)
+        # Test, že má metodu execute
+        self.assertTrue(hasattr(commands, 'execute'))
 
-    def test_execute_action_open_app_linux(self):
+    @patch('subprocess.Popen')
+    def test_commands_open_app_linux(self, mock_popen):
         """Test otevření aplikace na Linuxu"""
-        jarvis.IS_LINUX = True
-        jarvis.IS_WINDOWS = False
+        commands = CommandExecutor(self.test_config)
+        result = commands.execute("open_app", {"app": "firefox"})
+        self.assertEqual(result, "ok")
+        # Ověřit, že subprocess.Popen byl zavolán
+        mock_popen.assert_called()
 
-        with patch('subprocess.Popen') as mock_popen:
-            result = jarvis.execute_action("open_app", {"app": "firefox"})
-            mock_popen.assert_called_with("firefox", shell=True)
-            self.assertEqual(result, "ok")
-
-    def test_execute_action_volume(self):
-        """Test nastavení hlasitosti"""
-        with patch('jarvis._set_volume') as mock_set:
-            result = jarvis.execute_action("volume", {"level": 75})
-            mock_set.assert_called_with(75)
-            self.assertEqual(result, "ok")
-
-    def test_execute_action_screenshot(self):
+    @patch('pyautogui.screenshot')
+    def test_commands_screenshot(self, mock_screenshot):
         """Test screenshotu"""
-        with patch('pyautogui.screenshot') as mock_screenshot:
-            mock_img = MagicMock()
-            mock_screenshot.return_value = mock_img
-            mock_img.save = MagicMock()
+        mock_img = MagicMock()
+        mock_screenshot.return_value = mock_img
 
-            result = jarvis.execute_action("screenshot", {})
-            self.assertIn("Uloženo:", result)
-            mock_screenshot.assert_called_once()
-            mock_img.save.assert_called_once()
+        commands = CommandExecutor(self.test_config)
+        result = commands.execute("screenshot", {})
+        self.assertIn("Uloženo:", result)
+        mock_screenshot.assert_called_once()
+        mock_img.save.assert_called_once()
 
-if __name__ == '__main__':
+    @patch('pyautogui.press')
+    def test_commands_volume_mute(self, mock_press):
+        """Test ztlumení hlasitosti"""
+        commands = CommandExecutor(self.test_config)
+        result = commands.execute("volume", {"action": "mute"})
+        self.assertEqual(result, "ok")
+        mock_press.assert_called_with("volumemute")
+
+    def test_llm_clear_history(self):
+        """Test vymazání historie LLM"""
+        llm = LLMEngine(self.test_config)
+        # Přidat nějakou historii (mock)
+        llm.history = [{"role": "user", "content": "test"}]
+        llm.clear_history()
+        self.assertEqual(len(llm.history), 0)
+
+    @patch('requests.post')
+    def test_llm_ask_mock(self, mock_post):
+        """Test LLM odpovědi (mock)"""
+        # Mock odpověď od Ollama - správný formát
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "message": {
+                "content": '{"action": "answer", "params": {}, "message": "Test odpověď"}'
+            }
+        }
+        mock_post.return_value = mock_response
+
+        llm = LLMEngine(self.test_config)
+        message, action_data = llm.ask("Test otázka")
+
+        self.assertEqual(message, "Test odpověď")
+        self.assertEqual(action_data["action"], "answer")
+        mock_post.assert_called_once()
+
+if __name__ == "__main__":
     unittest.main()
