@@ -212,14 +212,22 @@ SYSTEM_PROMPT = (
     "\n"
     "AKCE:\n"
     "sequence, open_app, vscode_open, vscode_new_file, open_url, search_web, weather,\n"
-    "create_folder, create_file, delete_file, move_file, find_files, open_file,\n"
+    "youtube_play, create_folder, create_file, delete_file, move_file, find_files, open_file,\n"
     "install_app, uninstall_app, update_system,\n"
     "volume, set_brightness, media, screenshot,\n"
     "shutdown, restart, sleep_pc, system_info, kill_process,\n"
     "write_text, type_key, clipboard_set, run_script, set_timer, write_email,\n"
     "get_time, get_date, clear_history, answer\n"
     "\n"
+    "youtube_play params: {\"query\":\"název písničky\", \"index\":1, \"audio_only\":false}\n"
+    "  - index=1 → první výsledek, index=2 → druhý výsledek atd.\n"
+    "  - audio_only=true → jen zvuk (rychlejší), false → video\n"
+    "  - VŽDY použij youtube_play pro hudbu/video, NIKDY search_web nebo open_url!\n"
+    "\n"
     "PŘÍKLADY:\n"
+    '"Zahraj Justin Bieber" → {"action":"youtube_play","params":{"query":"Justin Bieber Let Me Love You","index":1,"audio_only":false},"message":"Spouštím video."}\n'
+    '"Zahraj jen zvuk" → {"action":"youtube_play","params":{"query":"název","index":1,"audio_only":true},"message":"Přehrávám zvuk."}\n'
+    '"Druhý výsledek" → {"action":"youtube_play","params":{"query":"předchozí dotaz","index":2,"audio_only":false},"message":"Spouštím druhý výsledek."}\n'
     f'"Vytvoř složku kytara v Dokumentech" → {{"action":"create_folder","params":{{"path":"{_HOME}/Dokumenty/kytara"}},"message":"Vytvářím složku."}}\n'
     f'"Vytvoř složku kytara a otevři ve vscode" → {{"action":"sequence","params":{{"steps":[{{"action":"create_folder","params":{{"path":"{_HOME}/kytara"}}}},{{"action":"vscode_open","params":{{"path":"{_HOME}/kytara"}}}}]}},"message":"Vytvářím složku a otevírám ve VSCode."}}\n'
     f'"Otevři složku ve vscode" → {{"action":"vscode_open","params":{{"path":"{_HOME}/složka"}},"message":"Otevírám ve VSCode."}}\n'
@@ -329,6 +337,43 @@ def execute_action(action: str, params: dict, notify=None) -> str:
                     results.append(r)
                 time.sleep(0.3)
             return " | ".join(results) if results else "ok"
+
+        elif action == "youtube_play":
+            query  = params.get("query", "")
+            index  = max(1, int(params.get("index", 1)))  # 1 = první výsledek
+            audio_only = params.get("audio_only", False)
+
+            def _yt_play():
+                try:
+                    import yt_dlp
+                    ydl_opts = {
+                        "quiet": True,
+                        "no_warnings": True,
+                        "format": "bestaudio/best" if audio_only else "best[height<=720]/best",
+                        "default_search": f"ytsearch{index}",
+                        "noplaylist": True,
+                    }
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(query, download=False)
+                        entries = info.get("entries") or [info]
+                        entry   = entries[min(index - 1, len(entries) - 1)]
+                        url     = entry.get("url") or entry.get("webpage_url")
+                        title   = entry.get("title", query)
+
+                    _notify(f"▶ {title}", "success")
+                    if audio_only:
+                        subprocess.Popen(
+                            ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", url],
+                        )
+                    else:
+                        subprocess.Popen(["ffplay", "-loglevel", "quiet", url])
+
+                except Exception as e:
+                    _notify(f"Chyba přehrávání: {e}", "error")
+
+            threading.Thread(target=_yt_play, daemon=True).start()
+            mode = "audio" if audio_only else "video"
+            return f"Spouštím {mode}: {query} (#{index})"
 
         elif action == "open_app":
             app  = _find_app(params.get("app", ""))
