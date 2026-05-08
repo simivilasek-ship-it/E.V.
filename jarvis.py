@@ -171,70 +171,33 @@ _os_name = "Windows" if IS_WINDOWS else "Linux"
 
 SYSTEM_PROMPT = (
     "Jsi JARVIS, inteligentní osobní asistent na PC. Komunikuješ POUZE v češtině.\n"
-    "Jsi stručný, přesný a přátelský. Vždy vrátíš POUZE validní JSON, nic jiného.\n"
+    "Vždy vrátíš POUZE validní JSON — jeden objekt, nic jiného.\n"
     "\n"
-    "KONTEXT SYSTÉMU:\n"
-    f"- Uživatel: {_USER}\n"
-    f"- Domovská složka: {_HOME}\n"
-    f"- OS: {_os_name}\n"
-    f"- Pro cesty VŽDY používej absolutní cestu začínající {_HOME}/ — nikdy /home/user/\n"
+    f"SYSTÉM: uživatel={_USER}, domov={_HOME}, OS={_os_name}\n"
+    f"DŮLEŽITÉ: Cesty VŽDY začínají {_HOME}/ — NIKDY nepoužívej /home/user/\n"
     "\n"
-    'FORMÁT: {"action": "AKCE", "params": {}, "message": "Česky, max 1-2 věty"}\n'
+    'FORMÁT: {"action":"AKCE","params":{{}},"message":"Česky, 1 věta"}\n'
     "\n"
-    "AKCE — SYSTÉM:\n"
-    '- shutdown      params: {"delay": 0}\n'
-    '- restart       params: {"delay": 0}\n'
-    "- sleep_pc      params: {}\n"
-    "- system_info   params: {}\n"
-    '- kill_process  params: {"name": "název"}\n'
-    "- update_system params: {}\n"
+    "POKUD CHCE UŽIVATEL VÍCE VĚCÍ NAJEDNOU → použij sequence:\n"
+    '{"action":"sequence","params":{"steps":[{"action":"A","params":{}},{"action":"B","params":{}}]},"message":"..."}\n'
     "\n"
-    "AKCE — SOUBORY:\n"
-    '- open_file     params: {"path": "/cesta"}\n'
-    '- create_folder params: {"path": "/cesta/složka"}\n'
-    '- create_file   params: {"path": "/cesta/soubor.txt"}\n'
-    '- delete_file   params: {"path": "/cesta"}\n'
-    '- move_file     params: {"src": "/odkud", "dst": "/kam"}\n'
-    '- find_files    params: {"name": "název", "path": "/kde"}\n'
-    "\n"
-    "AKCE — APLIKACE:\n"
-    '- open_app      params: {"app": "název"}\n'
-    '- install_app   params: {"name": "balíček"}\n'
-    '- uninstall_app params: {"name": "balíček"}\n'
-    "\n"
-    "AKCE — WEB:\n"
-    '- open_url      params: {"url": "https://..."}\n'
-    '- search_web    params: {"query": "výraz"}\n'
-    '- weather       params: {"city": "město"}\n'
-    "\n"
-    "AKCE — ZVUK & DISPLEJ:\n"
-    '- volume        params: {"level": 0-100} nebo {"action": "mute/unmute"}\n'
-    '- set_brightness params: {"level": 0-100}\n'
-    '- media         params: {"action": "play_pause/next/prev/stop"}\n'
-    "- screenshot    params: {}\n"
-    "\n"
-    "AKCE — AUTOMATIZACE:\n"
-    '- write_text    params: {"text": "text"}\n'
-    '- type_key      params: {"key": "ctrl+c"}\n'
-    '- clipboard_set params: {"text": "text"}\n'
-    '- run_script    params: {"path": "/cesta/skript.sh"}\n'
-    '- set_timer     params: {"seconds": 60, "label": "popis"}\n'
-    '- write_email   params: {"to": "", "subject": "", "body": ""}\n'
-    "\n"
-    "AKCE — INFO:\n"
-    "- get_time      params: {}\n"
-    "- get_date      params: {}\n"
-    "- clear_history params: {}\n"
-    "- answer        params: {}\n"
+    "AKCE:\n"
+    "sequence, open_app, vscode_open, vscode_new_file, open_url, search_web, weather,\n"
+    "create_folder, create_file, delete_file, move_file, find_files, open_file,\n"
+    "install_app, uninstall_app, update_system,\n"
+    "volume, set_brightness, media, screenshot,\n"
+    "shutdown, restart, sleep_pc, system_info, kill_process,\n"
+    "write_text, type_key, clipboard_set, run_script, set_timer, write_email,\n"
+    "get_time, get_date, clear_history, answer\n"
     "\n"
     "PŘÍKLADY:\n"
-    f'"Vypni PC"             → {{"action": "shutdown", "params": {{"delay": 0}}, "message": "Vypínám počítač."}}\n'
-    f'"Počasí Praha"         → {{"action": "weather", "params": {{"city": "Praha"}}, "message": "Zjišťuji počasí."}}\n'
-    f'"Vytvoř složku test"   → {{"action": "create_folder", "params": {{"path": "{_HOME}/test"}}, "message": "Vytvářím složku."}}\n'
-    f'"Nainstaluj vlc"       → {{"action": "install_app", "params": {{"name": "vlc"}}, "message": "Instaluji VLC."}}\n'
-    f'"Uspi počítač"         → {{"action": "sleep_pc", "params": {{}}, "message": "Uspávám počítač."}}\n'
-    "\n"
-    "Odpovídej POUZE validním JSON."
+    f'"Vytvoř složku kytara v Dokumentech" → {{"action":"create_folder","params":{{"path":"{_HOME}/Dokumenty/kytara"}},"message":"Vytvářím složku."}}\n'
+    f'"Vytvoř složku kytara a otevři ve vscode" → {{"action":"sequence","params":{{"steps":[{{"action":"create_folder","params":{{"path":"{_HOME}/kytara"}}}},{{"action":"vscode_open","params":{{"path":"{_HOME}/kytara"}}}}]}},"message":"Vytvářím složku a otevírám ve VSCode."}}\n'
+    f'"Otevři složku ve vscode" → {{"action":"vscode_open","params":{{"path":"{_HOME}/složka"}},"message":"Otevírám ve VSCode."}}\n'
+    '"Nový soubor ve vscode" → {"action":"vscode_new_file","params":{},"message":"Vytvářím nový soubor."}\n'
+    '"Počasí Praha" → {"action":"weather","params":{"city":"Praha"},"message":"Zjišťuji počasí."}\n'
+    '"Nainstaluj vlc" → {"action":"install_app","params":{"name":"vlc"},"message":"Instaluji VLC."}\n'
+    "\nOdpovídej POUZE validním JSON."
 )
 
 # ══════════════════════════════════════════════════════
@@ -329,9 +292,30 @@ def execute_action(action: str, params: dict, notify=None) -> str:
             notify(msg, tag)
 
     try:
-        if action == "open_app":
-            app = _find_app(params.get("app", ""))
-            subprocess.Popen(app, shell=True)
+        if action == "sequence":
+            results = []
+            for step in params.get("steps", []):
+                r = execute_action(step.get("action", "answer"), step.get("params", {}), notify=notify)
+                if r and r != "ok":
+                    results.append(r)
+                time.sleep(0.3)
+            return " | ".join(results) if results else "ok"
+
+        elif action == "open_app":
+            app  = _find_app(params.get("app", ""))
+            args = params.get("args", [])
+            cmd  = f"{app} {' '.join(str(a) for a in args)}" if args else app
+            subprocess.Popen(cmd, shell=True)
+            return "ok"
+
+        elif action == "vscode_open":
+            path = os.path.expanduser(params.get("path", ""))
+            subprocess.Popen(f"code {path!r}", shell=True)
+            return f"Otevřeno ve VSCode: {path}"
+
+        elif action == "vscode_new_file":
+            time.sleep(0.5)
+            pyautogui.hotkey("ctrl", "n")
             return "ok"
 
         elif action == "open_url":
