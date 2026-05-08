@@ -345,26 +345,31 @@ def execute_action(action: str, params: dict, notify=None) -> str:
 
             def _yt_play():
                 try:
-                    import yt_dlp
-                    ydl_opts = {
-                        "quiet": True,
-                        "no_warnings": True,
-                        "format": "bestaudio/best" if audio_only else "best[height<=720]/best",
-                        "default_search": f"ytsearch{index}",
-                        "noplaylist": True,
-                    }
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        info = ydl.extract_info(query, download=False)
-                        entries = info.get("entries") or [info]
-                        entry   = entries[min(index - 1, len(entries) - 1)]
-                        url     = entry.get("url") or entry.get("webpage_url")
-                        title   = entry.get("title", query)
+                    fmt = "bestaudio/best" if audio_only else "best[height<=720]/best"
+                    # Zkus python3 -m yt_dlp (systémový Python), pak yt-dlp binary
+                    for cmd_prefix in (["python3", "-m", "yt_dlp"], ["yt-dlp"]):
+                        r = subprocess.run(
+                            cmd_prefix + [
+                                "--quiet", "--no-warnings", "--no-playlist",
+                                "--format", fmt, "--get-url", "--get-title",
+                                f"ytsearch{index}:{query}",
+                            ],
+                            capture_output=True, text=True, timeout=30,
+                        )
+                        if r.returncode == 0 and r.stdout.strip():
+                            break
+                    else:
+                        _notify("yt-dlp nenalezeno. Spusť: pip install yt-dlp", "error")
+                        return
+
+                    lines = [l for l in r.stdout.strip().split("\n") if l]
+                    # yt-dlp --get-title --get-url vrátí: titulek, url, titulek, url...
+                    title = lines[0] if len(lines) >= 2 else query
+                    url   = lines[1] if len(lines) >= 2 else lines[0]
 
                     _notify(f"▶ {title}", "success")
                     if audio_only:
-                        subprocess.Popen(
-                            ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", url],
-                        )
+                        subprocess.Popen(["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", url])
                     else:
                         subprocess.Popen(["ffplay", "-loglevel", "quiet", url])
 
