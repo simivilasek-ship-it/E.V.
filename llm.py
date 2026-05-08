@@ -1,147 +1,243 @@
 """
 JARVIS v2.0 — LLM komunikace
-Komunikace s Ollama API
 """
 
-import requests
-import json
-import logging
+import os
 import re
-from typing import Dict, List, Optional, Tuple
+import requests
+import logging
+from typing import Dict, Tuple
 from collections import deque
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """Jsi JARVIS, inteligentní hlasový asistent na PC. Komunikuješ POUZE v češtině.
-Jsi stručný, přesný a přátelský. Vždy vrátíš validní JSON, nic jiného.
+_HOME = os.path.expanduser("~")
+_USER = os.environ.get("USER", os.path.basename(_HOME))
 
-FORMÁT ODPOVĚDI:
-{
-  "action": "AKCE",
-  "params": {},
-  "message": "Co říkáš uživateli (česky, max 1-2 věty)"
-}
+SYSTEM_PROMPT = f"""Jsi JARVIS, osobní hlasový asistent běžící lokálně na počítači uživatele.
+Systém: uživatel={_USER}, domov={_HOME}, OS=Linux
+Cesty vždy začínají {_HOME}/ — nikdy /home/user/
 
-DOSTUPNÉ AKCE:
-- open_app      — otevři aplikaci,       params: {"app": "název"}
-- open_url      — otevři URL,            params: {"url": "https://..."}
-- search_web    — hledej na webu,        params: {"query": "výraz"}
-- write_text    — napiš text,            params: {"text": "text"}
-- type_key      — stiskni klávesu,       params: {"key": "ctrl+c"} nebo {"key": "enter"}
-- volume        — hlasitost,             params: {"level": 0-100} nebo {"action": "mute"/"unmute"}
-- media         — přehrávač,             params: {"action": "play_pause"/"next"/"prev"/"stop"}
-- screenshot    — screenshot,            params: {}
-- open_file     — otevři soubor/složku, params: {"path": "cesta"}
-- clipboard_set — kopíruj do schránky,  params: {"text": "text"}
-- system_info   — CPU, RAM, disk,        params: {}
-- get_time      — aktuální čas,          params: {}
-- get_date      — aktuální datum,        params: {}
-- set_timer     — timer,                 params: {"seconds": 60, "label": "popis"}
-- kill_process  — ukonči proces,         params: {"name": "název.exe"}
-- write_email   — otevři email,          params: {"to": "", "subject": "", "body": ""}
-- spotify_play  — přehraj na Spotify,    params: {"query": "název skladby nebo interpreta"}
-- youtube_play  — přehraj na YouTube,     params: {"query": "search text", "audio_only": false}
-- shutdown      — vypni PC,              params: {"delay": 0}
-- restart       — restartuj PC,          params: {"delay": 0}
-- clear_history — vymaž paměť,           params: {}
-- answer        — jen odpověz,           params: {}
+Tvým úkolem je rozumět tomu, co uživatel chce, a podle toho buď:
+1) provést systémový příkaz
+2) nebo odpovědět jako inteligentní AI asistent
 
-PŘÍKLADY:
-"Otevři Chrome"       → {"action": "open_app", "params": {"app": "chrome"}, "message": "Otevírám Chrome."}
-"Počasí Praha"        → {"action": "search_web", "params": {"query": "počasí Praha"}, "message": "Hledám počasí."}
-"Hlasitost 60"        → {"action": "volume", "params": {"level": 60}, "message": "Nastavuji hlasitost na 60%."}
-"Kolik je hodin?"     → {"action": "get_time", "params": {}, "message": "Zjišťuji čas."}
-"Timer 5 minut"       → {"action": "set_timer", "params": {"seconds": 300, "label": "Timer"}, "message": "Timer nastaven."}
-"Přehraj/zastav"      → {"action": "media", "params": {"action": "play_pause"}, "message": "Přepínám přehrávání."}
-"Přehraj v Spotify Can I" → {"action": "spotify_play", "params": {"query": "Can I Drake"}, "message": "Hledám v Spotify."}
-"Přehraj YouTube video" → {"action": "youtube_play", "params": {"query": "Nights Frank Ocean"}, "message": "Otevírám YouTube."}
-"Ukonči notepad"      → {"action": "kill_process", "params": {"name": "notepad.exe"}, "message": "Ukončuji Notepad."}
-"Jak se jmenuješ?"    → {"action": "answer", "params": {}, "message": "Jsem JARVIS, tvůj osobní asistent."}
+---
 
-Odpovídej POUZE validním JSON, nic jiného."""
+### 1) KDYŽ UŽIVATEL CHCE PROVÉST PŘÍKAZ
+Vrať výstup ve formátu:
+
+COMMAND: <název_příkazu>
+ARGS: <argumenty>
+
+Příklady:
+- "vypni počítač" → COMMAND: shutdown
+- "otevři chrome" → COMMAND: open_app\\nARGS: chrome
+- "zvýš jas na 80%" → COMMAND: set_brightness\\nARGS: 80
+- "zastav discord" → COMMAND: kill_process\\nARGS: discord
+- "počasí Praha" → COMMAND: weather\\nARGS: Praha
+- "zahraj Justin Bieber" → COMMAND: youtube_play\\nARGS: Justin Bieber
+- "vytvoř složku projekt" → COMMAND: create_folder\\nARGS: {_HOME}/projekt
+- "timer 5 minut" → COMMAND: set_timer\\nARGS: 300 Timer
+- "hlasitost 60" → COMMAND: volume\\nARGS: 60
+- "screenshot" → COMMAND: screenshot
+
+Dostupné příkazy (z commands.py):
+open_app, open_url, search_web, write_text, type_key,
+volume, set_brightness, media, screenshot, open_file,
+clipboard_set, system_info, get_time, get_date,
+set_timer, kill_process, write_email,
+youtube_play, create_folder, create_file, delete_file,
+move_file, find_files, install_app, uninstall_app,
+update_system, sleep_pc, shutdown, restart,
+vscode_open, vscode_new_file, run_script, weather, answer
+
+---
+
+### 2) KDYŽ UŽIVATEL NECHCE PŘÍKAZ
+Odpověz jako plnohodnotný AI asistent — normální textová odpověď bez COMMAND.
+
+---
+
+### 3) STYL
+- stručný, jasný, věcný
+- v češtině
+- neomlouvej se zbytečně"""
+
+
+# Mapování ARGS → params dict pro každý příkaz
+def _parse_args(command: str, args: str) -> dict:
+    a = args.strip()
+    try:
+        if command == "open_app":
+            return {"app": a}
+        elif command == "open_url":
+            return {"url": a if a.startswith("http") else "https://" + a}
+        elif command == "search_web":
+            return {"query": a}
+        elif command == "write_text":
+            return {"text": a}
+        elif command == "type_key":
+            return {"key": a}
+        elif command == "kill_process":
+            return {"name": a}
+        elif command == "set_brightness":
+            return {"level": int(re.sub(r"[^\d]", "", a) or "50")}
+        elif command == "volume":
+            digits = re.sub(r"[^\d]", "", a)
+            if digits:
+                return {"level": int(digits)}
+            return {"action": a}
+        elif command == "weather":
+            return {"city": a}
+        elif command == "youtube_play":
+            parts = a.split("|")
+            query = parts[0].strip()
+            idx   = int(parts[1].strip()) if len(parts) > 1 else 1
+            audio = parts[2].strip().lower() == "true" if len(parts) > 2 else False
+            return {"query": query, "index": idx, "audio_only": audio}
+        elif command in ("create_folder", "create_file", "delete_file",
+                         "open_file", "run_script", "vscode_open"):
+            return {"path": os.path.expanduser(a)}
+        elif command == "find_files":
+            parts = a.split(" in ", 1)
+            return {"name": parts[0].strip(),
+                    "path": os.path.expanduser(parts[1].strip()) if len(parts) > 1 else _HOME}
+        elif command == "move_file":
+            parts = a.split(" -> ", 1)
+            if len(parts) == 2:
+                return {"src": os.path.expanduser(parts[0].strip()),
+                        "dst": os.path.expanduser(parts[1].strip())}
+            return {"src": a, "dst": ""}
+        elif command in ("install_app", "uninstall_app"):
+            return {"name": a}
+        elif command == "set_timer":
+            parts = a.split(None, 1)
+            seconds = int(parts[0]) if parts[0].isdigit() else 60
+            label   = parts[1] if len(parts) > 1 else "Timer"
+            return {"seconds": seconds, "label": label}
+        elif command == "media":
+            return {"action": a}
+        elif command in ("shutdown", "restart"):
+            digits = re.sub(r"[^\d]", "", a)
+            return {"delay": int(digits)} if digits else {}
+        elif command == "clipboard_set":
+            return {"text": a}
+        elif command in ("write_email",):
+            parts = a.split("|")
+            return {
+                "to":      parts[0].strip() if len(parts) > 0 else "",
+                "subject": parts[1].strip() if len(parts) > 1 else "",
+                "body":    parts[2].strip() if len(parts) > 2 else "",
+            }
+    except Exception:
+        pass
+    return {}
+
 
 class LLMEngine:
-    """Engine pro komunikaci s LLM"""
 
     def __init__(self, config: dict):
         self.config = config
-        self.url = config["ollama_url"]
-        self.model = config["ollama_model"]
-        self.history = deque(maxlen=config.get("history_size", 20))
-        logger.info(f"LLM engine inicializován: {self.model} @ {self.url}")
+        self.url    = config["ollama_url"]
+        self.model  = config["ollama_model"]
+        self.history: deque = deque(maxlen=config.get("history_size", 20))
+        logger.info(f"LLM: {self.model} @ {self.url}")
 
-    def ask(self, user_text: str) -> Tuple[str, Dict[str, any]]:
-        """
-        Zeptá se modelu a vrátí (message, action_data)
-        action_data obsahuje action a params
-        """
-        # Přidej uživatelskou zprávu do historie
+    def ask(self, user_text: str) -> Tuple[str, Dict]:
         self.history.append({"role": "user", "content": user_text})
 
-        # Připrav payload
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}] + list(self.history)
-
         payload = {
-            "model": self.model,
-            "messages": messages,
-            "stream": False,
-            "options": {"temperature": 0.2, "num_predict": 300},
+            "model":    self.model,
+            "messages": [{"role": "system", "content": SYSTEM_PROMPT},
+                         *list(self.history)],
+            "stream":   False,
+            "options":  {"temperature": 0.1, "num_predict": 400},
         }
 
-        try:
-            logger.debug(f"Odesílám dotaz na {self.url}")
-            resp = requests.post(self.url, json=payload, timeout=30)
-            resp.raise_for_status()
-
-            raw_response = resp.json().get("message", {}).get("content", "").strip()
-            logger.debug(f"Syrová odpověď: {raw_response[:100]}...")
-
-            # Přidej odpověď do historie
-            self.history.append({"role": "assistant", "content": raw_response})
-
-            # Parsuj JSON
-            action_data = self._parse_response(raw_response)
-            message = action_data.get("message", "Nerozuměl jsem.")
-
-            return message, action_data
-
-        except requests.Timeout:
-            logger.error("LLM timeout")
-            return "Ollama nereaguje (timeout).", {"action": "answer", "params": {}}
-        except requests.RequestException as e:
-            logger.error(f"LLM request error: {e}")
-            return f"Chyba připojení k Ollama: {e}", {"action": "answer", "params": {}}
-        except Exception as e:
-            logger.error(f"LLM chyba: {e}")
-            return f"Chyba: {e}", {"action": "answer", "params": {}}
-
-    def _parse_response(self, raw: str) -> Dict[str, any]:
-        """Parsuje JSON odpověď z modelu"""
-        # Najdi JSON v odpovědi
-        match = re.search(r'\{.*\}', raw, re.DOTALL)
-        if match:
+        for attempt in range(2):
             try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                logger.warning("Neplatný JSON v odpovědi modelu")
-        else:
-            logger.warning("Žádný JSON nenalezen v odpovědi modelu")
+                resp = requests.post(self.url, json=payload, timeout=30)
+                resp.raise_for_status()
+                raw = resp.json().get("message", {}).get("content", "").strip()
+                logger.debug(f"[LLM #{attempt+1}] {raw[:200]}")
 
-        # Fallback
-        return {"action": "answer", "params": {}, "message": raw or "Nerozuměl jsem."}
+                message, action_data = self._parse_response(raw)
 
-    def clear_history(self) -> None:
-        """Vymaže historii konverzace"""
+                # Retry pokud první pokus nevrátil příkaz ani smysluplnou odpověď
+                if attempt == 0 and action_data["action"] == "answer" and not message.strip():
+                    continue
+
+                self.history.append({"role": "assistant", "content": raw})
+                return message, action_data
+
+            except requests.Timeout:
+                self.history.pop() if self.history else None
+                return "Ollama nereaguje (timeout).", {"action": "answer", "params": {}}
+            except Exception as e:
+                self.history.pop() if self.history else None
+                return f"Chyba: {e}", {"action": "answer", "params": {}}
+
+        self.history.pop() if self.history else None
+        return "Nepodařilo se zpracovat.", {"action": "answer", "params": {}}
+
+    def _parse_response(self, raw: str) -> Tuple[str, Dict]:
+        # Najdi COMMAND: a volitelně ARGS:
+        cmd_match  = re.search(r"COMMAND:\s*(\w+)", raw)
+        args_match = re.search(r"ARGS:\s*(.+?)(?:\n|$)", raw)
+
+        if cmd_match:
+            command = cmd_match.group(1).strip()
+            args    = args_match.group(1).strip() if args_match else ""
+
+            # Zpráva = text PŘED příkazem (pokud existuje)
+            before = raw[:cmd_match.start()].strip()
+            message = before if before else self._default_message(command, args)
+
+            params = _parse_args(command, args)
+            return message, {"action": command, "params": params}
+
+        # Žádný příkaz → AI odpověď
+        return raw, {"action": "answer", "params": {}}
+
+    def _default_message(self, command: str, args: str) -> str:
+        msgs = {
+            "open_app":      f"Otevírám {args}.",
+            "open_url":      f"Otevírám stránku.",
+            "search_web":    f"Hledám: {args}.",
+            "youtube_play":  f"Přehrávám: {args}.",
+            "weather":       f"Zjišťuji počasí v {args}.",
+            "shutdown":      "Vypínám počítač.",
+            "restart":       "Restartuji počítač.",
+            "sleep_pc":      "Uspávám počítač.",
+            "screenshot":    "Pořizuji screenshot.",
+            "system_info":   "Zjišťuji stav systému.",
+            "get_time":      "Zjišťuji čas.",
+            "get_date":      "Zjišťuji datum.",
+            "set_timer":     f"Nastavuji timer.",
+            "create_folder": f"Vytvářím složku.",
+            "create_file":   f"Vytvářím soubor.",
+            "delete_file":   f"Mažu soubor.",
+            "kill_process":  f"Ukončuji {args}.",
+            "volume":        f"Nastavuji hlasitost.",
+            "set_brightness":f"Nastavuji jas na {args}%.",
+            "install_app":   f"Instaluji {args}.",
+            "vscode_open":   f"Otevírám ve VSCode.",
+        }
+        return msgs.get(command, "Provádím akci.")
+
+    def clear_history(self):
         self.history.clear()
-        logger.info("Historie konverzace vymazána")
+        logger.info("Historie vymazána")
 
     def is_available(self) -> bool:
-        """Zkontroluje dostupnost Ollama"""
         try:
-            resp = requests.get(self.url.replace("/api/chat", "/api/tags"), timeout=3)
+            resp = requests.get(
+                self.url.replace("/api/chat", "/api/tags"), timeout=3
+            )
             if resp.status_code == 200:
                 models = [m["name"] for m in resp.json().get("models", [])]
-                return self.model in models
-            return False
+                return any(self.model in m for m in models)
         except Exception:
-            return False
+            pass
+        return False

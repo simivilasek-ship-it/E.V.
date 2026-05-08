@@ -128,10 +128,9 @@ class TestJarvis(unittest.TestCase):
         """Test LLM odpovědi (mock)"""
         # Mock odpověď od Ollama - správný formát
         mock_response = MagicMock()
+        # Nový formát: plain text = AI odpověď, COMMAND: X = příkaz
         mock_response.json.return_value = {
-            "message": {
-                "content": '{"action": "answer", "params": {}, "message": "Test odpověď"}'
-            }
+            "message": {"content": "Test odpověď"}
         }
         mock_post.return_value = mock_response
 
