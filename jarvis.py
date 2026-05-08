@@ -299,13 +299,7 @@ def execute_action(action: str, params: dict, notify=None) -> str:
     try:
         if action == "open_app":
             app = _find_app(params.get("app", ""))
-            if IS_WINDOWS:
-                subprocess.Popen(app, shell=True)
-            else:
-                try:
-                    subprocess.Popen([app])
-                except FileNotFoundError:
-                    subprocess.Popen(["xdg-open", app])
+            subprocess.Popen(app, shell=True)
             return "ok"
 
         elif action == "open_url":
@@ -472,32 +466,35 @@ def ask_ollama(user_text: str) -> dict:
         "model":    OLLAMA_MODEL,
         "messages": [{"role": "system", "content": SYSTEM_PROMPT}, *list(_history)],
         "stream":   False,
-        "options":  {"temperature": 0.2, "num_predict": 300},
+        "options":  {"temperature": 0.1, "num_predict": 300},
     }
 
     try:
         resp = requests.post(OLLAMA_URL, json=payload, timeout=30)
         resp.raise_for_status()
         raw = resp.json().get("message", {}).get("content", "").strip()
+        print(f"[OLLAMA] {raw[:200]}")  # debug do terminálu
 
         match = re.search(r"\{.*\}", raw, re.DOTALL)
         if match:
-            result = json.loads(match.group())
-            _history.append({"role": "assistant", "content": raw})
-            return result
+            try:
+                result = json.loads(match.group())
+                _history.append({"role": "assistant", "content": raw})
+                return result
+            except json.JSONDecodeError:
+                pass
 
+        # Model nevrátil JSON — zobraz co řekl jako odpověď
         _history.append({"role": "assistant", "content": raw})
-        return {"action": "answer", "params": {}, "message": raw or "Nerozuměl jsem."}
+        clean = re.sub(r"[{}\[\]\"']", "", raw).strip()[:200]
+        return {"action": "answer", "params": {}, "message": clean or "Nerozuměl jsem."}
 
-    except json.JSONDecodeError:
-        _history.pop()
-        return {"action": "answer", "params": {}, "message": "Chyba při parsování odpovědi."}
     except requests.Timeout:
         _history.pop()
         return {"action": "answer", "params": {}, "message": "Ollama nereaguje (timeout 30s)."}
     except Exception as e:
         _history.pop()
-        return {"action": "answer", "params": {}, "message": f"Chyba: {e}"}
+        return {"action": "answer", "params": {}, "message": f"Chyba spojení: {e}"}
 
 # ══════════════════════════════════════════════════════
 #  ROZPOZNÁVÁNÍ ŘEČI
@@ -843,6 +840,8 @@ class JarvisApp(ctk.CTk):
             speak(message)
 
         if action != "answer":
+            self.after(0, lambda: self._chat_info(f"akce: {action} {params}", "muted"))
+
             def _notify(msg, tag="info"):
                 self.after(0, lambda: self._chat_info(msg, tag))
 
