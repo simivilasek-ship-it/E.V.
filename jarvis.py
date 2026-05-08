@@ -9,6 +9,7 @@ import threading
 import subprocess
 import webbrowser
 import os
+import shutil
 import platform
 import json
 import asyncio
@@ -163,47 +164,68 @@ def speak(text: str):
 #  SYSTEM PROMPT
 # ══════════════════════════════════════════════════════
 
-SYSTEM_PROMPT = """Jsi JARVIS, inteligentní hlasový asistent na PC. Komunikuješ POUZE v češtině.
-Jsi stručný, přesný a přátelský. Vždy vrátíš validní JSON, nic jiného.
+SYSTEM_PROMPT = """Jsi JARVIS, inteligentní osobní asistent na PC. Komunikuješ POUZE v češtině.
+Jsi stručný, přesný a přátelský. Vždy vrátíš POUZE validní JSON, nic jiného.
 
-FORMÁT ODPOVĚDI:
-{
-  "action": "AKCE",
-  "params": {},
-  "message": "Co říkáš uživateli (česky, max 1-2 věty)"
-}
+FORMÁT:
+{"action": "AKCE", "params": {}, "message": "Česky, max 1-2 věty"}
 
-DOSTUPNÉ AKCE:
-- open_app      — otevři aplikaci,       params: {"app": "název"}
-- open_url      — otevři URL,            params: {"url": "https://..."}
-- search_web    — hledej na webu,        params: {"query": "výraz"}
-- write_text    — napiš text,            params: {"text": "text"}
-- type_key      — stiskni klávesu,       params: {"key": "ctrl+c"} nebo {"key": "enter"}
-- volume        — hlasitost,             params: {"level": 0-100} nebo {"action": "mute"/"unmute"}
-- media         — přehrávač,             params: {"action": "play_pause"/"next"/"prev"/"stop"}
-- screenshot    — screenshot,            params: {}
-- open_file     — otevři soubor/složku, params: {"path": "cesta"}
-- clipboard_set — kopíruj do schránky,  params: {"text": "text"}
-- system_info   — CPU, RAM, disk,        params: {}
-- get_time      — aktuální čas,          params: {}
-- get_date      — aktuální datum,        params: {}
-- set_timer     — timer,                 params: {"seconds": 60, "label": "popis"}
-- kill_process  — ukonči proces,         params: {"name": "název.exe"}
-- write_email   — otevři email,          params: {"to": "", "subject": "", "body": ""}
-- shutdown      — vypni PC,              params: {"delay": 0}
-- restart       — restartuj PC,          params: {"delay": 0}
-- clear_history — vymaž paměť,           params: {}
-- answer        — jen odpověz,           params: {}
+AKCE — SYSTÉM:
+- shutdown      params: {"delay": 0}
+- restart       params: {"delay": 0}
+- sleep_pc      params: {}
+- system_info   params: {}
+- kill_process  params: {"name": "název"}
+- update_system params: {}
+
+AKCE — SOUBORY:
+- open_file     params: {"path": "/cesta"}
+- create_folder params: {"path": "/cesta/složka"}
+- create_file   params: {"path": "/cesta/soubor.txt"}
+- delete_file   params: {"path": "/cesta"}
+- move_file     params: {"src": "/odkud", "dst": "/kam"}
+- find_files    params: {"name": "název", "path": "/kde"}
+
+AKCE — APLIKACE:
+- open_app      params: {"app": "název"}
+- install_app   params: {"name": "balíček"}
+- uninstall_app params: {"name": "balíček"}
+
+AKCE — WEB:
+- open_url      params: {"url": "https://..."}
+- search_web    params: {"query": "výraz"}
+- weather       params: {"city": "město"}
+
+AKCE — ZVUK & DISPLEJ:
+- volume        params: {"level": 0-100} nebo {"action": "mute"/"unmute"}
+- set_brightness params: {"level": 0-100}
+- media         params: {"action": "play_pause"/"next"/"prev"/"stop"}
+- screenshot    params: {}
+
+AKCE — AUTOMATIZACE:
+- write_text    params: {"text": "text"}
+- type_key      params: {"key": "ctrl+c"}
+- clipboard_set params: {"text": "text"}
+- run_script    params: {"path": "/cesta/skript.sh"}
+- set_timer     params: {"seconds": 60, "label": "popis"}
+- write_email   params: {"to": "", "subject": "", "body": ""}
+
+AKCE — INFO:
+- get_time      params: {}
+- get_date      params: {}
+- clear_history params: {}
+- answer        params: {}
 
 PŘÍKLADY:
-"Otevři Chrome"       → {"action": "open_app", "params": {"app": "chrome"}, "message": "Otevírám Chrome."}
-"Počasí Praha"        → {"action": "search_web", "params": {"query": "počasí Praha"}, "message": "Hledám počasí."}
-"Hlasitost 60"        → {"action": "volume", "params": {"level": 60}, "message": "Nastavuji hlasitost na 60%."}
-"Kolik je hodin?"     → {"action": "get_time", "params": {}, "message": "Zjišťuji čas."}
-"Timer 5 minut"       → {"action": "set_timer", "params": {"seconds": 300, "label": "Timer"}, "message": "Timer nastaven."}
-"Jak se jmenuješ?"    → {"action": "answer", "params": {}, "message": "Jsem JARVIS, tvůj osobní asistent."}
+"Vypni PC"              → {"action": "shutdown", "params": {"delay": 0}, "message": "Vypínám počítač."}
+"Počasí Praha"          → {"action": "weather", "params": {"city": "Praha"}, "message": "Zjišťuji počasí."}
+"Vytvoř složku jarvis"  → {"action": "create_folder", "params": {"path": "/home/user/jarvis"}, "message": "Vytvářím složku."}
+"Nainstaluj vlc"        → {"action": "install_app", "params": {"name": "vlc"}, "message": "Instaluji VLC."}
+"Jas na 70"             → {"action": "set_brightness", "params": {"level": 70}, "message": "Nastavuji jas na 70%."}
+"Najdi soubor readme"   → {"action": "find_files", "params": {"name": "readme", "path": "/home/user"}, "message": "Hledám soubor."}
+"Uspi počítač"          → {"action": "sleep_pc", "params": {}, "message": "Uspávám počítač."}
 
-Odpovídej POUZE validním JSON, nic jiného."""
+Odpovídej POUZE validním JSON."""
 
 # ══════════════════════════════════════════════════════
 #  MAPA APLIKACÍ
@@ -442,6 +464,109 @@ def execute_action(action: str, params: dict, notify=None) -> str:
             else:
                 subprocess.run(["reboot"], check=False)
             return "ok"
+
+        elif action == "sleep_pc":
+            if IS_WINDOWS:
+                subprocess.run(["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"], check=False)
+            else:
+                subprocess.run(["systemctl", "suspend"], check=False)
+            return "ok"
+
+        elif action == "update_system":
+            if IS_LINUX:
+                subprocess.Popen(["pkexec", "bash", "-c", "apt update && apt upgrade -y"])
+            return "Spouštím aktualizaci systému..."
+
+        # ── SOUBORY ──────────────────────────────────────
+
+        elif action == "create_folder":
+            path = os.path.expanduser(params.get("path", ""))
+            os.makedirs(path, exist_ok=True)
+            return f"Složka vytvořena: {path}"
+
+        elif action == "create_file":
+            path = os.path.expanduser(params.get("path", ""))
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            open(path, "a").close()
+            return f"Soubor vytvořen: {path}"
+
+        elif action == "delete_file":
+            path = os.path.expanduser(params.get("path", ""))
+            result = subprocess.run(["gio", "trash", path], capture_output=True)
+            if result.returncode == 0:
+                return f"Přesunuto do koše: {path}"
+            if os.path.isfile(path):
+                os.remove(path)
+            elif os.path.isdir(path):
+                shutil.rmtree(path)
+            return f"Smazáno: {path}"
+
+        elif action == "move_file":
+            src = os.path.expanduser(params.get("src", ""))
+            dst = os.path.expanduser(params.get("dst", ""))
+            shutil.move(src, dst)
+            return f"Přesunuto: {src} → {dst}"
+
+        elif action == "find_files":
+            name = params.get("name", "")
+            path = os.path.expanduser(params.get("path", "~"))
+            result = subprocess.run(
+                ["find", path, "-iname", f"*{name}*", "-maxdepth", "6"],
+                capture_output=True, text=True, timeout=10,
+            )
+            files = [f for f in result.stdout.strip().split("\n") if f][:10]
+            found = "\n".join(files) if files else "Nic nenalezeno."
+            _notify(found, "info")
+            return found
+
+        # ── APLIKACE ─────────────────────────────────────
+
+        elif action == "install_app":
+            name = params.get("name", "")
+            subprocess.Popen(["pkexec", "apt", "install", "-y", name])
+            return f"Instaluji: {name}"
+
+        elif action == "uninstall_app":
+            name = params.get("name", "")
+            subprocess.Popen(["pkexec", "apt", "remove", "-y", name])
+            return f"Odinstaluji: {name}"
+
+        # ── WEB ──────────────────────────────────────────
+
+        elif action == "weather":
+            city = params.get("city", "")
+            url  = f"https://wttr.in/{quote(city)}?format=3" if city else "https://wttr.in/?format=3"
+            resp = requests.get(url, timeout=8, headers={"User-Agent": "curl/7.0"})
+            info = resp.text.strip()
+            _notify(info, "info")
+            return info
+
+        # ── DISPLEJ ──────────────────────────────────────
+
+        elif action == "set_brightness":
+            level = max(1, min(100, int(params.get("level", 50))))
+            done  = False
+            if IS_LINUX:
+                if subprocess.run(["which", "brightnessctl"], capture_output=True).returncode == 0:
+                    subprocess.run(["brightnessctl", "set", f"{level}%"], capture_output=True)
+                    done = True
+                else:
+                    displays = subprocess.check_output(
+                        "xrandr | grep ' connected' | awk '{print $1}'", shell=True, text=True
+                    ).strip().split("\n")
+                    for d in displays:
+                        subprocess.run(["xrandr", "--output", d, "--brightness", str(level / 100)])
+                    done = True
+            return f"Jas: {level}%" if done else "Nastavení jasu není podporováno."
+
+        # ── AUTOMATIZACE ─────────────────────────────────
+
+        elif action == "run_script":
+            path = os.path.expanduser(params.get("path", ""))
+            subprocess.Popen(["bash", path])
+            return f"Spouštím: {path}"
+
+        # ── OSTATNÍ ──────────────────────────────────────
 
         elif action == "clear_history":
             _history.clear()
