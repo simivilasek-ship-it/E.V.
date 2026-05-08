@@ -1,0 +1,22 @@
+# JARVIS v2.0 — závislosti
+# Instalace: pip install -r requirements.txt
+
+# Povinné
+customtkinter>=5.2.0
+requests>=2.31.0
+pyautogui>=0.9.54
+psutil>=5.9.0
+Pillow>=10.0.0
+
+# Hlasové ovládání (mikrofon)
+SpeechRecognition>=3.10.0
+PyAudio>=0.2.13
+
+# Text-to-Speech (JARVIS mluví)
+pyttsx3>=2.90
+
+# Schránka — potřeba pro správné psaní českých znaků
+pyperclip>=1.8.2
+
+# Přesné nastavení hlasitosti (pouze Windows, volitelné)
+# pip install pycaw comtypes
