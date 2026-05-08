@@ -204,12 +204,14 @@ class JarvisApp:
         )
         self.log.pack(fill="both", expand=True, padx=14, pady=(10, 4))
 
-        self.log._textbox.tag_config("accent", foreground=GOLD)
-        self.log._textbox.tag_config("muted", foreground=MUTED)
+        self.log._textbox.tag_config("accent",  foreground=GOLD)
+        self.log._textbox.tag_config("muted",   foreground=MUTED)
         self.log._textbox.tag_config("success", foreground="#4caf50")
-        self.log._textbox.tag_config("error", foreground="#e53935")
-        self.log._textbox.tag_config("user", foreground=FG)
-        self.log._textbox.tag_config("info", foreground="#64b5f6")
+        self.log._textbox.tag_config("error",   foreground="#e53935")
+        self.log._textbox.tag_config("user",    foreground=FG)
+        self.log._textbox.tag_config("info",    foreground="#64b5f6")
+        self.log._textbox.tag_config("code",    foreground="#a8d8a8",
+                                     font=("Consolas", 12))
 
         # Divider
         ctk.CTkFrame(self.root, fg_color=GOLD, height=1, corner_radius=0).pack(fill="x")
@@ -271,11 +273,27 @@ class JarvisApp:
             self.root.after(5000, self._refresh_vol)
 
     def _log(self, text: str, tag: str = "user"):
-        """Přidá zprávu do logu"""
+        """Přidá zprávu do logu, kódové bloky zvýrazní monospace zelenou."""
         self.log.configure(state="normal")
         ts = datetime.now().strftime("%H:%M:%S")
         self.log._textbox.insert("end", f"[{ts}] ", "muted")
-        self.log._textbox.insert("end", text + "\n", tag)
+
+        if "```" in text:
+            parts = text.split("```")
+            for i, part in enumerate(parts):
+                if i % 2 == 0:
+                    if part:
+                        self.log._textbox.insert("end", part, tag)
+                else:
+                    # Odstraň případný název jazyka z první řádky
+                    lines = part.split("\n")
+                    if lines[0].strip() and not lines[0].strip().startswith(" "):
+                        lines = lines[1:]
+                    self.log._textbox.insert("end", "\n" + "\n".join(lines) + "\n", "code")
+        else:
+            self.log._textbox.insert("end", text, tag)
+
+        self.log._textbox.insert("end", "\n")
         self.log.configure(state="disabled")
         self.log._textbox.see("end")
 
@@ -396,10 +414,12 @@ class JarvisApp:
             # Zeptej se LLM
             message, action_data = self.llm.ask(text)
 
-            # Řekni odpověď
+            # Řekni odpověď (přeskoč TTS pro kód nebo dlouhé texty)
             if message:
                 self.root.after(0, lambda: self._log(f"JARVIS: {message}", "accent"))
-                self.tts.speak(message)
+                has_code = "```" in message or "def " in message or "import " in message
+                if not has_code and len(message) < 300:
+                    self.tts.speak(message)
 
             # Vykonej akci
             action = action_data.get("action", "answer")
