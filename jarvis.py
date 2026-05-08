@@ -437,7 +437,6 @@ def execute_action(action: str, params: dict, notify=None) -> str:
                 pyautogui.press("volumemute")
             elif level is not None:
                 _set_volume(int(level))
-                return f"Hlasitost: {level}%"
             return "ok"
 
         elif action == "media":

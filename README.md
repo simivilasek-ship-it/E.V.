@@ -101,6 +101,83 @@ cp jarvis.desktop ~/Plocha/   # nebo ~/Desktop/
 }
 ```
 
+## Deployment
+
+### Docker (nejjednodušší)
+```bash
+# Sestav a spusť
+docker-compose up --build
+
+# Nebo jen JARVIS (pokud Ollama běží lokálně)
+docker build -t jarvis .
+docker run --rm -it --network host jarvis
+```
+
+### Systemd service (Linux autostart)
+```bash
+# Zkopíruj service soubor
+sudo cp jarvis.service /etc/systemd/system/
+
+# Povol a spusť
+sudo systemctl enable jarvis
+sudo systemctl start jarvis
+
+# Status
+sudo systemctl status jarvis
+```
+
+### Windows service
+Použij NSSM nebo Windows Task Scheduler pro autostart.
+
+## Troubleshooting
+
+### Ollama se nespustí
+```bash
+# Zkontroluj port
+curl http://localhost:11434/api/tags
+
+# Spusť manuálně
+ollama serve
+
+# Stáhni model
+ollama pull llama3.1:8b
+```
+
+### TTS nefunguje
+```bash
+# Nainstaluj audio přehrávač
+sudo apt install mpg123 ffmpeg
+
+# Test edge-tts
+python -c "import edge_tts; print('OK')"
+```
+
+### Mikrofon nefunguje
+```bash
+# Zkontroluj práva
+sudo usermod -a -G audio $USER
+
+# Test SpeechRecognition
+python -c "import speech_recognition as sr; print(sr.Microphone.list_microphone_names())"
+```
+
+## Vývoj
+
+### Spuštění testů
+```bash
+source venv/bin/activate
+python test_jarvis.py
+```
+
+### Přidání nové akce
+1. Přidej do `SYSTEM_PROMPT` v `jarvis.py`
+2. Implementuj v `execute_action()`
+3. Přidej unit test
+
+## Licence
+
+MIT License - volně šiřitelný a upravitelný.
+
 **Dostupné české hlasy (edge-tts):**
 - `cs-CZ-AntoninNeural` — muž (výchozí)
 - `cs-CZ-VlastaNeural` — žena

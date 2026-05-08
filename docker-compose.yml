@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    command: serve
+
+  jarvis:
+    build: .
+    depends_on:
+      - ollama
+    environment:
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.config/pulse:/home/jarvis/.config/pulse:rw
+      - ${HOME}/.Xauthority:/home/jarvis/.Xauthority:rw
+    devices:
+      - /dev/snd:/dev/snd
+    network_mode: host
+    restart: unless-stopped
+    command: ["python", "jarvis.py"]
+
+volumes:
+  ollama_data:
