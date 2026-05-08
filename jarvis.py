@@ -108,7 +108,7 @@ _audio_player = _find_player() if IS_LINUX else None
 try:
     import pyttsx3 as _pyttsx3
     _tts_engine = _pyttsx3.init()
-    _tts_engine.setProperty("rate", 170)
+    _tts_engine.setProperty("rate", _cfg.get("tts_rate", 170))
     for _v in _tts_engine.getProperty("voices"):
         if any(x in (_v.id + _v.name).lower() for x in ("czech", "cs-cz", "zuzana", "jakub")):
             _tts_engine.setProperty("voice", _v.id)
