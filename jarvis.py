@@ -139,6 +139,35 @@ async def _edge_say(text: str):
             pass
 
 
+# ── Desktop notifikace ──────────────────────────────
+
+_ICON_PATH = os.path.expanduser("~/.local/share/icons/jarvis.png")
+
+def desktop_notify(title: str, body: str):
+    if IS_LINUX:
+        cmd = ["notify-send", title, body, "-t", "6000"]
+        if os.path.exists(_ICON_PATH):
+            cmd += ["-i", _ICON_PATH]
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+# ── Whitelist chráněných cest ────────────────────────
+
+_PROTECTED = [
+    "/bin", "/usr", "/etc", "/lib", "/lib64", "/sbin", "/boot",
+    "/snap", "/proc", "/sys", "/dev",
+    os.path.expanduser("~/.local/share/applications"),
+    os.path.expanduser("~/.config"),
+    os.path.expanduser("~/.ssh"),
+]
+
+def _is_protected(path: str) -> bool:
+    real = os.path.realpath(os.path.expanduser(path))
+    return any(real == p or real.startswith(p + "/") for p in _PROTECTED)
+
+# ── Nebezpečné akce ──────────────────────────────────
+
+DANGEROUS_ACTIONS = {"shutdown", "restart", "sleep_pc", "delete_file", "update_system"}
+
 def speak(text: str):
     if not _tts_enabled or not HAS_TTS:
         return
@@ -417,6 +446,7 @@ def execute_action(action: str, params: dict, notify=None) -> str:
             def _fire():
                 time.sleep(seconds)
                 _notify(f"⏰ {label} — čas vypršel!", "success")
+                desktop_notify("⏰ JARVIS Timer", f"{label} — čas vypršel!")
                 speak(f"{label} — čas vypršel!")
 
             threading.Thread(target=_fire, daemon=True).start()
@@ -486,6 +516,8 @@ def execute_action(action: str, params: dict, notify=None) -> str:
 
         elif action == "delete_file":
             path = os.path.expanduser(params.get("path", ""))
+            if _is_protected(path):
+                return f"Zamítnuto: {path} je chráněná systémová cesta."
             result = subprocess.run(["gio", "trash", path], capture_output=True)
             if result.returncode == 0:
                 return f"Přesunuto do koše: {path}"
@@ -581,39 +613,51 @@ def execute_action(action: str, params: dict, notify=None) -> str:
 def ask_ollama(user_text: str) -> dict:
     _history.append({"role": "user", "content": user_text})
 
-    payload = {
-        "model":    OLLAMA_MODEL,
-        "messages": [{"role": "system", "content": SYSTEM_PROMPT}, *list(_history)],
-        "stream":   False,
-        "options":  {"temperature": 0.1, "num_predict": 300},
-    }
+    for attempt in range(2):
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}, *list(_history)]
+        if attempt == 1:
+            messages.append({
+                "role": "user",
+                "content": 'Odpověz POUZE tímto JSON (nic jiného): {"action":"answer","params":{},"message":"<tvá odpověď česky>"}',
+            })
 
-    try:
-        resp = requests.post(OLLAMA_URL, json=payload, timeout=30)
-        resp.raise_for_status()
-        raw = resp.json().get("message", {}).get("content", "").strip()
-        print(f"[OLLAMA] {raw[:200]}")  # debug do terminálu
+        payload = {
+            "model":    OLLAMA_MODEL,
+            "messages": messages,
+            "stream":   False,
+            "options":  {"temperature": 0.1 if attempt == 0 else 0.0, "num_predict": 300},
+        }
 
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if match:
-            try:
-                result = json.loads(match.group())
+        try:
+            resp = requests.post(OLLAMA_URL, json=payload, timeout=30)
+            resp.raise_for_status()
+            raw = resp.json().get("message", {}).get("content", "").strip()
+            print(f"[OLLAMA #{attempt+1}] {raw[:200]}")
+
+            match = re.search(r"\{.*\}", raw, re.DOTALL)
+            if match:
+                try:
+                    result = json.loads(match.group())
+                    _history.append({"role": "assistant", "content": raw})
+                    return result
+                except json.JSONDecodeError:
+                    if attempt == 0:
+                        continue  # zkus znovu
+
+            if attempt == 1:
                 _history.append({"role": "assistant", "content": raw})
-                return result
-            except json.JSONDecodeError:
-                pass
+                clean = re.sub(r"[{}\[\]\"']", "", raw).strip()[:200]
+                return {"action": "answer", "params": {}, "message": clean or "Nerozuměl jsem."}
 
-        # Model nevrátil JSON — zobraz co řekl jako odpověď
-        _history.append({"role": "assistant", "content": raw})
-        clean = re.sub(r"[{}\[\]\"']", "", raw).strip()[:200]
-        return {"action": "answer", "params": {}, "message": clean or "Nerozuměl jsem."}
+        except requests.Timeout:
+            _history.pop()
+            return {"action": "answer", "params": {}, "message": "Ollama nereaguje (timeout 30s)."}
+        except Exception as e:
+            _history.pop()
+            return {"action": "answer", "params": {}, "message": f"Chyba spojení: {e}"}
 
-    except requests.Timeout:
-        _history.pop()
-        return {"action": "answer", "params": {}, "message": "Ollama nereaguje (timeout 30s)."}
-    except Exception as e:
-        _history.pop()
-        return {"action": "answer", "params": {}, "message": f"Chyba spojení: {e}"}
+    _history.pop()
+    return {"action": "answer", "params": {}, "message": "Nepodařilo se zpracovat příkaz."}
 
 # ══════════════════════════════════════════════════════
 #  ROZPOZNÁVÁNÍ ŘEČI
@@ -663,6 +707,9 @@ class JarvisApp(ctk.CTk):
         self.configure(fg_color=BG)
         self._is_listening = False
         self._thinking_job = None
+        self._cmd_hist: list = []
+        self._cmd_idx  = -1
+        self._dark_mode = True
         self._build_ui()
         self.after(300, self._check_ollama)
 
@@ -714,6 +761,20 @@ class JarvisApp(ctk.CTk):
                 text_color=MUTED, corner_radius=4, height=24, width=90,
                 command=cmd,
             ).pack(side="left", padx=2, pady=5)
+
+        ctk.CTkButton(
+            tb, text="⚙",
+            font=("DM Sans", 13), fg_color="#2a2a2a", hover_color="#444",
+            text_color=MUTED, corner_radius=4, height=24, width=36,
+            command=self._open_settings,
+        ).pack(side="left", padx=2, pady=5)
+
+        ctk.CTkButton(
+            tb, text="☀",
+            font=("DM Sans", 13), fg_color="#2a2a2a", hover_color="#444",
+            text_color=MUTED, corner_radius=4, height=24, width=36,
+            command=self._toggle_theme,
+        ).pack(side="left", padx=2, pady=5)
 
         self._vol_lbl = ctk.CTkLabel(tb, text="", font=("DM Sans", 11), text_color=MUTED)
         self._vol_lbl.pack(side="right", padx=12)
@@ -776,6 +837,8 @@ class JarvisApp(ctk.CTk):
         )
         self.text_input.place(x=70, rely=0.5, anchor="w", relwidth=0.76)
         self.text_input.bind("<Return>", self._on_text_enter)
+        self.text_input.bind("<Up>",     self._hist_up)
+        self.text_input.bind("<Down>",   self._hist_down)
         self.text_input.focus()
 
         # Odeslat tlačítko (vpravo)
@@ -862,6 +925,97 @@ class JarvisApp(ctk.CTk):
         else:
             self._tts_btn.configure(text="🔇 Hlas: VYP", fg_color="#3a3a3a", text_color=FG)
 
+    def _toggle_theme(self):
+        self._dark_mode = not self._dark_mode
+        ctk.set_appearance_mode("dark" if self._dark_mode else "light")
+
+    def _ask_confirm(self, question: str) -> bool:
+        result = [False]
+        event  = threading.Event()
+
+        def _show():
+            win = ctk.CTkToplevel(self)
+            win.title("Potvrdit")
+            win.geometry("340x130")
+            win.resizable(False, False)
+            win.configure(fg_color=BG2)
+            win.grab_set()
+            win.lift()
+
+            ctk.CTkLabel(win, text=question, font=("DM Sans", 13),
+                         text_color=FG, wraplength=300).pack(pady=16)
+
+            bf = ctk.CTkFrame(win, fg_color=BG2)
+            bf.pack()
+
+            def yes():
+                result[0] = True
+                win.destroy()
+                event.set()
+
+            def no():
+                win.destroy()
+                event.set()
+
+            ctk.CTkButton(bf, text="Ano", fg_color=RED, hover_color="#c62828",
+                          text_color=FG, width=110, command=yes).pack(side="left", padx=8)
+            ctk.CTkButton(bf, text="Ne",  fg_color="#2a2a2a", hover_color="#444",
+                          text_color=FG, width=110, command=no).pack(side="left", padx=8)
+
+        self.after(0, _show)
+        event.wait(timeout=60)
+        return result[0]
+
+    def _open_settings(self):
+        win = ctk.CTkToplevel(self)
+        win.title("JARVIS — Nastavení")
+        win.geometry("440x360")
+        win.configure(fg_color=BG2)
+        win.grab_set()
+        win.lift()
+
+        def field(label, value):
+            f = ctk.CTkFrame(win, fg_color=BG2)
+            f.pack(fill="x", padx=24, pady=6)
+            ctk.CTkLabel(f, text=label, font=("DM Sans", 12), text_color=MUTED,
+                         width=130, anchor="w").pack(side="left")
+            var = ctk.StringVar(value=value)
+            ctk.CTkEntry(f, textvariable=var, fg_color=BG, text_color=FG,
+                         border_color=GOLD, border_width=1,
+                         corner_radius=4, height=30).pack(side="left", expand=True, fill="x")
+            return var
+
+        ctk.CTkLabel(win, text="Nastavení", font=("Georgia", 16), text_color=GOLD).pack(pady=14)
+
+        v_model = field("Model Ollama:", _cfg.get("ollama_model", OLLAMA_MODEL))
+
+        # Hlas — dropdown
+        vf = ctk.CTkFrame(win, fg_color=BG2)
+        vf.pack(fill="x", padx=24, pady=6)
+        ctk.CTkLabel(vf, text="Hlas (TTS):", font=("DM Sans", 12), text_color=MUTED,
+                     width=130, anchor="w").pack(side="left")
+        voices = ["cs-CZ-AntoninNeural", "cs-CZ-VlastaNeural", "cs-CZ-AntoninNeural"]
+        v_voice = ctk.StringVar(value=_cfg.get("tts_voice", _tts_voice))
+        ctk.CTkOptionMenu(vf, variable=v_voice, values=voices[:2],
+                          fg_color=BG, button_color=GOLD, button_hover_color=GOLDH,
+                          text_color=FG, corner_radius=4).pack(side="left", expand=True, fill="x")
+
+        v_size = field("Velikost okna:", _cfg.get("window_size", "600x820"))
+
+        def save():
+            new = dict(_cfg)
+            new["ollama_model"] = v_model.get().strip()
+            new["tts_voice"]    = v_voice.get()
+            new["window_size"]  = v_size.get().strip()
+            with open(_cfg_path, "w", encoding="utf-8") as f:
+                json.dump(new, f, indent=2, ensure_ascii=False)
+            self._chat_system("Nastavení uloženo. Restartuj JARVIS.")
+            win.destroy()
+
+        ctk.CTkButton(win, text="Uložit", fg_color=GOLD, hover_color=GOLDH,
+                      text_color=BG, width=160, height=36,
+                      command=save).pack(pady=20)
+
     # ── OLLAMA CHECK ──────────────────────────────────
 
     def _check_ollama(self):
@@ -934,11 +1088,34 @@ class JarvisApp(ctk.CTk):
 
     # ── TEXT INPUT ────────────────────────────────────
 
+    def _hist_up(self, event):
+        if not self._cmd_hist:
+            return "break"
+        self._cmd_idx = min(self._cmd_idx + 1, len(self._cmd_hist) - 1)
+        self.text_input.delete(0, "end")
+        self.text_input.insert(0, self._cmd_hist[self._cmd_idx])
+        return "break"
+
+    def _hist_down(self, event):
+        if self._cmd_idx <= 0:
+            self._cmd_idx = -1
+            self.text_input.delete(0, "end")
+            return "break"
+        self._cmd_idx -= 1
+        self.text_input.delete(0, "end")
+        self.text_input.insert(0, self._cmd_hist[self._cmd_idx])
+        return "break"
+
     def _on_text_enter(self, event=None):
         text = self.text_input.get().strip()
         if not text:
             return
         self.text_input.delete(0, "end")
+        if not self._cmd_hist or self._cmd_hist[0] != text:
+            self._cmd_hist.insert(0, text)
+            if len(self._cmd_hist) > 50:
+                self._cmd_hist.pop()
+        self._cmd_idx = -1
         threading.Thread(target=self._process_command, args=(text,), daemon=True).start()
 
     # ── PROCESS COMMAND ───────────────────────────────
@@ -959,6 +1136,21 @@ class JarvisApp(ctk.CTk):
             speak(message)
 
         if action != "answer":
+            # Potvrzení nebezpečných akcí
+            if action in DANGEROUS_ACTIONS:
+                confirm_msg = {
+                    "shutdown":      "Opravdu vypnout počítač?",
+                    "restart":       "Opravdu restartovat počítač?",
+                    "sleep_pc":      "Uspat počítač?",
+                    "delete_file":   f"Smazat: {params.get('path', '')}?",
+                    "update_system": "Spustit aktualizaci systému (apt upgrade)?",
+                }.get(action, "Pokračovat?")
+
+                if not self._ask_confirm(confirm_msg):
+                    self.after(0, lambda: self._chat_info("Zrušeno.", "muted"))
+                    self.after(0, lambda: self._set_status("● Online", GREEN))
+                    return
+
             self.after(0, lambda: self._chat_info(f"akce: {action} {params}", "muted"))
 
             def _notify(msg, tag="info"):
