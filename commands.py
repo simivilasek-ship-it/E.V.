@@ -10,9 +10,17 @@ import time
 import psutil
 import platform
 import logging
+import shutil
 from datetime import datetime
 from urllib.parse import quote
 from typing import Dict, Any, Optional
+
+try:
+    import pyautogui
+    HAS_PYAUTOGUI = True
+except ImportError:
+    pyautogui = None  # type: ignore
+    HAS_PYAUTOGUI = False
 
 logger = logging.getLogger(__name__)
 
@@ -70,12 +78,66 @@ class CommandExecutor:
         if not app_cmd:
             return f"Aplikace '{app}' nenalezena"
 
+        if app_cmd == "spotify":
+            if args:
+                query = " ".join(str(a) for a in args)
+                return self._cmd_spotify_play(query)
+            return self._launch_spotify()
+
         cmd = f"{app_cmd} {' '.join(str(a) for a in (args or []))}"
         try:
             subprocess.Popen(cmd, shell=True)
             return "ok"
         except Exception as e:
             logger.error(f"Chyba při otevírání aplikace: {e}")
+            return f"Chyba: {e}"
+
+    def _launch_spotify(self) -> str:
+        """Otevře Spotify aplikaci nebo web"""
+        uri = "spotify:"
+        try:
+            if shutil.which("spotify"):
+                subprocess.Popen(["spotify"])
+            else:
+                subprocess.Popen(["xdg-open", uri])
+            return "ok"
+        except Exception as e:
+            logger.warning(f"Spotify launch fallback selhal: {e}")
+            try:
+                webbrowser.open("https://open.spotify.com/")
+                return "ok"
+            except Exception as exc:
+                return f"Chyba: {exc}"
+
+    def _cmd_spotify_play(self, query: str, index: int = 1, audio_only: bool = False) -> str:
+        """Přehrát skladbu na Spotify"""
+        if not query:
+            return self._launch_spotify()
+
+        uri = f"spotify:search:{quote(query)}"
+        try:
+            if shutil.which("spotify"):
+                subprocess.Popen(["xdg-open", uri])
+                return "ok"
+            subprocess.Popen(["xdg-open", uri])
+            return "ok"
+        except Exception as e:
+            logger.warning(f"Spotify search selhalo: {e}")
+            try:
+                webbrowser.open(f"https://open.spotify.com/search/{quote(query)}")
+                return "ok"
+            except Exception as exc:
+                return f"Chyba: {exc}"
+
+    def _cmd_youtube_play(self, query: str, index: int = 1, audio_only: bool = False) -> str:
+        """Přehrát video na YouTube"""
+        if not query:
+            return self._cmd_open_url("https://www.youtube.com")
+        try:
+            url = f"https://www.youtube.com/results?search_query={quote(query)}"
+            webbrowser.open(url)
+            return "ok"
+        except Exception as e:
             return f"Chyba: {e}"
 
     def _cmd_open_url(self, url: str) -> str:
@@ -100,47 +162,44 @@ class CommandExecutor:
     def _cmd_write_text(self, text: str) -> str:
         """Napíše text"""
         try:
-            import pyautogui
             time.sleep(0.5)
             pyautogui.write(text, interval=0.03)
             return "ok"
-        except ImportError:
-            return "pyautogui není nainstalován"
         except Exception as e:
             return f"Chyba: {e}"
 
     def _cmd_type_key(self, key: str) -> str:
         """Stiskne klávesu"""
         try:
-            import pyautogui
             if "+" in key:
                 pyautogui.hotkey(*key.split("+"))
             else:
                 pyautogui.press(key)
             return "ok"
-        except ImportError:
-            return "pyautogui není nainstalován"
         except Exception as e:
             return f"Chyba: {e}"
 
     def _cmd_volume(self, level: Optional[int] = None, action: Optional[str] = None) -> str:
         """Nastaví hlasitost"""
         try:
-            import pyautogui
             if action in ("mute", "unmute"):
                 pyautogui.press("volumemute")
             elif level is not None:
                 self._set_volume(level)
             return "ok"
-        except ImportError:
-            return "pyautogui není nainstalován"
         except Exception as e:
             return f"Chyba: {e}"
 
-    def _cmd_media(self, action: str) -> str:
+    def _cmd_media(self, action: str = None, url: Optional[str] = None) -> str:
         """Ovládá přehrávač"""
         try:
-            import pyautogui
+            if url:
+                webbrowser.open(url)
+                return "ok"
+
+            if not action:
+                return "ok"
+
             key_map = {
                 "play_pause": "playpause",
                 "next": "nexttrack",
@@ -149,24 +208,21 @@ class CommandExecutor:
             }
             if action in key_map:
                 pyautogui.press(key_map[action])
-            return "ok"
-        except ImportError:
-            return "pyautogui není nainstalován"
+                return "ok"
+
+            return f"Neznámá mediální akce: {action}"
         except Exception as e:
             return f"Chyba: {e}"
 
     def _cmd_screenshot(self) -> str:
         """Udělá screenshot"""
         try:
-            import pyautogui
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             home = os.path.expanduser("~")
             desk = os.path.join(home, "Desktop")
             dest = os.path.join(desk if os.path.isdir(desk) else home, f"screenshot_{ts}.png")
             pyautogui.screenshot().save(dest)
             return f"Uloženo: {dest}"
-        except ImportError:
-            return "pyautogui není nainstalován"
         except Exception as e:
             return f"Chyba: {e}"
 
@@ -322,7 +378,6 @@ class CommandExecutor:
 
         # Fallback přes pyautogui
         try:
-            import pyautogui
             # Zjednodušený fallback - nefunguje přesně
             for _ in range(50):
                 pyautogui.press("volumedown")

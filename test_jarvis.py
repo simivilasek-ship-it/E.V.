@@ -14,6 +14,13 @@ from unittest.mock import patch, MagicMock
 # Přidat aktuální adresář do cesty
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Mock volitelné závislosti před importem modulů
+for _mod in ("pyautogui", "pyperclip", "edge_tts", "pyttsx3",
+             "speech_recognition", "customtkinter", "pycaw",
+             "pycaw.pycaw", "comtypes"):
+    if _mod not in sys.modules:
+        sys.modules[_mod] = MagicMock()
+
 # Importovat JARVIS moduly
 try:
     from config import CONFIG
@@ -88,25 +95,25 @@ class TestJarvis(unittest.TestCase):
         # Ověřit, že subprocess.Popen byl zavolán
         mock_popen.assert_called()
 
-    @patch('pyautogui.screenshot')
-    def test_commands_screenshot(self, mock_screenshot):
+    @patch('commands.pyautogui')
+    def test_commands_screenshot(self, mock_pg):
         """Test screenshotu"""
         mock_img = MagicMock()
-        mock_screenshot.return_value = mock_img
+        mock_pg.screenshot.return_value = mock_img
 
         commands = CommandExecutor(self.test_config)
         result = commands.execute("screenshot", {})
         self.assertIn("Uloženo:", result)
-        mock_screenshot.assert_called_once()
+        mock_pg.screenshot.assert_called_once()
         mock_img.save.assert_called_once()
 
-    @patch('pyautogui.press')
-    def test_commands_volume_mute(self, mock_press):
+    @patch('commands.pyautogui')
+    def test_commands_volume_mute(self, mock_pg):
         """Test ztlumení hlasitosti"""
         commands = CommandExecutor(self.test_config)
         result = commands.execute("volume", {"action": "mute"})
         self.assertEqual(result, "ok")
-        mock_press.assert_called_with("volumemute")
+        mock_pg.press.assert_called_with("volumemute")
 
     def test_llm_clear_history(self):
         """Test vymazání historie LLM"""

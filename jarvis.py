@@ -21,6 +21,8 @@ from commands import CommandExecutor
 import customtkinter as ctk
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
+
 # ══════════════════════════════════════════════════════
 #  KONSTANTY
 # ══════════════════════════════════════════════════════
@@ -69,7 +71,7 @@ class JarvisApp:
         signal.signal(signal.SIGTERM, self._signal_handler)
 
         # Kontrola Ollama
-        self.after(300, self._check_ollama)
+        self.root.after(300, self._check_ollama)
 
         logger.info("JARVIS připraven")
 
