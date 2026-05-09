@@ -9,15 +9,32 @@ except Exception:
 logger = logging.getLogger(__name__)
 
 ALLOWED_ACTIONS = {
-    "open_app", "youtube_play", "open_url", "search_web", "write_text",
-    "type_key", "kill_process", "weather", "vscode_open", "open_file",
-    "create_folder", "create_file", "delete_file", "move_file", "find_files",
-    "clipboard_set", "system_info", "get_time", "get_date", "set_timer",
-    "write_email", "shutdown", "restart", "sleep_pc", "update_system",
-    "screenshot", "volume", "media", "set_brightness", "install_app",
-    "uninstall_app", "run_script", "calculate", "translate", "note_add",
-    "note_list", "reminder_set", "wiki_search", "currency_convert",
+    # Základní odpovědi a konverzace
+    "answer", "clear_history",
+    # Aplikace a weby
+    "open_app", "open_url", "search_web", "youtube_play",
+    # Soubory
+    "open_file", "vscode_open", "vscode_new_file",
+    "create_folder", "create_file", "move_file", "find_files",
+    # Schránka a text
+    "write_text", "type_key", "clipboard_set",
+    # Systémové informace
+    "system_info", "get_time", "get_date", "screenshot",
+    # Zvuk a displej
+    "volume", "media", "set_brightness",
+    # Časovače a připomínky
+    "set_timer", "reminder_set",
+    # Počasí a informace
+    "weather", "wiki_search", "calculate", "translate", "currency_convert",
+    # Poznámky
+    "note_add", "note_list",
+    # Paměť
     "memory_recall", "memory_store", "memory_stats", "memory_maintenance",
+    # Email
+    "write_email",
+    # Systémové akce (vyžadují potvrzení)
+    "kill_process", "delete_file", "shutdown", "restart", "sleep_pc",
+    "update_system", "install_app", "uninstall_app", "run_script",
 }
 
 SENSITIVE_ACTIONS = {

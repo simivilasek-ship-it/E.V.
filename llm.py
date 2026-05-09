@@ -7,6 +7,7 @@ LLM (qwen2.5:3b) slouží pro AI konverzaci, kód, vysvětlení.
 import os
 import re
 import json
+import unicodedata
 import requests
 import logging
 from datetime import datetime
@@ -198,22 +199,29 @@ _PROC_ALIASES = {
     "kalkulačka": "gnome-calculator",
 }
 
-# Trigger slova pro hudbu
+def _norm(text: str) -> str:
+    """Odstraní diakritiku pro robustní matching (otevři == otevri)."""
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', text.lower())
+        if unicodedata.category(c) != 'Mn'
+    )
+
+# Trigger slova pro hudbu (bez diakritiky)
 _MUSIC_STOP = re.compile(
-    r"\b(pusti?t?|zahraj|přehraj|play|spusť|dej\s+mi|chci\s+slyšet"
-    r"|spotif[yi]|youtube\s+music|hudbu|muziku|písni?čku?|song|track|skladbu|zvuk)\b",
+    r"\b(pust|zahraj|prehraj|play|spust|dej\s+mi|chci\s+slyset"
+    r"|spotif[yi]|youtube\s+music|hudbu|muziku|pisni?cku?|song|track|skladbu|zvuk)\b",
     re.IGNORECASE,
 )
 
-# Trigger slova pro zavření/ukončení
+# Trigger slova pro zavření/ukončení (bez diakritiky)
 _CLOSE_TRIGGER = re.compile(
-    r"\b(zavři|ukonči|zabij|kill|stop|ukončit|zabi|vypni\s+(?!pc|počítač|laptop))\b",
+    r"\b(zavri|ukonci|zabij|kill|stop|ukoncit|zabi|vypni\s+(?!pc|pocitac|laptop))\b",
     re.IGNORECASE,
 )
 
-# Trigger slova pro otevření
+# Trigger slova pro otevření (bez diakritiky)
 _OPEN_TRIGGER = re.compile(
-    r"\b(otevři|spusť|open|start|nastartuj|otvírej)\b",
+    r"\b(otevri|spust|open|start|nastartuj|otvirej)\b",
     re.IGNORECASE,
 )
 
@@ -221,9 +229,9 @@ _OPEN_TRIGGER = re.compile(
 def _extract_app_name(text: str) -> str:
     """Odstraní trigger slova a vrátí název aplikace/procesu."""
     t = re.sub(
-        r"\b(zavři|ukonči|zabij|kill|stop|otevři|spusť|open|start"
-        r"|okno|aplikaci|program|proces|appku|app|web|stránku)\b",
-        "", text, flags=re.IGNORECASE
+        r"\b(zavri|ukonci|zabij|kill|stop|otevri|spust|open|start"
+        r"|okno|aplikaci|program|proces|appku|app|web|stranku)\b",
+        "", _norm(text), flags=re.IGNORECASE
     ).strip(" ,.-")
     return t
 
@@ -235,20 +243,21 @@ class LocalRouter:
     """
 
     def route(self, text: str) -> tuple:
-        t  = text.lower().strip()
+        # Normalizujeme diakritiku → "otevři" == "otevri", "spusť" == "spust"
+        t  = _norm(text)
         dt = datetime.now()
 
         # ── ČAS ──────────────────────────────────────
-        if re.search(r"\b(kolik je|jaký je|čas|cas|hodin|time)\b", t) and \
-           not re.search(r"\b(pracovní|volný|čas na)\b", t):
+        if re.search(r"\b(kolik je|jaky je|cas|hodin|time)\b", t) and \
+           not re.search(r"\b(pracovni|volny|cas na)\b", t):
             return f"Je {dt.strftime('%H:%M:%S')}.", {"action": "get_time", "params": {}}
 
         # ── DATUM ─────────────────────────────────────
-        if re.search(r"\b(datum|dnes|jaký den|který den|date)\b", t):
+        if re.search(r"\b(datum|dnes|jaky den|ktery den|date)\b", t):
             return f"Dnes je {dt.strftime('%-d. %-m. %Y')}.", {"action": "get_date", "params": {}}
 
         # ── SCREENSHOT ────────────────────────────────
-        if re.search(r"\b(screenshot|snímek\s+obrazovky|printscreen|screenshoot)\b", t):
+        if re.search(r"\b(screenshot|sniiek\s+obrazovky|printscreen|screenshoot|snimek)\b", t):
             return "Pořizuji screenshot.", {"action": "screenshot", "params": {}}
 
         # ── SYSTEM INFO ───────────────────────────────
@@ -256,19 +265,19 @@ class LocalRouter:
             return None, {"action": "system_info", "params": {}}
 
         # ── VYPNOUT ───────────────────────────────────
-        if re.search(r"\b(vypni\s+(pc|počítač|laptop|komputer)|shutdown)\b", t):
+        if re.search(r"\b(vypni\s+(pc|pocitac|laptop|komputer)|shutdown)\b", t):
             return "Vypínám počítač.", {"action": "shutdown", "params": {"delay": 0}}
 
         # ── RESTART ───────────────────────────────────
-        if re.search(r"\b(restartuj|restart\s+(pc|počítač))\b", t):
+        if re.search(r"\b(restartuj|restart\s+(pc|pocitac))\b", t):
             return "Restartuji počítač.", {"action": "restart", "params": {"delay": 0}}
 
         # ── USPAT ─────────────────────────────────────
-        if re.search(r"\b(uspi\s+(pc|počítač)|sleep|spánek\s+pc)\b", t):
+        if re.search(r"\b(uspi\s+(pc|pocitac)|sleep\s+pc|spanek\s+pc)\b", t):
             return "Uspávám počítač.", {"action": "sleep_pc", "params": {}}
 
         # ── AKTUALIZACE ───────────────────────────────
-        if re.search(r"\b(aktualizuj\s+systém|apt\s+upgrade|update\s+systém)\b", t):
+        if re.search(r"\b(aktualizuj\s+system|apt\s+upgrade|update\s+system)\b", t):
             return "Spouštím aktualizaci.", {"action": "update_system", "params": {}}
 
         # ── HLASITOST ─────────────────────────────────
@@ -276,11 +285,11 @@ class LocalRouter:
         if vol:
             lvl = min(100, max(0, int(vol.group(3))))
             return f"Hlasitost: {lvl}%.", {"action": "volume", "params": {"level": lvl}}
-        if re.search(r"\b(ztlum|mute|umlč)\b", t):
+        if re.search(r"\b(ztlum|mute|umlc)\b", t):
             return "Ztlumeno.", {"action": "volume", "params": {"action": "mute"}}
-        if re.search(r"\b(odtlum|unmute|zesil zvuk)\b", t):
+        if re.search(r"\b(odtlum|unmute|zesil\s+zvuk)\b", t):
             return "Odtlumeno.", {"action": "volume", "params": {"action": "unmute"}}
-        vol2 = re.search(r"\b(zvyš|sniž|zesil|ztlum)\s+zvuk\s+na\s*(\d+)", t)
+        vol2 = re.search(r"\b(zvys|sniz|zesil|ztlum)\s+zvuk\s+na\s*(\d+)", t)
         if vol2:
             lvl = min(100, max(0, int(vol2.group(2))))
             return f"Hlasitost: {lvl}%.", {"action": "volume", "params": {"level": lvl}}
@@ -294,27 +303,25 @@ class LocalRouter:
         # ── MEDIA ─────────────────────────────────────
         if re.search(r"\b(pozastav|pauza|pause)\b", t):
             return "Pozastavuji.", {"action": "media", "params": {"action": "play_pause"}}
-        if re.search(r"\b(přeskočit|další\s+skladba|next\s+track)\b", t):
+        if re.search(r"\b(preskocit|dalsi\s+skladb|next\s+track)\b", t):
             return "Další skladba.", {"action": "media", "params": {"action": "next"}}
-        if re.search(r"\b(předchozí\s+skladba|zpět\s+skladba)\b", t):
+        if re.search(r"\b(predchozi\s+skladb|zpet\s+skladb)\b", t):
             return "Předchozí.", {"action": "media", "params": {"action": "prev"}}
 
         # ── ZAVŘÍT APLIKACI ───────────────────────────
         if _CLOSE_TRIGGER.search(t):
             app_name = _extract_app_name(text)
             if len(app_name) > 1:
-                # Přelož alias na název procesu
                 proc = app_name.lower()
                 for alias, real in _PROC_ALIASES.items():
-                    if alias in proc:
+                    if _norm(alias) in proc:
                         proc = real
                         break
                 return f"Ukončuji {app_name}.", {
                     "action": "kill_process", "params": {"name": proc}}
 
         # ── HUDBA ─────────────────────────────────────
-        if re.search(r"\b(pust|zahraj|přehraj|spusť|play)\b", t):
-            # Samotný web bez obsahu → otevři web
+        if re.search(r"\b(pust|zahraj|prehraj|spust|play)\b", t):
             for site, url in _SITES.items():
                 if site in t:
                     rest = re.sub(rf"\b{site}\b", "", t)
@@ -322,7 +329,6 @@ class LocalRouter:
                     if len(rest) < 3:
                         return f"Otevírám {site.capitalize()}.", {
                             "action": "open_url", "params": {"url": url}}
-            # Extrahuj query
             query = _MUSIC_STOP.sub("", text).strip(" ,.-")
             if len(query) > 2:
                 return f"Přehrávám: {query}.", {
@@ -330,14 +336,14 @@ class LocalRouter:
                     "params": {"query": query, "index": 1, "audio_only": False}}
 
         # ── POČASÍ ────────────────────────────────────
-        if re.search(r"\b(počasí|weather|bude\s+pršet|teplota\s+v)\b", t):
-            m = re.search(r"\b(počasí|weather)\b\s+(?:v\s+)?(\w+)", t)
+        if re.search(r"\b(pocasi|weather|bude\s+prset|teplota\s+v)\b", t):
+            m = re.search(r"\b(pocasi|weather)\b\s+(?:v\s+)?(\w+)", t)
             city = m.group(2).capitalize() if m else ""
             return f"Počasí{' v ' + city if city else ''}.", {
                 "action": "weather", "params": {"city": city}}
 
         # ── TIMER ─────────────────────────────────────
-        if re.search(r"\b(timer|časovač|připomínka|upozorni\s+za|za\s+\d+\s+minut)\b", t):
+        if re.search(r"\b(timer|casovac|pripominka|upozorni\s+za|za\s+\d+\s+minut)\b", t):
             m = re.search(r"(\d+)\s*(minut|sekund|hodin)", t)
             if m:
                 n, unit = int(m.group(1)), m.group(2)
@@ -346,17 +352,16 @@ class LocalRouter:
                 return f"Timer {n} {unit}.", {
                     "action": "set_timer", "params": {"seconds": secs, "label": "Timer"}}
 
-        # ── OTEVŘÍT WEB ───────────────────────────────
+        # ── OTEVŘÍT WEB / APLIKACI ────────────────────
         if _OPEN_TRIGGER.search(t):
             for site, url in _SITES.items():
                 if site in t:
                     return f"Otevírám {site.capitalize()}.", {
                         "action": "open_url", "params": {"url": url}}
             for name, cmd in _APPS.items():
-                if name in t:
+                if _norm(name) in t:
                     return f"Spouštím {name}.", {
                         "action": "open_app", "params": {"app": cmd}}
-            # Vlastní URL
             url_m = re.search(r"(https?://\S+|\w+\.\w{2,}\S*)", text)
             if url_m:
                 url = url_m.group(1)
