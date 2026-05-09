@@ -1,7 +1,7 @@
 """
-JARVIS GUI — Animovaný hlasový asistent
-Samostatný GUI modul s Three.js-inspirovaným orbem na tkinter Canvas.
-Barvy: fialová/modrá paleta (bez zlata/oranžové)
+JARVIS GUI — Sci-fi HUD hlasový asistent
+Tmavý modrý dark mode s neon cyan akcenty.
+Animovaný orb s částicemi, HUD detaily, vysuvný chat panel.
 """
 
 import math
@@ -12,37 +12,40 @@ from datetime import datetime
 
 
 # ══════════════════════════════════════════════════════
-#  BARVY
+#  BAREVNÁ PALETA
 # ══════════════════════════════════════════════════════
 
-BG      = "#080810"   # hlavní pozadí — tmavá modročerná
-BG2     = "#0e0e1c"   # sekundární pozadí
-BG3     = "#14142a"   # terciární (bubliny, vstupy)
-FG      = "#f1f5f9"   # primární text
-MUTED   = "#475569"   # tlumený text
-BORDER  = "#1e1b4b"   # rámeček
+BG      = "#050a15"   # hlavní pozadí — tmavá námořní modrá
+BG2     = "#0a1628"   # pozadí panelů
+BG3     = "#0d1f3c"   # pozadí karet a tlačítek
+FG      = "#e3f2fd"   # primární text
+FG2     = "#90caf9"   # sekundární text
+BORDER  = "#1a3a5c"   # okraje
+CYAN    = "#00e5ff"   # neon cyan — hlavní akcent
+BLUE    = "#1976d2"   # sekundární modrá
 
-# Barvy ORBu pro každý stav
+# Barvy orbu pro každý stav
 ORB_COLORS = {
-    "idle":      "#8b5cf6",   # fialová
-    "listening": "#ef4444",   # červená
-    "thinking":  "#3b82f6",   # modrá
-    "speaking":  "#10b981",   # smaragdová
+    "idle":      "#1565c0",
+    "listening": "#00e5ff",
+    "thinking":  "#7c4dff",
+    "speaking":  "#00b0ff",
 }
 
-# Tmavší verze pro glow efekt (nižší opacita = ztmavení)
+# Tmavší verze pro glow efekt
 ORB_DARK = {
-    "idle":      "#4c1d95",
-    "listening": "#7f1d1d",
-    "thinking":  "#1e3a8a",
-    "speaking":  "#064e3b",
+    "idle":      "#0d47a1",
+    "listening": "#006064",
+    "thinking":  "#4527a0",
+    "speaking":  "#01579b",
 }
 
+# Popis stavů (s tečkou prefix)
 STATE_LABELS = {
-    "idle":      "I D L E",
-    "listening": "L I S T E N I N G",
-    "thinking":  "T H I N K I N G",
-    "speaking":  "S P E A K I N G",
+    "idle":      "● IDLE",
+    "listening": "● LISTENING",
+    "thinking":  "● THINKING",
+    "speaking":  "● SPEAKING",
 }
 
 
@@ -50,22 +53,21 @@ STATE_LABELS = {
 #  POMOCNÉ FUNKCE
 # ══════════════════════════════════════════════════════
 
-def blend(color_hex: str, bg_hex: str, alpha: float) -> str:
-    """Smíchá barvu s pozadím při dané průhlednosti (0–1)."""
-    def parse(h):
+def blend(color: str, bg: str, alpha: float) -> str:
+    """Smíchá barvu s pozadím při dané průhlednosti (0.0–1.0)."""
+    def p(h):
         h = h.lstrip("#")
         return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-
-    cr, cg, cb = parse(color_hex)
-    br, bg_, bb = parse(bg_hex)
-    r = int(br + (cr - br) * alpha)
-    g = int(bg_ + (cg - bg_) * alpha)
-    b = int(bb + (cb - bb) * alpha)
+    cr, cg, cb = p(color)
+    br, bg_, bb = p(bg)
+    r = int(br + (cr - br) * max(0.0, min(1.0, alpha)))
+    g = int(bg_ + (cg - bg_) * max(0.0, min(1.0, alpha)))
+    b = int(bb + (cb - bb) * max(0.0, min(1.0, alpha)))
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-def hex_lerp(a: str, b: str, t: float) -> str:
-    """Lineární interpolace mezi dvěma hexadecimálními barvami."""
+def lerp_color(a: str, b: str, t: float) -> str:
+    """Lineární interpolace mezi dvěma barvami (t = 0..1)."""
     return blend(b, a, t)
 
 
@@ -74,42 +76,47 @@ def hex_lerp(a: str, b: str, t: float) -> str:
 # ══════════════════════════════════════════════════════
 
 class Particle:
-    """Jedna částice pohybující se po eliptické dráze kolem středu orbu."""
+    """
+    Jedna částice pohybující se po eliptické dráze kolem středu orbu.
+    Simuluje 3D pohyb projekcí do 2D roviny.
+    """
 
     def __init__(self, cx: float, cy: float):
-        self.cx = cx
-        self.cy = cy
-        self.orbit_r  = random.uniform(55, 125)   # poloměr dráhy
-        self.phase    = random.uniform(0, 2 * math.pi)
-        self.speed    = random.uniform(0.008, 0.035)
-        # Naklopení elipsy (simulace 3D sféry)
-        self.tilt     = random.uniform(0.15, 0.85)
-        self.tilt_dir = random.choice([-1, 1])
-        # Rotace celé dráhy kolem osy Y
-        self.axis     = random.uniform(0, math.pi)
+        self.cx        = cx
+        self.cy        = cy
+        self.orbit_r   = random.uniform(55, 125)    # poloměr dráhy (px)
+        self.phase     = random.uniform(0, 2 * math.pi)
+        self.base_speed = random.uniform(0.009, 0.033)
+        # Naklopení elipsy — simuluje natočení ve 3D prostoru
+        self.tilt      = random.uniform(0.18, 0.82)
+        self.axis      = random.uniform(0, math.pi)  # rotace dráhy kolem osy Y
         # Vizuální vlastnosti
-        self.size     = random.uniform(1.5, 3.5)
-        # Z-hloubka určí, zda je částice "před" nebo "za" orbem
-        self.z_phase  = random.uniform(0, 2 * math.pi)
-        self.z_speed  = self.speed * random.uniform(0.5, 1.5)
+        self.size      = random.uniform(1.5, 3.5)
+        # Fáze pro speaking pulsaci
+        self.pulse_phase = random.uniform(0, 2 * math.pi)
 
-    def position(self, frame: int):
-        """Vrátí (x, y, z) pozici částice v daném snímku."""
-        angle = self.phase + self.speed * frame
+    def get_xy(self, frame: int, speed_mult: float, orbit_mult: float) -> tuple:
+        """
+        Vrátí (x, y, z_depth) pro daný snímek.
+        z_depth ∈ (-orbit_r, +orbit_r) — kladné = vpředu.
+        """
+        speed = self.base_speed * speed_mult
+        angle = self.phase + speed * frame
+        r     = self.orbit_r * orbit_mult
 
         # 3D eliptická dráha
-        x3 = self.orbit_r * math.cos(angle)
-        y3 = self.orbit_r * math.sin(angle) * self.tilt
-        z3 = self.orbit_r * math.sin(angle) * (1 - self.tilt) * self.tilt_dir
+        x3 = r * math.cos(angle)
+        y3 = r * math.sin(angle) * self.tilt
+        z3 = r * math.sin(angle) * (1.0 - self.tilt)
 
-        # Projekce do 2D (axonometrická rotace)
+        # Projekce — rotace kolem osy Y o self.axis
         cos_a = math.cos(self.axis)
         sin_a = math.sin(self.axis)
-        x2 = x3 * cos_a - z3 * sin_a
-        y2 = y3
-        z2 = x3 * sin_a + z3 * cos_a   # hloubka pro velikost/jas
+        x2    = x3 * cos_a - z3 * sin_a
+        y2    = y3
+        depth = x3 * sin_a + z3 * cos_a   # hloubka = simulace Z
 
-        return self.cx + x2, self.cy + y2, z2
+        return self.cx + x2, self.cy + y2, depth
 
 
 # ══════════════════════════════════════════════════════
@@ -118,95 +125,101 @@ class Particle:
 
 class OrbCanvas(tk.Canvas):
     """
-    Animovaný orb kreslený na tkinter Canvas každých 30 ms.
-    Obsahuje částice, vnitřní glow, vnější ring s tečkami a stavový text.
+    Animovaný ORB na tkinter Canvas.
+    Kreslí se každých 30 ms přes root.after().
+
+    Obsahuje:
+      • 60 částic na eliptických drahách
+      • 4 vrstvy vnitřního glow jádra
+      • Vnější rotující ring se 4 tečkami
+      • Přerušovaný druhý ring (rotuje opačně)
+      • HUD rohy a boční level indikátory
+      • Stavový text a hodiny
     """
 
-    ORB_SIZE = 300   # velikost canvasu
+    SIZE = 300   # rozměr canvasu (čtverec)
 
     def __init__(self, parent, **kwargs):
         super().__init__(
             parent,
-            width=self.ORB_SIZE,
-            height=self.ORB_SIZE,
-            bg=BG,
-            highlightthickness=0,
-            bd=0,
+            width=self.SIZE, height=self.SIZE,
+            bg=BG, highlightthickness=0, bd=0,
             **kwargs,
         )
-        self.cx = self.ORB_SIZE / 2
-        self.cy = self.ORB_SIZE / 2
+        self.cx = self.SIZE / 2
+        self.cy = self.SIZE / 2
 
-        # Stav
-        self._state       = "idle"
-        self._color       = ORB_COLORS["idle"]
+        # Stav a barevný přechod
+        self._state        = "idle"
+        self._color        = ORB_COLORS["idle"]
         self._target_color = self._color
-        self._lerp_t      = 0.0
+        self._lerp_t       = 1.0
 
-        # Animace
-        self._frame       = 0
-        self._pulse       = 0.0
-        self._ring_angle  = 0.0
-        self._running     = True
+        # Animační čítač
+        self._frame        = 0
+        self._pulse        = 0.0       # sinusový puls glow jádra
+        self._ring_angle   = 0.0       # úhel rotace hlavního ringu
+        self._ring2_angle  = 0.0       # úhel druhého ringu (opačně)
+        self._running      = True
 
-        # Částice
-        self._particles   = [Particle(self.cx, self.cy) for _ in range(60)]
+        # 60 částic
+        self._particles    = [Particle(self.cx, self.cy) for _ in range(60)]
 
         # Spusť animaci
         self._animate()
 
-    # ── STAV ─────────────────────────────────────────
+    # ── VEŘEJNÉ METODY ───────────────────────────────
 
     def set_state(self, state: str):
+        """Nastaví stav orbu a zahájí barevný přechod."""
         if state not in ORB_COLORS:
             return
         self._state        = state
         self._target_color = ORB_COLORS[state]
         self._lerp_t       = 0.0
 
-    # ── ANIMACE ──────────────────────────────────────
-
     def stop(self):
+        """Zastaví animační smyčku."""
         self._running = False
+
+    # ── ANIMACE ──────────────────────────────────────
 
     def _animate(self):
         if not self._running:
             return
-
-        self._frame     += 1
-        self._pulse     += 0.04
-        self._ring_angle = (self._ring_angle + 1.2) % 360
+        self._frame      += 1
+        self._pulse      += 0.04
+        self._ring_angle  = (self._ring_angle  + 1.1) % 360
+        self._ring2_angle = (self._ring2_angle - 0.7) % 360
 
         # Plynulý přechod barvy
         if self._lerp_t < 1.0:
-            self._lerp_t = min(1.0, self._lerp_t + 0.04)
-            self._color  = hex_lerp(self._color, self._target_color, self._lerp_t)
+            self._lerp_t  = min(1.0, self._lerp_t + 0.05)
+            self._color   = lerp_color(self._color, self._target_color, self._lerp_t)
 
         self._draw()
         self.after(30, self._animate)
 
     def _draw(self):
         self.delete("all")
-
-        # 1. Glow core — 4 soustředné kruhy s klesající opacitou
-        self._draw_glow()
-
-        # 2. Částice
-        self._draw_particles()
-
-        # 3. Vnější rotující ring s tečkami
+        self._draw_hud_corners()
+        self._draw_ring2()
         self._draw_ring()
+        self._draw_glow()
+        self._draw_particles()
+        self._draw_hud_levels()
+        self._draw_state_text()
+
+    # ── VNITŘNÍ GLOW ─────────────────────────────────
 
     def _draw_glow(self):
-        """Kreslí pulsující vnitřní záři (4 vrstvy)."""
+        """Kreslí 4 soustředné kruhy (glow jádro), pulsující sinusem."""
         pulse = math.sin(self._pulse) * 8
-        layers = [
-            (35 + pulse * 0.5, 0.42),
-            (50 + pulse * 0.6, 0.26),
-            (65 + pulse * 0.7, 0.15),
-            (80 + pulse,       0.08),
-        ]
-        for r, alpha in layers:
+        # (poloměr, průhlednost)
+        layers = [(35, 0.40), (50, 0.25), (65, 0.15), (80, 0.08)]
+
+        for base_r, alpha in layers:
+            r = base_r + pulse * (base_r / 80)
             c = blend(self._color, BG, alpha)
             self.create_oval(
                 self.cx - r, self.cy - r,
@@ -214,75 +227,169 @@ class OrbCanvas(tk.Canvas):
                 fill=c, outline="",
             )
 
-        # Střed — nejjasnější tečka
-        r_core = 12 + math.sin(self._pulse) * 2
-        c_core = blend(self._color, "#ffffff", 0.3)
+        # Jasné středové jádro
+        r_core = 10 + math.sin(self._pulse) * 2
+        c_core = blend(self._color, "#ffffff", 0.35)
         self.create_oval(
             self.cx - r_core, self.cy - r_core,
             self.cx + r_core, self.cy + r_core,
             fill=c_core, outline="",
         )
 
+    # ── ČÁSTICE ──────────────────────────────────────
+
     def _draw_particles(self):
-        """Kreslí 60 částic na eliptických drahách."""
-        # Rychlost závisí na stavu
-        speed_mult = {
-            "idle":      1.0,
-            "listening": 1.4,
-            "thinking":  2.2,
-            "speaking":  1.7,
-        }.get(self._state, 1.0)
+        """Kreslí 60 částic se stavově závislým chováním."""
+        state = self._state
 
-        for p in self._particles:
-            # Uloží původní rychlost, modifikuje dočasně
-            orig = p.speed
-            p.speed = orig * speed_mult
-            x, y, z = p.position(self._frame)
-            p.speed = orig
+        # Parametry závisejí na stavu
+        if state == "idle":
+            speed_mult, orbit_mult = 1.0, 1.0
+        elif state == "listening":
+            speed_mult, orbit_mult = 1.7, 0.75   # stahují se ke středu
+        elif state == "thinking":
+            speed_mult, orbit_mult = 2.6, 1.0    # rychlé kroužení
+        else:  # speaking
+            speed_mult, orbit_mult = 1.4, 1.0
 
-            # Z-hloubka → velikost a jas (simulace 3D)
-            z_norm   = (z / 130 + 1) / 2          # 0–1, 0 = vzadu, 1 = vpředu
-            size     = p.size * (0.4 + z_norm * 0.6)
-            alpha    = 0.15 + z_norm * 0.75
+        for i, p in enumerate(self._particles):
+            # Speaking: pulsace ven od středu
+            om = orbit_mult
+            if state == "speaking":
+                om *= 1.0 + 0.22 * math.sin(self._frame * 0.09 + p.pulse_phase)
 
-            # Částice za centrem — tmavší
-            if z_norm < 0.35:
-                alpha *= 0.5
-                c = blend(ORB_DARK[self._state], BG, alpha)
+            x, y, depth = p.get_xy(self._frame, speed_mult, om)
+
+            # Z-hloubka → jas a velikost
+            z_norm = (depth / 130 + 1) / 2        # 0 = vzadu, 1 = vpředu
+            size   = p.size * (0.35 + z_norm * 0.65)
+            alpha  = 0.12 + z_norm * 0.75
+
+            # Částice "za" orbem jsou tmavší
+            if z_norm < 0.3:
+                c = blend(ORB_DARK.get(state, self._color), BG, alpha * 0.55)
             else:
                 c = blend(self._color, BG, alpha)
 
-            if 0 < x < self.ORB_SIZE and 0 < y < self.ORB_SIZE:
+            if 0 < x < self.SIZE and 0 < y < self.SIZE:
                 self.create_oval(
-                    x - size, y - size,
-                    x + size, y + size,
+                    x - size, y - size, x + size, y + size,
                     fill=c, outline="",
                 )
 
+    # ── VNĚJŠÍ RING ───────────────────────────────────
+
     def _draw_ring(self):
-        """Kreslí vnější tenký ring (1px) s rotujícími tečkami."""
-        r    = 105
-        c    = blend(self._color, BG, 0.35)
-        # Celý kruh jako polygonový aproximace
+        """Hlavní tenký ring (110px) s rotujícími 4 cyan tečkami."""
+        r = 110
+        c = blend(BORDER, BG, 0.7)
         self.create_oval(
             self.cx - r, self.cy - r,
             self.cx + r, self.cy + r,
             outline=c, width=1, fill="",
         )
 
-        # 4 tečky rovnoměrně rozmístěné, rotující
-        dot_r = 3
-        dot_c = blend(self._color, BG, 0.85)
+        # 4 tečky rovnoměrně na ringu (rotují)
+        dot_r = 4
         for i in range(4):
-            angle_deg = self._ring_angle + i * 90
-            angle_rad = math.radians(angle_deg)
-            dx = r * math.cos(angle_rad)
-            dy = r * math.sin(angle_rad)
+            angle = math.radians(self._ring_angle + i * 90)
+            dx    = r * math.cos(angle)
+            dy    = r * math.sin(angle)
             self.create_oval(
                 self.cx + dx - dot_r, self.cy + dy - dot_r,
                 self.cx + dx + dot_r, self.cy + dy + dot_r,
-                fill=dot_c, outline="",
+                fill=CYAN, outline="",
             )
+
+    def _draw_ring2(self):
+        """
+        Druhý přerušovaný ring (125px), rotuje opačně.
+        Přerušení simulovány obloukovými segmenty.
+        """
+        r     = 125
+        c     = blend(BORDER, BG, 0.5)
+        step  = 18      # stupňů na segment
+        gap   = 8       # stupňů mezery
+
+        for start in range(0, 360, step + gap):
+            a1 = math.radians(start + self._ring2_angle)
+            a2 = math.radians(start + step + self._ring2_angle)
+            # Aproximuj oblouk čarami (8 úseků na segment)
+            segs = 6
+            pts = []
+            for k in range(segs + 1):
+                a = a1 + (a2 - a1) * k / segs
+                pts.append(self.cx + r * math.cos(a))
+                pts.append(self.cy + r * math.sin(a))
+            if len(pts) >= 4:
+                self.create_line(*pts, fill=c, width=1, smooth=True)
+
+    # ── HUD ROHOVÉ ČÁRY ──────────────────────────────
+
+    def _draw_hud_corners(self):
+        """Malé L-shaped rohové čáry v každém rohu canvasu (12px, cyan)."""
+        L = 14     # délka ramene
+        w = 1
+        c = blend(CYAN, BG, 0.7)
+        corners = [
+            # (x_start, y_start), směr x, směr y
+            ((0,   0  ), ( 1,  0), ( 0,  1)),
+            ((300, 0  ), (-1,  0), ( 0,  1)),
+            ((0,   300), ( 1,  0), ( 0, -1)),
+            ((300, 300), (-1,  0), ( 0, -1)),
+        ]
+        for (ox, oy), (hx, hy), (vx, vy) in corners:
+            # vodorovné rameno
+            self.create_line(ox, oy, ox + hx * L, oy + hy * L, fill=c, width=w)
+            # svislé rameno
+            self.create_line(ox, oy, ox + vx * L, oy + vy * L, fill=c, width=w)
+
+    # ── HUD BOČNÍ LEVEL INDIKÁTORY ────────────────────
+
+    def _draw_hud_levels(self):
+        """3 malé vodorovné čárky vlevo a vpravo od orbu (level indikátory)."""
+        c      = blend(CYAN, BG, 0.4)
+        offsets = [-24, 0, 24]    # y-offset od středu
+
+        # Levá strana
+        for dy in offsets:
+            y = self.cy + dy
+            brightness = 0.4 + 0.3 * (1 - abs(dy) / 30)
+            cc = blend(CYAN, BG, brightness)
+            self.create_line(6, y, 20, y, fill=cc, width=1)
+
+        # Pravá strana
+        for dy in offsets:
+            y = self.cy + dy
+            brightness = 0.4 + 0.3 * (1 - abs(dy) / 30)
+            cc = blend(CYAN, BG, brightness)
+            self.create_line(280, y, 294, y, fill=cc, width=1)
+
+    # ── STAVOVÝ TEXT ─────────────────────────────────
+
+    def _draw_state_text(self):
+        """Stavový label a hodiny pod orbem (uvnitř canvasu, spodní část)."""
+        label = STATE_LABELS.get(self._state, self._state.upper())
+        color = self._color
+
+        # Stavový text (spodek canvasu)
+        self.create_text(
+            self.cx, self.SIZE - 26,
+            text=label,
+            font=("Courier New", 10),
+            fill=color,
+            anchor="center",
+        )
+
+        # Hodiny — aktuální čas
+        ts = datetime.now().strftime("%H:%M:%S")
+        self.create_text(
+            self.cx, self.SIZE - 10,
+            text=ts,
+            font=("Courier New", 8),
+            fill=BORDER,
+            anchor="center",
+        )
 
 
 # ══════════════════════════════════════════════════════
@@ -290,50 +397,53 @@ class OrbCanvas(tk.Canvas):
 # ══════════════════════════════════════════════════════
 
 class ChatBubble(ctk.CTkFrame):
-    """Jedna chatová bublina (user vpravo, jarvis vlevo)."""
+    """
+    Jedna chatová bublina ve vysuvném panelu.
+    Uživatel: vpravo, zlatá; JARVIS: vlevo, modrá.
+    """
 
     def __init__(self, parent, text: str, sender: str, **kwargs):
         super().__init__(parent, fg_color="transparent", **kwargs)
 
-        is_user = sender == "user"
+        is_user = (sender == "user")
         ts      = datetime.now().strftime("%H:%M")
 
-        # Meta řádek (emoji + čas)
+        # Řádek s meta informacemi (emoji + timestamp)
         meta = ctk.CTkFrame(self, fg_color="transparent")
-        meta.pack(fill="x")
+        meta.pack(fill="x", padx=4)
 
         if is_user:
-            ctk.CTkLabel(meta, text=ts,    font=("DM Sans", 9),  text_color=MUTED).pack(side="right", padx=(0, 2))
-            ctk.CTkLabel(meta, text="🧑",  font=("DM Sans", 10), text_color=FG).pack(side="right")
+            ctk.CTkLabel(meta, text="🧑", font=("DM Sans", 10)).pack(side="right")
+            ctk.CTkLabel(meta, text=ts, font=("Courier New", 8),
+                         text_color=BORDER).pack(side="right", padx=(0, 4))
         else:
-            ctk.CTkLabel(meta, text="🤖",  font=("DM Sans", 10), text_color=ORB_COLORS["thinking"]).pack(side="left")
-            ctk.CTkLabel(meta, text=ts,    font=("DM Sans", 9),  text_color=MUTED).pack(side="left", padx=(2, 0))
+            ctk.CTkLabel(meta, text="🤖", font=("DM Sans", 10)).pack(side="left")
+            ctk.CTkLabel(meta, text=ts, font=("Courier New", 8),
+                         text_color=BORDER).pack(side="left", padx=(4, 0))
 
-        # Textová bublina
-        bubble_bg  = "#16162a" if not is_user else "#1a1a3a"
-        border_col = ORB_COLORS["thinking"] if not is_user else ORB_COLORS["idle"]
+        # Bublina
+        bg_bubble  = BG3 if is_user else BG
+        text_color = FG  if is_user else FG2
+        anchor     = "e" if is_user else "w"
+        pad_left   = (30, 6) if is_user else (6, 30)
 
         bubble = ctk.CTkFrame(
             self,
-            fg_color=bubble_bg,
-            border_color=border_col,
+            fg_color=bg_bubble,
+            border_color=CYAN if is_user else BORDER,
             border_width=1,
-            corner_radius=12,
+            corner_radius=8,
         )
-        bubble.pack(
-            anchor="e" if is_user else "w",
-            padx=(40, 4) if is_user else (4, 40),
-            pady=(2, 0),
-        )
+        bubble.pack(anchor=anchor, padx=pad_left, pady=(2, 0))
 
         ctk.CTkLabel(
             bubble,
             text=text,
-            font=("DM Sans", 12),
-            text_color=FG,
-            wraplength=220,
+            font=("DM Sans", 11),
+            text_color=text_color,
+            wraplength=200,
             justify="right" if is_user else "left",
-        ).pack(padx=10, pady=6)
+        ).pack(padx=8, pady=6)
 
 
 # ══════════════════════════════════════════════════════
@@ -345,25 +455,32 @@ class JarvisGUI:
     Hlavní GUI třída JARVIS asistenta.
 
     Veřejné API:
-      set_state(state)          — změní stav orbu
-      add_message(text, sender) — přidá zprávu do chatu
-      set_status(text)          — nastaví text pod orbem
-      run()                     — spustí mainloop
-      on_mic_click              — callback pro klik na mikrofon
-      on_send                   — callback pro odeslání textu
+      set_state(state: str)          — idle | listening | thinking | speaking
+      add_message(text, sender)      — user | jarvis
+      set_status(text)               — info text pod orbem
+      run()                          — spustí mainloop
+
+    Callbacky (nastav zvenčí):
+      on_mic_click: callable
+      on_send: callable (text: str)
     """
 
+    CHAT_WIDTH = 280   # šířka chat panelu
+
     def __init__(self):
-        # Callbacky (nastaví volající kód)
+        # Callbacky pro integraci se zbytkem systému
         self.on_mic_click: callable = None
         self.on_send:      callable = None
 
-        self._chat_open  = False
-        self._dark_mode  = True
         self._state      = "idle"
+        self._chat_open  = False
+        self._chat_anim  = False       # probíhá animace?
+        self._chat_cur_x = -self.CHAT_WIDTH   # aktuální x chat panelu
 
         self._setup_window()
-        self._build_ui()
+        self._build_main()
+        self._build_chat_panel()
+        self._bind_keys()
 
     # ── OKNO ─────────────────────────────────────────
 
@@ -377,7 +494,7 @@ class JarvisGUI:
         self.root.resizable(False, False)
         self.root.configure(fg_color=BG)
 
-        # Vystředění okna
+        # Vystředění okna na obrazovce
         self.root.update_idletasks()
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
@@ -385,226 +502,260 @@ class JarvisGUI:
         y  = (sh - 700) // 2
         self.root.geometry(f"480x700+{x}+{y}")
 
-        # Mezerník = mikrofon
-        self.root.bind("<space>", self._on_space)
+    # ── HLAVNÍ OBSAH ─────────────────────────────────
 
-    # ── SESTAVENÍ UI ─────────────────────────────────
+    def _build_main(self):
+        """Sestaví hlavní layout: header → orb sekce → controls."""
+        self._main = ctk.CTkFrame(self.root, fg_color=BG, corner_radius=0)
+        self._main.place(x=0, y=0, width=480, height=700)
 
-    def _build_ui(self):
-        # ── Header ──────────────────────────────────
         self._build_header()
-
-        # ── ORB sekce ───────────────────────────────
-        self._orb_section = ctk.CTkFrame(self.root, fg_color=BG, corner_radius=0)
-        self._orb_section.pack(fill="both", expand=True)
-
-        # Canvas orbu — vystředěný
-        canvas_wrap = ctk.CTkFrame(self._orb_section, fg_color=BG, corner_radius=0)
-        canvas_wrap.pack(expand=True)
-
-        self.orb = OrbCanvas(canvas_wrap)
-        self.orb.pack()
-
-        # Stavový text pod orbem (s mezerami = letter-spacing efekt)
-        self._status_lbl = ctk.CTkLabel(
-            canvas_wrap,
-            text="I D L E",
-            font=("Courier New", 11),
-            text_color=ORB_COLORS["idle"],
-        )
-        self._status_lbl.pack(pady=(8, 0))
-
-        # Doplňkový status text (set_status)
-        self._info_lbl = ctk.CTkLabel(
-            canvas_wrap,
-            text="",
-            font=("DM Sans", 11),
-            text_color=MUTED,
-        )
-        self._info_lbl.pack(pady=(2, 0))
-
-        # ── Chat panel (skrytý ve výchozím stavu) ────
-        self._build_chat_panel()
-
-        # ── Dolní ovládání ───────────────────────────
+        self._build_orb_section()
         self._build_controls()
 
     def _build_header(self):
-        """Tenký header s názvem a hodinami."""
-        hdr = ctk.CTkFrame(self.root, fg_color=BG2, corner_radius=0, height=42)
+        """Tenký header s názvem JARVIS a stavem Ollama."""
+        hdr = ctk.CTkFrame(self._main, fg_color=BG2, corner_radius=0, height=40)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
 
         ctk.CTkLabel(
-            hdr,
-            text="J A R V I S",
-            font=("Courier New", 14),
-            text_color=ORB_COLORS["idle"],
+            hdr, text="J A R V I S",
+            font=("Courier New", 13),
+            text_color=CYAN,
         ).pack(side="left", padx=18)
 
-        self._clock_lbl = ctk.CTkLabel(
-            hdr, text="",
-            font=("Courier New", 11),
-            text_color=MUTED,
+        self._header_status = ctk.CTkLabel(
+            hdr, text="● ONLINE",
+            font=("Courier New", 9),
+            text_color=BLUE,
         )
-        self._clock_lbl.pack(side="right", padx=16)
+        self._header_status.pack(side="right", padx=16)
 
-        # Dělicí čára
-        ctk.CTkFrame(self.root, fg_color=BORDER, height=1, corner_radius=0).pack(fill="x")
+        # Dělicí linka
+        ctk.CTkFrame(self._main, fg_color=BORDER, height=1, corner_radius=0).pack(fill="x")
 
-        self._tick_clock()
+    def _build_orb_section(self):
+        """Sekce s animovaným orbem a stavovým textem."""
+        orb_sec = ctk.CTkFrame(self._main, fg_color=BG, corner_radius=0)
+        orb_sec.pack(fill="both", expand=True)
 
-    def _build_chat_panel(self):
-        """Chatový panel — skrytý dokud uživatel neklikne na 💬."""
-        self._chat_frame = ctk.CTkFrame(self.root, fg_color=BG2, corner_radius=0)
-        # Nezobrazujeme — _toggle_chat ho přidá
+        # Wrapper pro centrování canvasu
+        wrap = ctk.CTkFrame(orb_sec, fg_color=BG, corner_radius=0)
+        wrap.pack(expand=True)
 
-        # Scrollovatelný seznam zpráv
-        self._chat_scroll = ctk.CTkScrollableFrame(
-            self._chat_frame,
-            fg_color=BG2,
-            corner_radius=0,
-            height=200,
+        # ORB canvas
+        self.orb = OrbCanvas(wrap)
+        self.orb.pack(pady=(16, 4))
+
+        # Info text (set_status)
+        self._info_lbl = ctk.CTkLabel(
+            wrap, text="",
+            font=("Courier New", 9),
+            text_color=FG2,
         )
-        self._chat_scroll.pack(fill="both", expand=True, padx=0, pady=0)
-
-        # Vstup pro chat
-        inp_row = ctk.CTkFrame(self._chat_frame, fg_color=BG3, corner_radius=0, height=48)
-        inp_row.pack(fill="x")
-        inp_row.pack_propagate(False)
-
-        self._chat_input = ctk.CTkEntry(
-            inp_row,
-            placeholder_text="Napiš zprávu...",
-            font=("DM Sans", 13),
-            fg_color=BG, text_color=FG,
-            border_color=ORB_COLORS["idle"],
-            border_width=1,
-            corner_radius=6, height=32,
-        )
-        self._chat_input.place(x=10, rely=0.5, anchor="w", relwidth=0.80)
-        self._chat_input.bind("<Return>", self._on_chat_enter)
-
-        ctk.CTkButton(
-            inp_row, text="↵",
-            font=("Georgia", 16),
-            fg_color=ORB_COLORS["idle"],
-            hover_color="#7c3aed",
-            text_color=BG,
-            corner_radius=6, width=38, height=32,
-            command=self._on_chat_enter,
-        ).place(relx=0.96, rely=0.5, anchor="e")
+        self._info_lbl.pack()
 
     def _build_controls(self):
-        """Dolní panel s mic tlačítkem, settings a theme togglem."""
-        ctrl = ctk.CTkFrame(self.root, fg_color=BG2, corner_radius=0, height=110)
+        """
+        Spodní panel:
+        [💬]  [🎤 kulaté]  [⚙️]
+        """
+        ctrl = ctk.CTkFrame(
+            self._main, fg_color=BG2,
+            border_color=BORDER, border_width=0,
+            corner_radius=0, height=110,
+        )
         ctrl.pack(fill="x", side="bottom")
         ctrl.pack_propagate(False)
 
-        # Zlatý rámeček kolem mic tlačítka
+        # Horní dělicí linka
+        ctk.CTkFrame(ctrl, fg_color=BORDER, height=1, corner_radius=0).pack(fill="x")
+
+        # Rámeček mic tlačítka (zlatý okraj)
         mic_ring = ctk.CTkFrame(
             ctrl,
             fg_color=BG2,
-            border_color=ORB_COLORS["idle"],
+            border_color=CYAN,
             border_width=2,
             corner_radius=50,
             width=70, height=70,
         )
-        mic_ring.place(relx=0.5, rely=0.42, anchor="center")
+        mic_ring.place(relx=0.5, rely=0.44, anchor="center")
         mic_ring.pack_propagate(False)
 
-        # Mic tlačítko — kulaté
+        # Kulaté mic tlačítko
         self.mic_btn = ctk.CTkButton(
             mic_ring,
             text="🎤",
             font=("DM Sans", 22),
-            fg_color=ORB_COLORS["idle"],
-            hover_color="#7c3aed",
-            text_color=BG,
+            fg_color=BG3,
+            hover_color=BORDER,
+            text_color=CYAN,
             corner_radius=50, width=62, height=62,
+            border_color=CYAN, border_width=0,
             command=self._on_mic,
         )
         self.mic_btn.place(relx=0.5, rely=0.5, anchor="center")
 
-        # Stavový label pod mic tlačítkem
+        # Text pod tlačítkem
         self._mic_lbl = ctk.CTkLabel(
             ctrl,
             text="Klikni nebo stiskni mezerník",
-            font=("DM Sans", 9),
-            text_color=MUTED,
+            font=("Courier New", 9),
+            text_color=FG2,
         )
-        self._mic_lbl.place(relx=0.5, rely=0.86, anchor="center")
+        self._mic_lbl.place(relx=0.5, rely=0.88, anchor="center")
 
-        # Vedlejší tlačítka — vlevo od středu
-        side_left = ctk.CTkFrame(ctrl, fg_color=BG2, corner_radius=0)
-        side_left.place(relx=0.18, rely=0.42, anchor="center")
-
-        self._theme_btn = ctk.CTkButton(
-            side_left, text="🌙",
-            font=("DM Sans", 16), fg_color="#1e1b4b",
-            hover_color="#2d2a6e", text_color=FG,
-            corner_radius=8, width=38, height=38,
-            command=self._toggle_theme,
-        )
-        self._theme_btn.pack()
-
-        # Vedlejší tlačítka — vpravo od středu
-        side_right = ctk.CTkFrame(ctrl, fg_color=BG2, corner_radius=0)
-        side_right.place(relx=0.82, rely=0.42, anchor="center")
-
+        # Chat toggle vlevo
         ctk.CTkButton(
-            side_right, text="💬",
-            font=("DM Sans", 16), fg_color="#1e1b4b",
-            hover_color="#2d2a6e", text_color=FG,
+            ctrl, text="💬",
+            font=("DM Sans", 16), fg_color=BG3,
+            hover_color=BORDER, text_color=FG2,
             corner_radius=8, width=38, height=38,
             command=self._toggle_chat,
-        ).pack()
+        ).place(relx=0.16, rely=0.42, anchor="center")
 
-    # ── HODINY ───────────────────────────────────────
+        # Settings vpravo
+        ctk.CTkButton(
+            ctrl, text="⚙",
+            font=("DM Sans", 16), fg_color=BG3,
+            hover_color=BORDER, text_color=FG2,
+            corner_radius=8, width=38, height=38,
+            command=lambda: None,   # placeholder pro settings dialog
+        ).place(relx=0.84, rely=0.42, anchor="center")
 
-    def _tick_clock(self):
-        self._clock_lbl.configure(text=datetime.now().strftime("%H:%M:%S"))
-        self.root.after(1000, self._tick_clock)
+    # ── CHAT PANEL ───────────────────────────────────
+
+    def _build_chat_panel(self):
+        """
+        Vysuvný chat panel (280px) ze leva.
+        Ve výchozím stavu skrytý (x = -CHAT_WIDTH).
+        Animovaně se vysouvá/zasunuje přes _slide_chat().
+        """
+        self._chat_panel = ctk.CTkFrame(
+            self.root,
+            fg_color=BG2,
+            border_color=BORDER,
+            border_width=0,
+            corner_radius=0,
+            width=self.CHAT_WIDTH,
+        )
+        # Umístění mimo obrazovku
+        self._chat_panel.place(x=-self.CHAT_WIDTH, y=0,
+                               width=self.CHAT_WIDTH, height=700)
+        self._chat_panel.pack_propagate(False)
+
+        # Nadpis panelu
+        hdr = ctk.CTkFrame(self._chat_panel, fg_color=BG3, corner_radius=0, height=40)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+
+        ctk.CTkLabel(
+            hdr, text="KOMUNIKACE",
+            font=("Courier New", 10),
+            text_color=CYAN,
+        ).pack(side="left", padx=12, pady=10)
+
+        ctk.CTkButton(
+            hdr, text="✕",
+            font=("DM Sans", 12), fg_color=BG3,
+            hover_color=BORDER, text_color=FG2,
+            corner_radius=4, width=28, height=28,
+            command=self._toggle_chat,
+        ).pack(side="right", padx=6)
+
+        ctk.CTkFrame(self._chat_panel, fg_color=BORDER, height=1, corner_radius=0).pack(fill="x")
+
+        # Scrollovatelná oblast zpráv
+        self._chat_scroll = ctk.CTkScrollableFrame(
+            self._chat_panel,
+            fg_color=BG2,
+            corner_radius=0,
+        )
+        self._chat_scroll.pack(fill="both", expand=True)
+
+        # Vstupní pole pro text
+        inp_row = ctk.CTkFrame(self._chat_panel, fg_color=BG3,
+                               corner_radius=0, height=48)
+        inp_row.pack(fill="x", side="bottom")
+        inp_row.pack_propagate(False)
+
+        ctk.CTkFrame(inp_row, fg_color=BORDER, height=1, corner_radius=0).pack(fill="x")
+
+        self._chat_input = ctk.CTkEntry(
+            inp_row,
+            placeholder_text="Napiš zprávu...",
+            font=("DM Sans", 12),
+            fg_color=BG, text_color=FG,
+            border_color=BORDER, border_width=1,
+            corner_radius=6, height=30,
+        )
+        self._chat_input.place(x=8, rely=0.5, anchor="w", relwidth=0.76)
+        self._chat_input.bind("<Return>", self._on_chat_enter)
+
+        ctk.CTkButton(
+            inp_row, text="↵",
+            font=("Georgia", 14),
+            fg_color=BLUE, hover_color=BORDER,
+            text_color=FG, corner_radius=6,
+            width=32, height=30,
+            command=self._on_chat_enter,
+        ).place(relx=0.94, rely=0.5, anchor="center")
+
+    # ── KLÁVESY ──────────────────────────────────────
+
+    def _bind_keys(self):
+        self.root.bind("<space>",  self._on_space)
+        self.root.bind("<Escape>", self._on_escape)
+
+    def _on_space(self, event):
+        """Mezerník spustí mikrofon (pokud není focus na textovém vstupu)."""
+        focused = self.root.focus_get()
+        if not isinstance(focused, (tk.Entry, ctk.CTkEntry)):
+            self._on_mic()
+
+    def _on_escape(self, event):
+        """Escape zavře chat panel."""
+        if self._chat_open:
+            self._toggle_chat()
 
     # ── VEŘEJNÉ API ──────────────────────────────────
 
     def set_state(self, state: str):
-        """Nastaví stav orbu: idle | listening | thinking | speaking"""
+        """Nastaví stav orbu a aktualizuje UI prvky."""
         if state not in ORB_COLORS:
             return
         self._state = state
         self.orb.set_state(state)
 
-        # Aktualizace stavového textu (s mezerami = letter-spacing)
-        label = STATE_LABELS.get(state, state.upper())
-        color = ORB_COLORS[state]
-        self._status_lbl.configure(text=label, text_color=color)
-
-        # Aktualizace mic labelu
-        mic_labels = {
+        # Barva mic labelu odpovídá stavu
+        labels = {
             "idle":      "Klikni nebo stiskni mezerník",
-            "listening": "Poslouchám...",
-            "thinking":  "Zpracovávám...",
-            "speaking":  "Mluvím...",
+            "listening": "● Poslouchám...",
+            "thinking":  "● Zpracovávám...",
+            "speaking":  "● Mluvím...",
         }
-        self._mic_lbl.configure(text=mic_labels.get(state, ""))
+        self._mic_lbl.configure(
+            text=labels.get(state, ""),
+            text_color=ORB_COLORS.get(state, FG2),
+        )
 
-        # Barva mic tlačítka odpovídá stavu
-        self.mic_btn.configure(fg_color=color, hover_color=ORB_DARK.get(state, color))
+        # Barva mic tlačítka
+        self.mic_btn.configure(text_color=ORB_COLORS.get(state, CYAN))
 
     def add_message(self, text: str, sender: str):
-        """Přidá zprávu do chatu. sender = 'user' | 'jarvis'"""
+        """Přidá zprávu do chat panelu. Pokud je panel zavřený, otevře ho."""
         bubble = ChatBubble(self._chat_scroll, text=text, sender=sender)
-        bubble.pack(fill="x", padx=8, pady=4)
+        bubble.pack(fill="x", padx=4, pady=4)
         # Scroll na konec
-        self.root.after(50, lambda: self._chat_scroll._parent_canvas.yview_moveto(1.0))
+        self.root.after(60, lambda: self._chat_scroll._parent_canvas.yview_moveto(1.0))
 
-        # Pokud je chat zavřený — otevři ho
         if not self._chat_open:
             self._toggle_chat()
 
     def set_status(self, text: str):
-        """Nastaví doplňkový info text pod stavovým labelem."""
+        """Nastaví info text pod orbem."""
         self._info_lbl.configure(text=text)
 
     def run(self):
@@ -617,12 +768,6 @@ class JarvisGUI:
         if self.on_mic_click:
             self.on_mic_click()
 
-    def _on_space(self, event):
-        # Mezerník = mikrofon (pokud focus není na textovém vstupu)
-        focused = self.root.focus_get()
-        if not isinstance(focused, (tk.Entry, ctk.CTkEntry)):
-            self._on_mic()
-
     def _on_chat_enter(self, event=None):
         text = self._chat_input.get().strip()
         if not text:
@@ -631,70 +776,97 @@ class JarvisGUI:
         if self.on_send:
             self.on_send(text)
         else:
-            # Demo: zobraz zprávu lokálně
             self.add_message(text, "user")
 
+    # ── CHAT SLIDE ANIMACE ────────────────────────────
+
     def _toggle_chat(self):
-        """Přepne zobrazení chat panelu."""
-        if self._chat_open:
-            self._chat_frame.pack_forget()
-            self._chat_open = False
-        else:
-            self._chat_frame.pack(
-                fill="x", side="bottom",
-                before=self.root.pack_slaves()[-1],  # nad controls
-            )
-            self._chat_open = True
+        """Přepíná chat panel — spouští animaci vysunutí/zasunutí."""
+        if self._chat_anim:
+            return
+        self._chat_open  = not self._chat_open
+        self._chat_anim  = True
+        target = 0 if self._chat_open else -self.CHAT_WIDTH
+        self._slide_chat(target)
 
-    def _toggle_theme(self):
-        """Přepíná dark/light mód."""
-        self._dark_mode = not self._dark_mode
-        mode = "dark" if self._dark_mode else "light"
-        ctk.set_appearance_mode(mode)
-        self._theme_btn.configure(text="🌙" if self._dark_mode else "☀")
+    def _slide_chat(self, target: int):
+        """Rekurzivně animuje x-pozici chat panelu (30px/krok, 12ms)."""
+        cur  = self._chat_cur_x
+        step = 30 if target > cur else -30
+
+        if abs(target - cur) <= abs(step):
+            self._chat_cur_x = target
+            self._chat_panel.place(x=target, y=0,
+                                   width=self.CHAT_WIDTH, height=700)
+            self._chat_anim = False
+            return
+
+        self._chat_cur_x += step
+        self._chat_panel.place(x=self._chat_cur_x, y=0,
+                               width=self.CHAT_WIDTH, height=700)
+        self.root.after(12, lambda: self._slide_chat(target))
 
 
 # ══════════════════════════════════════════════════════
-#  DEMO — ukázka všech stavů
+#  DEMO — ukázka animace všech stavů
 # ══════════════════════════════════════════════════════
 
-def _demo(gui: JarvisGUI):
-    """Cyklicky prochází všechny stavy pro ukázku."""
-    states = ["idle", "listening", "thinking", "speaking"]
-    messages = [
-        ("Ahoj JARVIS, jak se máš?", "user"),
-        ("Výborně! Jsem připraven ti pomoci.", "jarvis"),
-        ("Otevři VS Code prosím.", "user"),
-        ("Otevírám VS Code.", "jarvis"),
+def _run_demo(gui: JarvisGUI):
+    """
+    Demo sekvence:
+    0s  → idle
+    2s  → listening + zpráva uživatele
+    4s  → thinking
+    6s  → speaking + zpráva JARVIS
+    8s  → idle (cyklus se opakuje)
+    """
+    sequence = [
+        (0,    "idle",      None,       None),
+        (2000, "listening", "user",     "Jaký je čas?"),
+        (4000, "thinking",  None,       None),
+        (6000, "speaking",  "jarvis",   "Je 14:37. Mohu pomoci s něčím dalším?"),
+        (8000, "idle",      None,       None),
+        (9500, "listening", "user",     "Otevři VS Code prosím."),
+        (11500,"thinking",  None,       None),
+        (13000,"speaking",  "jarvis",   "Otevírám VS Code."),
+        (15000,"idle",      None,       None),
     ]
-    idx = [0]
-    msg_idx = [0]
 
-    def cycle():
-        state = states[idx[0] % len(states)]
+    def step(i=0):
+        if i >= len(sequence):
+            # Opakuj od začátku
+            gui.root.after(1000, lambda: step(0))
+            return
+        delay, state, sender, text = sequence[i]
+        gui.root.after(delay, lambda: _apply(state, sender, text))
+        gui.root.after(delay, lambda: step(i + 1) if i + 1 < len(sequence) else None)
+
+    def _apply(state, sender, text):
         gui.set_state(state)
-        gui.set_status(f"Demo stav: {state}")
-
-        # Přidej zprávu každé 2 cykly
-        if idx[0] % 2 == 0 and msg_idx[0] < len(messages):
-            text, sender = messages[msg_idx[0]]
+        if sender and text:
             gui.add_message(text, sender)
-            msg_idx[0] += 1
+        labels = {
+            "idle":      "",
+            "listening": "Analyzuji audio vstup...",
+            "thinking":  "Zpracovávám dotaz...",
+            "speaking":  "Generuji odpověď...",
+        }
+        gui.set_status(labels.get(state, ""))
 
-        idx[0] += 1
-        gui.root.after(2500, cycle)
-
-    gui.root.after(1500, cycle)
+    gui.root.after(500, lambda: step(0))
 
 
 if __name__ == "__main__":
     gui = JarvisGUI()
 
-    # Nastav demo callbacky
-    gui.on_mic_click = lambda: print("[MIC] Kliknuto!")
-    gui.on_send      = lambda t: (print(f"[SEND] {t}"), gui.add_message(t, "user"))
+    # Demo callbacky
+    gui.on_mic_click = lambda: (
+        gui.set_state("listening"),
+        gui.set_status("Poslouchám..."),
+    )
+    gui.on_send = lambda t: gui.add_message(t, "user")
 
-    # Spusť demo animaci stavů
-    _demo(gui)
+    # Spusť demo sekvenci
+    _run_demo(gui)
 
     gui.run()
