@@ -245,13 +245,73 @@ pip install -r requirements.txt
 
 Aplikace zapisuje logy do souboru `jarvis.log` v kořenovém adresáři projektu.
 
-## Struktura projektu
+## Architektura
 
+JARVIS je rozdělen do modulárních vrstev, aby se oddělila logika orchestrace, GUI, systémové akce, LLM a paměť.
+
+```mermaid
+graph TB
+    User[Uživatel] -->|hlas/text| GUI{JarvisGUI}
+    GUI -->|příkaz| Core[JarvisApp / orchestrátor]
+    Core --> Router[LLMEngine / lokální router]
+    Router -->|přímý| Commands[CommandExecutor]
+    Router -->|nepoznáno| Ollama[Ollama API]
+    Ollama --> Core
+    Core -->|zobrazení| GUI
+    Core --> Memory[JarvisMemory / neural memory]
+    Memory -->|context| Router
+    Core -->|údržba| Memory
 ```
-jarvis.py          — hlavní aplikace
-config.json        — konfigurace
-requirements.txt   — Python závislosti
-start_jarvis.sh    — launcher (Linux)
-install.sh         — instalace Linux
-install.bat        — instalace Windows
+
+### Moduly
+- `jarvis.py` — minimalistický bootstrap, který spouští `JarvisApp`
+- `app_core.py` — hlavní orchestrátor, event loop, error handling a bezpečnostní kontrola
+- `gui.py` — desktopové UI, ovládací prvky, animovaný orb a chat
+- `commands.py` — konkrétní systémové akce (otevření aplikací, soubory, zvuk, systém)
+- `llm.py` — lokální router + Ollama integrace, odpovědi, streamování a paměťový kontext
+- `memory.py` — neural memory wrapper s ukládáním, recall kontextem a údržbou
+- `security.py` — whitelist a potvrzovací logika pro nebezpečné akce
+- `logging_setup.py` — samostatná konfigurace logování
+
+## Datové toky
+1. Uživatel mluví nebo píše do GUI.
+2. `JarvisApp` přijme text a nejdříve zkusí lokální router v `LLMEngine`.
+3. Pokud router nalezne akci, ta se provede lokálně.
+4. Pokud se akce nerozpozná, dotaz jde na Ollama a výstup se zobrazí uživateli.
+5. Relevantní výsledky i konverzace se ukládají do `JarvisMemory`.
+6. Při dalších dotazech se do promptu přidává kontext z paměti.
+
+## Memory pipeline
+Paměť `JarvisMemory` využívá `neural-ai-memory` jako brain-inspired vrstvu:
+- `store()` ukládá obsah s důležitostí, tagy a metadata
+- `recall()` vyhledává semanticky relevantní vzpomínky
+- `recall_context()` sestavuje kontext pro aktuální dotaz
+- `run_maintenance()` spouští decay, merge a abstrakci
+- `stats()` vrací agregovaná data
+
+### Jak funguje paměť
+- Relevance se hodnotí vážením sémantické podobnosti, důležitosti a recency.
+- `decay_rate` postupně snižuje skóre starých záznamů.
+- `merge_similarity_threshold` slouží k automatickému spojování podobných vzpomínek.
+- Koncepty mohou být abstrahovány do širších shrnutí.
+
+## Bezpečnostní vrstva
+JARVIS nyní používá whitelist akcí a potvrzovací logiku pro rizikové operace.
+
+- **Whitelist:** pouze explicitně definované akce se mohou vykonat.
+- **Potvrzení:** `delete_file`, `shutdown`, `restart`, `install_app`, `uninstall_app`, `run_script`, `kill_process` a podobné akce vyžadují uživatelské potvrzení.
+- **Sandbox režim:** nebezpečné akce je možné blokovat bez změny zbytku systému.
+
+## Vývoj
+
+### Spuštění testů
+```bash
+source venv/bin/activate
+python -m unittest discover tests
 ```
+
+### Přidání nové akce
+1. Přidej do `SYSTEM_PROMPT` v `llm.py`
+2. Implementuj v `commands.py`
+3. Pokud je to bezpečnostní akce, přidej ji do `security.py`
+4. Přidej unit test
