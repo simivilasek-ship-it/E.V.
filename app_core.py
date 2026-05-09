@@ -298,7 +298,8 @@ class JarvisApp:
 
             full_text = full_response.strip()
             if full_text:
-                self._execute_result(full_text, {"action": "answer", "params": {}})
+                # speak=False — věty byly già mluveny po jedné při streamování
+                self._execute_result(full_text, {"action": "answer", "params": {}}, speak=False)
 
         except Exception as e:
             logger.error(f"Chyba: {e}", exc_info=True)
@@ -333,7 +334,8 @@ class JarvisApp:
 
         return None
 
-    def _execute_result(self, message: str, action_data: dict):
+    def _execute_result(self, message: str, action_data: dict, speak: bool = True):
+        """Zobrazí odpověď a vykoná akci. speak=False přeskočí TTS (pokud bylo mluveno při streamování)."""
         action = action_data.get("action", "answer")
         params = action_data.get("params", {})
 
@@ -353,7 +355,8 @@ class JarvisApp:
 
         if message:
             self._gui(lambda m=message: self.gui.add_message(m, "jarvis"))
-            self._speak(message)
+            if speak:
+                self._speak(message)
 
         if action not in ("answer", ""):
             logger.info(f"Akce: {action} {params}")
