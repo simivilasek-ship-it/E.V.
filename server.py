@@ -30,7 +30,18 @@ logger = logging.getLogger(__name__)
 #  INICIALIZACE
 # ──────────────────────────────────────────────────────
 
-app  = FastAPI(title="JARVIS v3.0", docs_url=None, redoc_url=None)
+async def _lifespan(_app):
+    global _loop
+    _loop = asyncio.get_event_loop()
+    logger.info("JARVIS v3.0 server spuštěn")
+    if llm.is_available():
+        logger.info(f"Ollama [{CONFIG['ollama_model']}] OK")
+    else:
+        logger.warning("Ollama není dostupná — spusť: ollama serve")
+    threading.Thread(target=lambda: (time.sleep(1.2), webbrowser.open("http://localhost:8000")), daemon=True).start()
+    yield  # server běží
+
+app  = FastAPI(title="JARVIS v3.0", docs_url=None, redoc_url=None, lifespan=_lifespan)
 llm  = LLMEngine(CONFIG)
 cmds = CommandExecutor(CONFIG)
 
@@ -262,28 +273,6 @@ if os.path.isdir(_frontend_dir):
     app.mount("/static", StaticFiles(directory=_frontend_dir), name="static")
 
 
-# ──────────────────────────────────────────────────────
-#  STARTUP
-# ──────────────────────────────────────────────────────
-
-@app.on_event("startup")
-async def on_startup():
-    global _loop
-    _loop = asyncio.get_event_loop()
-    logger.info("JARVIS v3.0 server spuštěn")
-
-    # Ollama check
-    if llm.is_available():
-        logger.info(f"Ollama [{CONFIG['ollama_model']}] OK")
-    else:
-        logger.warning("Ollama není dostupná — spusť: ollama serve")
-
-    # Otevři browser po 1s
-    def open_browser():
-        time.sleep(1.0)
-        webbrowser.open("http://localhost:8000")
-
-    threading.Thread(target=open_browser, daemon=True).start()
 
 
 # ──────────────────────────────────────────────────────
