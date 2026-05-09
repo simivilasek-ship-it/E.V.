@@ -507,8 +507,9 @@ class JarvisGUI:
 
     def _build_main(self):
         """Sestaví hlavní layout: header → orb sekce → controls."""
-        self._main = ctk.CTkFrame(self.root, fg_color=BG, corner_radius=0)
-        self._main.place(x=0, y=0, width=480, height=700)
+        self._main = ctk.CTkFrame(self.root, fg_color=BG, corner_radius=0,
+                                  width=480, height=700)
+        self._main.place(x=0, y=0)
 
         self._build_header()
         self._build_orb_section()
@@ -641,10 +642,10 @@ class JarvisGUI:
             border_width=0,
             corner_radius=0,
             width=self.CHAT_WIDTH,
+            height=700,
         )
         # Umístění mimo obrazovku
-        self._chat_panel.place(x=-self.CHAT_WIDTH, y=0,
-                               width=self.CHAT_WIDTH, height=700)
+        self._chat_panel.place(x=-self.CHAT_WIDTH, y=0)
         self._chat_panel.pack_propagate(False)
 
         # Nadpis panelu
@@ -854,14 +855,12 @@ class JarvisGUI:
 
         if abs(target - cur) <= abs(step):
             self._chat_cur_x = target
-            self._chat_panel.place(x=target, y=0,
-                                   width=self.CHAT_WIDTH, height=700)
+            self._chat_panel.place(x=target, y=0)
             self._chat_anim = False
             return
 
         self._chat_cur_x += step
-        self._chat_panel.place(x=self._chat_cur_x, y=0,
-                               width=self.CHAT_WIDTH, height=700)
+        self._chat_panel.place(x=self._chat_cur_x, y=0)
         self.root.after(12, lambda: self._slide_chat(target))
 
 
