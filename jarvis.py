@@ -158,9 +158,10 @@ class JarvisApp:
             if sentence_buf.strip():
                 self._speak(sentence_buf.strip())
 
-            # Parsuj finální odpověď
-            message, action_data = self.llm._parse_response(full_response)
-            self._execute_result(message, action_data)
+            # LLM vrátil textovou odpověď — zobraz ji
+            full_text = full_response.strip()
+            if full_text:
+                self._execute_result(full_text, {"action": "answer", "params": {}})
 
         except Exception as e:
             logger.error(f"Chyba: {e}", exc_info=True)

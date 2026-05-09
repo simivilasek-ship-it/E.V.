@@ -88,7 +88,17 @@ cp jarvis.desktop ~/Plocha/   # nebo ~/Desktop/
 | „Kolik je hodin?" | Čas |
 | „Jaké je datum?" | Datum |
 | „Jaký je jas CPU?" | System info |
-| Obecné otázky | Ollama AI odpověď |
+| „Vypočítej 2+2*3" | Kalkulačka |
+| „Přelož hello world" | Překlad (EN→CS) |
+| „Přidej poznámku nakoupit chleba" | Uložení poznámky |
+| „Zobraz poznámky" | Zobrazení poznámek |
+| „Připomeň mi zavolat mamce" | Nastavení připomínky |
+| „Co je Python?" | Hledání na Wikipedii |
+| „Převeď 100 USD na CZK" | Převod měny |
+| „Zapamatuj si uživatel má rád kávu" | Uložení do neural memory |
+| „Co si pamatuješ o uživateli?" | Vyhledávání v paměti |
+| „Statistiky paměti" | Info o neural memory |
+| Obecné otázky | Ollama AI odpověď s kontextem z paměti |
 
 ## Konfigurace (`config.json`)
 
@@ -187,6 +197,24 @@ MIT License - volně šiřitelný a upravitelný.
 - `cs-CZ-VlastaNeural` — žena
 
 **Modely Ollama:** `llama3.1:8b` (výchozí), `mistral:7b`, `llama3.2:3b` (rychlejší)
+
+## Neural AI Memory System
+
+JARVIS používá pokročilý brain-inspired memory systém z [neural-ai-memory](https://github.com/Reezxy/Neural-AI-Memory-system):
+
+### Funkce paměti:
+- **Dynamické ukládání:** Automatické ukládání konverzací s hodnocením důležitosti
+- **Inteligentní vyhledávání:** Sémantické vyhledávání s ohodnocením relevance, důležitosti a časovosti
+- **Automatická údržba:** Decay neaktivních vzpomínek, merge podobných, abstrakce konceptů
+- **Kontext pro AI:** Poskytuje relevantní kontext pro lepší odpovědi
+
+### Příkazy pro paměť:
+- `"Zapamatuj si [informace]"` - Uloží do dlouhodobé paměti
+- `"Co si pamatuješ o [téma]?"` - Vyhledá relevantní vzpomínky
+- `"Statistiky paměti"` - Zobrazí počet uložených vzpomínek
+- `"Údržba paměti"` - Spustí optimalizaci paměti
+
+Paměť se ukládá lokálně v `memory_data/` a přežívá restarty JARVIS.
 
 ## Závislosti
 

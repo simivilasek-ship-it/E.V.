@@ -20,3 +20,6 @@ pyperclip>=1.8.2
 
 # Přesné nastavení hlasitosti (pouze Windows, volitelné)
 # pip install pycaw comtypes
+
+# Neural AI Memory System — pokročilá paměť
+neural-ai-memory[local]>=0.1.0

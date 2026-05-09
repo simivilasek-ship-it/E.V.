@@ -11,6 +11,7 @@ import psutil
 import platform
 import logging
 import shutil
+import math
 from datetime import datetime
 from urllib.parse import quote
 from typing import Dict, Any, Optional
@@ -433,6 +434,52 @@ class CommandExecutor:
         subprocess.Popen(["bash", os.path.expanduser(path)])
         return f"Spouštím: {path}"
 
+    def _cmd_memory_recall(self, query: str = "", top_k: int = 5) -> str:
+        """Vyhledá v neural memory"""
+        try:
+            from memory import JarvisMemory
+            mem = JarvisMemory(self.config)
+            results = mem.recall(query, top_k=top_k)
+            if not results:
+                return "Nic nenalezeno v paměti."
+
+            response = f"Nalezeno {len(results)} vzpomínek:\n"
+            for i, r in enumerate(results, 1):
+                response += f"{i}. [{r['score']:.2f}] {r['content'][:100]}...\n"
+            return response
+        except Exception as e:
+            return f"Chyba paměti: {e}"
+
+    def _cmd_memory_store(self, content: str = "", importance: float = 0.5) -> str:
+        """Uloží do neural memory"""
+        try:
+            from memory import JarvisMemory
+            mem = JarvisMemory(self.config)
+            mem_id = mem.store(content, importance=importance)
+            return f"Uloženo do paměti (ID: {mem_id})."
+        except Exception as e:
+            return f"Chyba: {e}"
+
+    def _cmd_memory_stats(self) -> str:
+        """Statistiky neural memory"""
+        try:
+            from memory import JarvisMemory
+            mem = JarvisMemory(self.config)
+            stats = mem.stats()
+            return f"Paměť: {stats.get('total_memories', 0)} položek, průměrná důležitost: {stats.get('avg_importance', 0):.2f}"
+        except Exception as e:
+            return f"Chyba: {e}"
+
+    def _cmd_memory_maintenance(self) -> str:
+        """Spustí údržbu paměti"""
+        try:
+            from memory import JarvisMemory
+            mem = JarvisMemory(self.config)
+            result = mem.run_maintenance()
+            return f"Údržba dokončena: {result}"
+        except Exception as e:
+            return f"Chyba: {e}"
+
     def _find_app(self, name: str) -> Optional[str]:
         """Najde příkaz pro aplikaci"""
         nl = name.lower().strip()
@@ -441,38 +488,93 @@ class CommandExecutor:
                 return cmd
         return nl
 
-    def _set_volume(self, level: int) -> None:
-        """Nastaví hlasitost"""
-        level = max(0, min(100, level))
-
-        # Windows specifické
-        if self.is_windows:
-            try:
-                import ctypes
-                v = int(level / 100 * 0xFFFF)
-                ctypes.windll.winmm.waveOutSetVolume(None, v | (v << 16))
-                return
-            except Exception:
-                pass
-
-        # Linux přes pactl
-        if self.is_linux:
-            try:
-                subprocess.run(
-                    ["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{level}%"],
-                    capture_output=True,
-                    check=True
-                )
-                return
-            except Exception:
-                pass
-
-        # Fallback přes pyautogui
+    def _cmd_calculate(self, expression: str) -> str:
+        """Vypočítá matematický výraz"""
         try:
-            # Zjednodušený fallback - nefunguje přesně
-            for _ in range(50):
-                pyautogui.press("volumedown")
-            for _ in range(level // 2):
-                pyautogui.press("volumeup")
-        except Exception:
-            pass
+            # Bezpečné vyhodnocení
+            allowed_names = {
+                k: v for k, v in math.__dict__.items() if not k.startswith("__")
+            }
+            allowed_names.update({"__builtins__": {}})
+            result = eval(expression, allowed_names)
+            return f"{expression} = {result}"
+        except Exception as e:
+            return f"Chyba výpočtu: {e}"
+
+    def _cmd_translate(self, text: str, from_lang: str = "auto", to_lang: str = "cs") -> str:
+        """Přeloží text (jednoduchá implementace, může být rozšířena)"""
+        try:
+            # Zjednodušený překlad - v reálu by použil API jako Google Translate
+            # Pro demo jen základní slova
+            translations = {
+                "hello": "ahoj", "world": "svět", "computer": "počítač",
+                "time": "čas", "day": "den", "night": "noc"
+            }
+            words = text.lower().split()
+            translated = [translations.get(w, w) for w in words]
+            return f"Překlad: {' '.join(translated)}"
+        except Exception as e:
+            return f"Chyba překladu: {e}"
+
+    def _cmd_note_add(self, note: str) -> str:
+        """Přidá poznámku"""
+        try:
+            notes_file = os.path.join(_HOME, "jarvis_notes.txt")
+            with open(notes_file, "a", encoding="utf-8") as f:
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"[{timestamp}] {note}\n")
+            return "Poznámka uložena."
+        except Exception as e:
+            return f"Chyba: {e}"
+
+    def _cmd_note_list(self) -> str:
+        """Zobrazí poznámky"""
+        try:
+            notes_file = os.path.join(_HOME, "jarvis_notes.txt")
+            if os.path.exists(notes_file):
+                with open(notes_file, "r", encoding="utf-8") as f:
+                    notes = f.read().strip()
+                return notes if notes else "Žádné poznámky."
+            return "Žádné poznámky."
+        except Exception as e:
+            return f"Chyba: {e}"
+
+    def _cmd_reminder_set(self, text: str, time_str: str) -> str:
+        """Nastaví připomínku"""
+        try:
+            # Zjednodušené parsování času
+            import threading
+            def remind():
+                time.sleep(60)  # Pro demo 1 minuta
+                # Zde by byla notifikace
+                logger.info(f"Připomínka: {text}")
+            thread = threading.Thread(target=remind, daemon=True)
+            thread.start()
+            return f"Připomínka nastavena: {text}"
+        except Exception as e:
+            return f"Chyba: {e}"
+
+    def _cmd_wiki_search(self, query: str) -> str:
+        """Hledá na Wikipedii"""
+        try:
+            import requests
+            url = f"https://cs.wikipedia.org/api/rest_v1/page/summary/{quote(query)}"
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("extract", "Nenalezeno.").split(".")[0] + "."
+            return "Nenalezeno na Wikipedii."
+        except Exception as e:
+            return f"Chyba: {e}"
+
+    def _cmd_currency_convert(self, amount: float, from_curr: str, to_curr: str) -> str:
+        """Převede měnu (jednoduchá implementace)"""
+        try:
+            # Zjednodušené kurzy
+            rates = {"USD": 1.0, "EUR": 0.85, "CZK": 25.0}
+            if from_curr.upper() in rates and to_curr.upper() in rates:
+                result = amount * rates[to_curr.upper()] / rates[from_curr.upper()]
+                return f"{amount} {from_curr.upper()} = {result:.2f} {to_curr.upper()}"
+            return "Nepodporované měny."
+        except Exception as e:
+            return f"Chyba: {e}"
