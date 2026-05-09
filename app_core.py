@@ -40,6 +40,9 @@ class JarvisApp:
         self.gui.on_mic_click    = self._on_mic_click
         self.gui.on_send         = self._on_send
         self.gui.on_model_change = self._on_model_change
+        self.gui.on_language_change = self._on_language_change
+        self.gui.on_energy_threshold_change = self._on_energy_threshold_change
+        self.gui.on_tts_rate_change = self._on_tts_rate_change
 
         signal.signal(signal.SIGINT,  self._sig)
         signal.signal(signal.SIGTERM, self._sig)
@@ -69,6 +72,39 @@ class JarvisApp:
         except Exception:
             pass
         self._gui(lambda m=model: self.gui.add_message(f"Model: {m}", "jarvis"))
+
+    def _on_language_change(self, language: str):
+        """Změní jazyk rozpoznávání řeči."""
+        if self.stt.set_language(language):
+            CONFIG["stt_language"] = language
+            try:
+                save_config(CONFIG)
+            except Exception:
+                pass
+            lang_name = CONFIG.get("available_languages", {}).get(language, language)
+            self._gui(lambda l=lang_name: self.gui.add_message(f"Jazyk STT: {l}", "jarvis"))
+        else:
+            self._gui(lambda: self.gui.add_message("Jazyk není dostupný.", "jarvis"))
+
+    def _on_energy_threshold_change(self, energy: int):
+        """Změní energetický práh mikrofonu."""
+        CONFIG["stt_energy_threshold"] = energy
+        self.stt.recognizer.energy_threshold = energy
+        try:
+            save_config(CONFIG)
+        except Exception:
+            pass
+        logger.info(f"Energetický práh: {energy}")
+
+    def _on_tts_rate_change(self, rate: int):
+        """Změní rychlost TTS."""
+        CONFIG["tts_rate"] = rate
+        self.tts.rate = rate
+        try:
+            save_config(CONFIG)
+        except Exception:
+            pass
+        self._gui(lambda r=rate: self.gui.add_message(f"TTS rychlost: {r}", "jarvis"))
 
     def _listen_and_process(self):
         self._gui(lambda: self.gui.set_state("listening"))

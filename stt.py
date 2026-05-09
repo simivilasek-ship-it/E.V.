@@ -1,6 +1,6 @@
 """
-JARVIS v2.0 — Speech-to-Text (STT)
-Rozpoznávání řeči pomocí SpeechRecognition
+JARVIS v3.0 — Speech-to-Text (STT)
+Rozpoznávání řeči s podporou více jazyků
 """
 
 import logging
@@ -16,20 +16,36 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class STTEngine:
-    """Engine pro rozpoznávání řeči"""
+    """Engine pro rozpoznávání řeči s multi-language supportem"""
 
     def __init__(self, config: dict):
         self.config = config
         self.recognizer = None
+        self.language = config.get("stt_language", "cs-CZ")
 
         if HAS_STT:
             self.recognizer = sr.Recognizer()
             self.recognizer.pause_threshold = 1.0
             self.recognizer.energy_threshold = config.get("stt_energy_threshold", 300)
             self.recognizer.dynamic_energy_threshold = True
-            logger.info("STT engine inicializován")
+            logger.info(f"STT engine inicializován (jazyk: {self.language})")
         else:
             logger.warning("SpeechRecognition není nainstalován - STT nebude fungovat")
+
+    def set_language(self, language_code: str) -> bool:
+        """Změní jazyk rozpoznávání řeči."""
+        available = self.config.get("available_languages", {})
+        if language_code not in available:
+            logger.warning(f"Jazyk {language_code} není dostupný")
+            return False
+        self.language = language_code
+        self.config["stt_language"] = language_code
+        logger.info(f"Jazyk změněn na {language_code}")
+        return True
+
+    def get_language(self) -> str:
+        """Vrátí aktuálně nastaveného jazyka."""
+        return self.language
 
     def listen(self) -> Optional[str]:
         """
@@ -45,7 +61,7 @@ class STTEngine:
                 logger.debug("Přizpůsobuji se okolnímu hluku...")
                 self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
 
-                logger.info("Poslouchám...")
+                logger.info(f"Poslouchám... ({self.language})")
                 audio = self.recognizer.listen(
                     source,
                     timeout=self.config.get("stt_timeout", 10),
@@ -54,16 +70,20 @@ class STTEngine:
 
             # Primární rozpoznávání (Google)
             try:
-                text = self.recognizer.recognize_google(audio, language="cs-CZ")
+                text = self.recognizer.recognize_google(audio, language=self.language)
                 logger.info(f"Rozpoznáno: {text}")
                 return text
             except sr.UnknownValueError:
                 logger.warning("Nerozuměl jsem - zkouším offline...")
-                # Fallback na offline rozpoznávání
+                # Fallback na offline rozpoznávání (omezeno na češtinu)
                 try:
-                    text = self.recognizer.recognize_sphinx(audio, language="cs-CZ")
-                    logger.info(f"Offline rozpoznáno: {text}")
-                    return text
+                    if self.language.startswith("cs"):
+                        text = self.recognizer.recognize_sphinx(audio, language="cs-CZ")
+                        logger.info(f"Offline rozpoznáno: {text}")
+                        return text
+                    else:
+                        logger.warning(f"Offline rozpoznávání není dostupné pro {self.language}")
+                        return None
                 except sr.UnknownValueError:
                     logger.warning("Offline rozpoznávání také selhalo")
                     return None
@@ -77,6 +97,19 @@ class STTEngine:
         except Exception as e:
             logger.error(f"Chyba mikrofonu: {e}")
             return None
+
+    def is_available(self) -> bool:
+        """Ověří dostupnost mikrofonu."""
+        if not HAS_STT:
+            return False
+        try:
+            with sr.Microphone() as source:
+                logger.debug("Mikrofon dostupný")
+                return True
+        except Exception as e:
+            logger.error(f"Mikrofon není dostupný: {e}")
+            return False
+
 
     def is_available(self) -> bool:
         """Vrátí True pokud STT funguje"""

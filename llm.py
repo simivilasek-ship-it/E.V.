@@ -493,12 +493,12 @@ _router = LocalRouter()
 
 class LLMEngine:
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, memory: JarvisMemory = None):
         self.config  = config
         self.url     = config["ollama_url"]
         self.model   = config["ollama_model"]
         self.history: deque = deque(maxlen=config.get("history_size", 20))  # fallback
-        self.memory  = JarvisMemory(config)  # neural memory
+        self.memory  = memory or JarvisMemory(config)  # neural memory
         self._stream_resp = None
         logger.info(f"LLM: {self.model} @ {self.url} + Neural Memory")
 

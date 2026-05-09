@@ -117,6 +117,12 @@ class OrbCanvas(tk.Canvas):
         self._particles  = [Particle(self.cx, self.cy) for _ in range(55)]
         self._animate()
 
+    _speed_mult = 1.0
+
+    def set_speed(self, multiplier: float):
+        """Nastaví rychlost animace (0.1 = pomalé, 1.0 = normální)"""
+        self._speed_mult = max(0.1, min(1.0, multiplier))
+
     def set_state(self, s):
         if s in ORB_COLORS:
             self._state = s
@@ -128,12 +134,13 @@ class OrbCanvas(tk.Canvas):
 
     def _animate(self):
         if not self._running: return
-        self._frame  += 1
-        self._pulse  += 0.04
-        self._ring_a  = (self._ring_a  + 1.1) % 360
-        self._ring2_a = (self._ring2_a - 0.7) % 360
+        sm = self._speed_mult
+        self._frame  += 1 * sm
+        self._pulse  += 0.04 * sm
+        self._ring_a  = (self._ring_a  + 1.1 * sm) % 360
+        self._ring2_a = (self._ring2_a - 0.7 * sm) % 360
         if self._lerp_t < 1.0:
-            self._lerp_t = min(1.0, self._lerp_t + 0.06)
+            self._lerp_t = min(1.0, self._lerp_t + 0.06 * sm)
             self._color  = lerp(self._color, self._tgt, self._lerp_t)
         self._draw()
         self.after(30, self._animate)
@@ -230,9 +237,12 @@ class JarvisGUI:
     LEFT_W = 300
 
     def __init__(self):
-        self.on_mic_click:    callable = None
-        self.on_send:         callable = None
-        self.on_model_change: callable = None
+        self.on_mic_click:         callable = None
+        self.on_send:              callable = None
+        self.on_model_change:      callable = None
+        self.on_language_change:   callable = None
+        self.on_energy_threshold_change: callable = None
+        self.on_tts_rate_change:   callable = None
 
         self._state = "idle"
         self._setup()
@@ -322,6 +332,9 @@ class JarvisGUI:
         # Model selector
         self._build_model_bar(parent)
 
+        # Settings tlačítko
+        self._build_settings_bar(parent)
+
         ctk.CTkFrame(parent, fg_color=BORDER, height=1, corner_radius=0).pack(fill="x", pady=(0, 0))
 
         # Mic tlačítko
@@ -350,6 +363,23 @@ class JarvisGUI:
             corner_radius=4,
         )
         self._model_opt.pack(side="left", padx=6)
+
+    def _build_settings_bar(self, parent):
+        bar = ctk.CTkFrame(parent, fg_color=BG2, corner_radius=0, height=40)
+        bar.pack(fill="x")
+        bar.pack_propagate(False)
+
+        ctk.CTkLabel(bar, text="NASTAVENÍ", font=("Courier New", 8),
+                     text_color=BORDER).pack(side="left", padx=10)
+
+        ctk.CTkButton(
+            bar, text="⚙",
+            font=("DM Sans", 16),
+            fg_color=BG3, hover_color=BORDER,
+            text_color=CYAN,
+            corner_radius=4, width=36, height=28,
+            command=self._open_settings
+        ).pack(side="left", padx=6)
 
     def _build_mic_area(self, parent):
         area = ctk.CTkFrame(parent, fg_color=BG2, corner_radius=0)
@@ -529,6 +559,115 @@ class JarvisGUI:
         self.root.mainloop()
 
     # ── INTERNÍ ──────────────────────────────────────
+
+    def _open_settings(self):
+        """Otevře Settings dialog."""
+        dialog = ctk.CTkToplevel(self.root)
+        dialog.title("NASTAVENÍ")
+        dialog.geometry("400x400")
+        dialog.resizable(False, False)
+        dialog.configure(fg_color=BG)
+        dialog.grab_set()
+        
+        # Centruj dialog
+        self.root.update_idletasks()
+        x = self.root.winfo_x() + (self.W - 400) // 2
+        y = self.root.winfo_y() + (self.H - 400) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        # Scroll frame pro obsah
+        scroll = ctk.CTkScrollableFrame(dialog, fg_color=BG, corner_radius=0)
+        scroll.pack(fill="both", expand=True, padx=0, pady=0)
+
+        # ── JAZYK STT ────────────────────────────────────
+        ctk.CTkLabel(scroll, text="Jazyk rozpoznávání (STT):",
+                     font=("Courier New", 11), text_color=FG).pack(anchor="w", padx=12, pady=(12, 4))
+
+        self._lang_var = ctk.StringVar(value="cs-CZ")
+        lang_opt = ctk.CTkOptionMenu(
+            scroll,
+            variable=self._lang_var,
+            values=["cs-CZ", "en-US", "en-GB", "es-ES", "fr-FR", "de-DE", "it-IT", "pt-BR", "pl-PL", "ru-RU"],
+            command=self._on_language_select,
+            fg_color=BG3, button_color=CYAN2,
+            button_hover_color=BORDER,
+            text_color=FG, dropdown_text_color=FG,
+            font=("DM Sans", 11),
+            corner_radius=4,
+        )
+        lang_opt.pack(anchor="w", padx=12, pady=(0, 12), fill="x")
+
+        ctk.CTkLabel(scroll, text="",
+                     font=("Courier New", 8), text_color=BORDER).pack()
+
+        # ── ENERGETICKÝ PRÁH ─────────────────────────────
+        ctk.CTkLabel(scroll, text="Citlivost mikrofonu (energetický práh):",
+                     font=("Courier New", 11), text_color=FG).pack(anchor="w", padx=12, pady=(12, 4))
+
+        self._energy_var = ctk.IntVar(value=300)
+        energy_slider = ctk.CTkSlider(
+            scroll,
+            from_=100, to=4000,
+            variable=self._energy_var,
+            command=self._on_energy_change,
+            fg_color=BORDER, progress_color=CYAN,
+            button_color=CYAN2, button_hover_color=CYAN,
+            corner_radius=4, height=6,
+        )
+        energy_slider.pack(anchor="w", padx=12, pady=(0, 6), fill="x")
+
+        self._energy_lbl = ctk.CTkLabel(scroll, text="300",
+                                         font=("Courier New", 10), text_color=FG2)
+        self._energy_lbl.pack(anchor="w", padx=12, pady=(0, 12))
+
+        ctk.CTkLabel(scroll, text="Nižší = citlivější",
+                     font=("Courier New", 8), text_color=BORDER).pack(anchor="w", padx=12)
+
+        ctk.CTkLabel(scroll, text="",
+                     font=("Courier New", 8), text_color=BORDER).pack()
+
+        # ── HLASITOST TTS ────────────────────────────────
+        ctk.CTkLabel(scroll, text="Rychlost TTS:",
+                     font=("Courier New", 11), text_color=FG).pack(anchor="w", padx=12, pady=(12, 4))
+
+        self._tts_var = ctk.IntVar(value=170)
+        tts_slider = ctk.CTkSlider(
+            scroll,
+            from_=100, to=250,
+            variable=self._tts_var,
+            command=self._on_tts_change,
+            fg_color=BORDER, progress_color=CYAN,
+            button_color=CYAN2, button_hover_color=CYAN,
+            corner_radius=4, height=6,
+        )
+        tts_slider.pack(anchor="w", padx=12, pady=(0, 6), fill="x")
+
+        self._tts_lbl = ctk.CTkLabel(scroll, text="170",
+                                      font=("Courier New", 10), text_color=FG2)
+        self._tts_lbl.pack(anchor="w", padx=12, pady=(0, 12))
+
+        ctk.CTkLabel(scroll, text="Vyšší = rychleji",
+                     font=("Courier New", 8), text_color=BORDER).pack(anchor="w", padx=12)
+
+        # Chyť zavření dialogu
+        dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+
+    def _on_language_select(self, value):
+        if self.on_language_change:
+            self.on_language_change(value)
+        self._add_sys(f"Jazyk: {value}")
+
+    def _on_energy_change(self, value):
+        val = int(float(value))
+        self._energy_lbl.configure(text=str(val))
+        if self.on_energy_threshold_change:
+            self.on_energy_threshold_change(val)
+
+    def _on_tts_change(self, value):
+        val = int(float(value))
+        self._tts_lbl.configure(text=str(val))
+        if self.on_tts_rate_change:
+            self.on_tts_rate_change(val)
 
     def _on_mic(self):
         if self.on_mic_click:

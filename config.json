@@ -10,5 +10,18 @@
   "stt_timeout": 10,
   "stt_phrase_limit": 15,
   "stt_energy_threshold": 300,
+  "stt_language": "cs-CZ",
+  "available_languages": {
+    "cs-CZ": "Čeština",
+    "en-US": "English",
+    "en-GB": "English (UK)",
+    "es-ES": "Español",
+    "fr-FR": "Français",
+    "de-DE": "Deutsch",
+    "it-IT": "Italiano",
+    "pt-BR": "Português",
+    "pl-PL": "Polski",
+    "ru-RU": "Русский"
+  },
   "theme": "dark"
 }

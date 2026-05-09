@@ -101,6 +101,7 @@ class TTSEngine:
         """Syntéza pomocí pyttsx3"""
         try:
             if self._pyttsx3_engine:
+                self._pyttsx3_engine.setProperty("rate", self.rate)
                 self._pyttsx3_engine.say(text)
                 self._pyttsx3_engine.runAndWait()
             else:
