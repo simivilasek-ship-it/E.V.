@@ -4,6 +4,7 @@ JARVIS v2.0 — LLM komunikace
 
 import os
 import re
+import json
 import requests
 import logging
 from typing import Dict, Tuple
@@ -237,6 +238,70 @@ class LLMEngine:
             "vscode_open":   f"Otevírám ve VSCode.",
         }
         return msgs.get(command, "Provádím akci.")
+
+    def stream_ask(self, user_text: str):
+        """
+        Generator: streamuje tokeny z Ollama jeden po druhém.
+        Přidá user zprávu do historie; assistant přidá volající kód
+        po získání plné odpovědi přes _parse_response.
+        """
+        self.history.append({"role": "user", "content": user_text})
+        self._stream_resp = None
+
+        payload = {
+            "model":    self.model,
+            "messages": [{"role": "system", "content": SYSTEM_PROMPT},
+                         *list(self.history)],
+            "stream":   True,
+            "options":  {"temperature": 0.1, "num_predict": 500},
+        }
+
+        try:
+            self._stream_resp = requests.post(
+                self.url, json=payload, stream=True, timeout=60
+            )
+            self._stream_resp.raise_for_status()
+
+            for line in self._stream_resp.iter_lines():
+                if not line:
+                    continue
+                try:
+                    data  = json.loads(line.decode("utf-8"))
+                    chunk = data.get("message", {}).get("content", "")
+                    if chunk:
+                        yield chunk
+                    if data.get("done"):
+                        break
+                except json.JSONDecodeError:
+                    continue
+
+        except Exception as e:
+            logger.error(f"Stream chyba: {e}")
+            yield f"Chyba: {e}"
+        finally:
+            self._stream_resp = None
+
+    def drain_stream(self):
+        """Dočerpá zbytek streamu po přerušení (COMMAND detekce)"""
+        if self._stream_resp is None:
+            return
+        try:
+            for line in self._stream_resp.iter_lines():
+                if not line:
+                    continue
+                try:
+                    data  = json.loads(line.decode("utf-8"))
+                    chunk = data.get("message", {}).get("content", "")
+                    if chunk:
+                        yield chunk
+                    if data.get("done"):
+                        break
+                except json.JSONDecodeError:
+                    continue
+        except Exception:
+            pass
+        finally:
+            self._stream_resp = None
 
     def clear_history(self):
         self.history.clear()
