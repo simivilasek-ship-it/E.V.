@@ -258,9 +258,11 @@ graph TB
     Router -->|nepoznáno| Ollama[Ollama API]
     Ollama --> Core
     Core -->|zobrazení| GUI
-    Core --> Memory[JarvisMemory / neural memory]
+    Core -->|údržba| Memory[JarvisMemory / neural memory]
     Memory -->|context| Router
-    Core -->|údržba| Memory
+    Core -->|error handling| ErrorHandler[ErrorHandler / robustní error handling]
+    Core -->|async tasks| AsyncEngine[AsyncEngine / asynchronní operace]
+    Core -->|plugins| PluginManager[PluginManager / rozšiřitelnost]
 ```
 
 ### Moduly
@@ -272,14 +274,79 @@ graph TB
 - `memory.py` — neural memory wrapper s ukládáním, recall kontextem a údržbou
 - `security.py` — whitelist a potvrzovací logika pro nebezpečné akce
 - `logging_setup.py` — samostatná konfigurace logování
+- `error_handling.py` — robustní error handling s fallbacky a recovery strategií
+- `async_utils.py` — asynchronní engine pro správu úloh s prioritami
+- `plugin_system.py` — plugin systém pro rozšiřitelnost JARVIS
+
+## Pokročilé funkce
+
+### Error Handling & Fallback System
+
+JARVIS obsahuje robustní error handling systém s automatickými fallbacky:
+
+#### Funkce error handlingu:
+- **Kategorizace chyb** — Network, System, Configuration, Dependency, Permission, Timeout, Resource, Unknown
+- **Automatické fallbacky** — STT → offline Sphinx, TTS → pyttsx3, LLM → základní odpověď
+- **Recovery strategie** — Automatické opravy pro síťové a dependency chyby
+- **Rate limiting** — Ochrana před opakovanými chybami
+- **Logování** — Detailní záznamy s kontextem a traceback
+
+#### Built-in fallbacky:
+- **STT fallback** — Při selhání Google STT použije offline rozpoznávání
+- **TTS fallback** — Při selhání Edge TTS použije pyttsx3
+- **LLM fallback** — Při nedostupnosti Ollama vrátí základní odpověď
+- **Network recovery** — Automatické testování a obnovení připojení
+
+### Async Operations Engine
+
+Unified asynchronní layer pro konzistentní správu úloh:
+
+#### Funkce async enginu:
+- **Task priority** — LOW, NORMAL, HIGH, CRITICAL priority levels
+- **Thread pool** — Konfigurovatelný počet worker threadů (výchozí 4)
+- **Task lifecycle** — PENDING → RUNNING → COMPLETED/FAILED/TIMEOUT/CANCELLED
+- **Error handling** — Callbacky pro task completion a errors
+- **Timeout management** — Automatické ukončování dlouhých úloh
+
+#### Použití v JARVIS:
+- **STT processing** — Asynchronní rozpoznávání řeči
+- **TTS playback** — Asynchronní přehrávání řeči
+- **Command execution** — Asynchronní spouštění systémových příkazů
+- **Plugin operations** — Asynchronní plugin akce
+
+### Plugin System
+
+Rozšiřitelná architektura pro pluginy:
+
+#### Funkce plugin systému:
+- **Plugin discovery** — Automatické načítání z `plugins/` adresáře
+- **Metadata management** — Verze, autor, závislosti, oprávnění
+- **Command routing** — Pluginy mohou registrovat vlastní příkazy
+- **Action execution** — Pluginy mohou poskytovat vlastní akce
+- **Configuration** — Per-plugin konfigurace s validací schématu
+
+#### Plugin API:
+```python
+class MyPlugin(PluginBase):
+    def on_load(self):
+        # Inicializace pluginu
+        pass
+    
+    def get_commands(self):
+        return {"můj příkaz": self.handle_command}
+    
+    def get_actions(self):
+        return {"moje_akce": self.execute_action}
+```
 
 ## Datové toky
 1. Uživatel mluví nebo píše do GUI.
-2. `JarvisApp` přijme text a nejdříve zkusí lokální router v `LLMEngine`.
-3. Pokud router nalezne akci, ta se provede lokálně.
-4. Pokud se akce nerozpozná, dotaz jde na Ollama a výstup se zobrazí uživateli.
-5. Relevantní výsledky i konverzace se ukládají do `JarvisMemory`.
-6. Při dalších dotazech se do promptu přidává kontext z paměti.
+2. `JarvisApp` přijme text a nejdříve zkusí plugin routes.
+3. Pokud plugin neodpoví, zkusí lokální router v `LLMEngine`.
+4. Pokud router nalezne akci, ta se provede s error handling.
+5. Pokud se akce nerozpozná, dotaz jde na Ollama s kontextem z paměti.
+6. Výsledek se zobrazí uživateli a uloží se do neural memory.
+7. Všechny operace probíhají asynchronně s fallbacky při chybách.
 
 ## Memory pipeline
 Paměť `JarvisMemory` využívá `neural-ai-memory` jako brain-inspired vrstvu:
