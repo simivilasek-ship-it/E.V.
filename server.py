@@ -271,10 +271,10 @@ async def get_models():
         resp = requests.get(base, timeout=4)
         if resp.status_code == 200:
             models = [m["name"] for m in resp.json().get("models", [])]
-            return {"models": models, "current": CONFIG["ollama_model"]}
+            return {"models": models, "current": llm.model}  # llm.model je pravda
     except Exception:
         pass
-    return {"models": [], "current": CONFIG["ollama_model"]}
+    return {"models": [], "current": llm.model}
 
 
 @app.post("/api/model/{model_name:path}")

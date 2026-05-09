@@ -8,14 +8,17 @@ import json
 from typing import Dict, Any
 
 AVAILABLE_OLLAMA_MODELS = [
+    "qwen2.5:3b",
     "llama3.1:8b",
     "llama3.2:3b",
     "mistral:7b",
+    "deepseek-coder:latest",
+    "qwen2.5-coder:1.5b-base",
 ]
 
 DEFAULT_CONFIG = {
     "ollama_url": "http://localhost:11434/api/chat",
-    "ollama_model": "llama3.1:8b",
+    "ollama_model": "qwen2.5:3b",   # výchozí — lepší než llama3.1:8b
     "tts_enabled": True,
     "tts_voice": "cs-CZ-AntoninNeural",
     "tts_rate": 170,

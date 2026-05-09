@@ -1,8 +1,14 @@
 {
-  "ollama_url":   "http://localhost:11434/api/chat",
-  "ollama_model": "llama3.1:8b",
-  "tts_enabled":  true,
-  "tts_voice":    "cs-CZ-AntoninNeural",
+  "ollama_url": "http://localhost:11434/api/chat",
+  "ollama_model": "qwen2.5:3b",
+  "tts_enabled": true,
+  "tts_voice": "cs-CZ-AntoninNeural",
+  "tts_rate": 170,
   "history_size": 20,
-  "window_size":  "600x820"
+  "window_size": "600x820",
+  "log_level": "INFO",
+  "stt_timeout": 10,
+  "stt_phrase_limit": 15,
+  "stt_energy_threshold": 300,
+  "theme": "dark"
 }
