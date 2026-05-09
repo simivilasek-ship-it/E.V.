@@ -45,6 +45,12 @@ class JarvisApp:
         signal.signal(signal.SIGINT,  self._sig)
         signal.signal(signal.SIGTERM, self._sig)
 
+        # Napoj clear_mem na llm.clear_history
+        self.gui._clear_mem = lambda: (
+            self.llm.clear_history(),
+            self.gui._add_sys("Paměť vymazána.")
+        )
+
         self.gui.root.after(800, self._check_ollama)
         logger.info("JARVIS připraven.")
 
