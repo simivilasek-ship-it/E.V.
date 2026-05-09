@@ -118,50 +118,141 @@ class LLMEngine:
         self.history: deque = deque(maxlen=config.get("history_size", 20))
         logger.info(f"LLM: {self.model} @ {self.url}")
 
-    # Slova která odstraníme z hudebního dotazu
+    # Slovník webů → URL
+    _SITES = {
+        "youtube": "https://www.youtube.com",
+        "google":  "https://www.google.com",
+        "github":  "https://github.com",
+        "facebook":"https://www.facebook.com",
+        "instagram":"https://www.instagram.com",
+        "reddit":  "https://www.reddit.com",
+        "twitch":  "https://www.twitch.tv",
+        "netflix": "https://www.netflix.com",
+        "gmail":   "https://mail.google.com",
+        "twitter": "https://www.twitter.com",
+        "maps":    "https://maps.google.com",
+        "moodle":  "https://moodle.sspu-opava.cz",
+        "spotify": "https://open.spotify.com",
+    }
+
+    # Slovník aplikací
+    _APPS = {
+        "chrome": "chrome", "firefox": "firefox", "discord": "discord",
+        "spotify": "spotify", "steam": "steam", "vscode": "code",
+        "code": "code", "telegram": "telegram", "vlc": "vlc",
+        "kalkulačka": "calc", "notepad": "notepad",
+        "průzkumník": "explorer", "soubory": "explorer",
+    }
+
+    # Trigger slova pro hudbu — odstraníme je z query
     _MUSIC_STOP = re.compile(
         r"\b(pusti?t?|zahraj|přehraj|play|spusť|dej|chci|prosím|mi|na|ve?"
-        r"|spotify|youtube|hudbu|muziku|písni?čku?|song|track|skladbu)\b",
-        re.IGNORECASE
+        r"|spotify|youtube|hudbu|muziku|písni?čku?|song|track|skladbu|zvuk)\b",
+        re.IGNORECASE,
     )
 
-    # Lokální quick-match — bez LLM, okamžitá odpověď
-    _QUICK = [
-        # Hudba — vytáhne query z přirozeného jazyka
-        (r"(pusti?t?|zahraj|přehraj|spusť|play).{0,60}",  "youtube_play", None),
-        # Čas / datum / system
-        (r"\b(čas|cas|hodin|time)\b",                      "get_time",     {}),
-        (r"\b(datum|date|dnes)\b",                          "get_date",     {}),
-        (r"\b(system|cpu|ram|disk)\b",                     "system_info",  {}),
-    ]
-
     def _quick_match(self, text: str) -> tuple:
-        """Vrátí (message, action_data) pro jednoduché dotazy bez LLM, nebo (None, None)."""
+        """
+        Lokální router — zpracuje ~90% příkazů bez LLM.
+        Vrátí (message, action_data) nebo (None, None) → jde na LLM.
+        """
         from datetime import datetime as _dt
-        t = text.lower()
+        t  = text.lower().strip()
+        dt = _dt.now()
 
-        for pattern, action, params in self._QUICK:
-            if not re.search(pattern, t):
-                continue
+        # ── ČAS ──────────────────────────────────────
+        if re.search(r"\b(čas|cas|kolik[  ]je|hodin|time)\b", t):
+            now = dt.strftime("%H:%M:%S")
+            return f"Je {now}.", {"action": "get_time", "params": {}}
 
-            if action == "get_time":
-                now = _dt.now().strftime("%H:%M:%S")
-                return f"Je {now}.", {"action": action, "params": {}}
+        # ── DATUM ─────────────────────────────────────
+        if re.search(r"\b(datum|date|dnes|jaký[  ]den)\b", t):
+            d = dt.strftime("%-d. %-m. %Y")
+            return f"Dnes je {d}.", {"action": "get_date", "params": {}}
 
-            if action == "get_date":
-                d = _dt.now().strftime("%-d. %-m. %Y")
-                return f"Dnes je {d}.", {"action": action, "params": {}}
+        # ── SYSTEM INFO ───────────────────────────────
+        if re.search(r"\b(system[  ]info|cpu|ram|disk|procesor|využití)\b", t):
+            return None, {"action": "system_info", "params": {}}
 
-            if action == "system_info":
-                return None, {"action": action, "params": {}}
+        # ── SCREENSHOT ────────────────────────────────
+        if re.search(r"\b(screenshot|snímek[  ]obrazovky|printscreen)\b", t):
+            return "Pořizuji screenshot.", {"action": "screenshot", "params": {}}
 
-            if action == "youtube_play":
-                # Extrahuj query: odstraň trigger slova
-                query = self._MUSIC_STOP.sub("", text).strip(" ,.-")
-                if len(query) > 2:
-                    return (f"Přehrávám: {query}.",
-                            {"action": action, "params": {"query": query, "index": 1, "audio_only": False}})
+        # ── VYPNOUT ───────────────────────────────────
+        if re.search(r"\b(vypni|vypnout|shutdown)\b", t):
+            return "Vypínám počítač.", {"action": "shutdown", "params": {"delay": 0}}
 
+        # ── RESTART ───────────────────────────────────
+        if re.search(r"\b(restart|restartuj)\b", t):
+            return "Restartuji.", {"action": "restart", "params": {"delay": 0}}
+
+        # ── USPAT ─────────────────────────────────────
+        if re.search(r"\b(uspi|uspat|sleep|spánek)\b", t):
+            return "Uspávám počítač.", {"action": "sleep_pc", "params": {}}
+
+        # ── HLASITOST ─────────────────────────────────
+        vol = re.search(r"\b(hlasitost|volume|zvuk)\b.*?(\d+)", t)
+        if vol:
+            lvl = min(100, max(0, int(vol.group(2))))
+            return f"Hlasitost: {lvl}%.", {"action": "volume", "params": {"level": lvl}}
+        if re.search(r"\b(ztlum|mute)\b", t):
+            return "Ztlumeno.", {"action": "volume", "params": {"action": "mute"}}
+        if re.search(r"\b(odtlum|unmute|zesil)\b", t):
+            return "Odtlumeno.", {"action": "volume", "params": {"action": "unmute"}}
+
+        # ── HUDBA ─────────────────────────────────────
+        if re.search(r"\b(pust|zahraj|přehraj|spusť|play)\b", t):
+            # Samotný název webu bez obsahu → otevři web
+            for site, url in self._SITES.items():
+                if site in t:
+                    rest = re.sub(rf"\b{site}\b", "", t)
+                    rest = self._MUSIC_STOP.sub("", rest).strip()
+                    if len(rest) < 3:   # jen "pust youtube" bez názvu
+                        return f"Otevírám {site.capitalize()}.", {
+                            "action": "open_url", "params": {"url": url}}
+            # Extrahuj query
+            query = self._MUSIC_STOP.sub("", text).strip(" ,.-")
+            if len(query) > 2:
+                return f"Přehrávám: {query}.", {
+                    "action": "youtube_play",
+                    "params": {"query": query, "index": 1, "audio_only": False}}
+
+        # ── POČASÍ ────────────────────────────────────
+        if re.search(r"\b(počasí|weather)\b", t):
+            m = re.search(r"\b(počasí|weather)\b\s+(\w+)", t)
+            city = m.group(2).capitalize() if m else ""
+            return f"Zjišťuji počasí{' v ' + city if city else ''}.", {
+                "action": "weather", "params": {"city": city}}
+
+        # ── TIMER ─────────────────────────────────────
+        if re.search(r"\b(timer|časovač|připomínka|upozorni)\b", t):
+            m = re.search(r"(\d+)\s*(minut|sekund|hodin)", t)
+            if m:
+                n, unit = int(m.group(1)), m.group(2)
+                secs = n * (3600 if unit.startswith("hodin") else 60 if unit.startswith("minut") else 1)
+                return f"Timer {n} {unit}.", {
+                    "action": "set_timer", "params": {"seconds": secs, "label": "Timer"}}
+
+        # ── OTEVŘÍT WEB ───────────────────────────────
+        if re.search(r"\b(otevři|open|jdi[  ]na|zobraz)\b", t):
+            for site, url in self._SITES.items():
+                if site in t:
+                    return f"Otevírám {site.capitalize()}.", {
+                        "action": "open_url", "params": {"url": url}}
+            # Otevřít aplikaci
+            for name, cmd in self._APPS.items():
+                if name in t:
+                    return f"Otevírám {name}.", {
+                        "action": "open_app", "params": {"app": cmd}}
+
+        # ── HLEDEJ ────────────────────────────────────
+        if re.search(r"\b(hledej|vyhledej|search)\b", t):
+            query = re.sub(r"\b(hledej|vyhledej|search)\b\s*", "", text, flags=re.IGNORECASE).strip()
+            if query:
+                return f"Hledám: {query}.", {
+                    "action": "search_web", "params": {"query": query}}
+
+        # Nerozpoznáno → LLM
         return None, None
 
     def ask(self, user_text: str) -> Tuple[str, Dict]:

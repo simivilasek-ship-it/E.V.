@@ -46,8 +46,9 @@ class JarvisApp:
 
         # ── GUI ───────────────────────────────────────
         self.gui = JarvisGUI()
-        self.gui.on_mic_click = self._on_mic_click
-        self.gui.on_send      = self._on_send
+        self.gui.on_mic_click    = self._on_mic_click
+        self.gui.on_send         = self._on_send
+        self.gui.on_model_change = self._on_model_change
 
         # ── Signály ───────────────────────────────────
         signal.signal(signal.SIGINT,  self._signal_handler)
@@ -200,6 +201,18 @@ class JarvisApp:
         if not has_code and len(text) < 400:
             self._gui(lambda: self.gui.set_state("speaking"))
             self.tts.speak(text)
+
+    def _on_model_change(self, model: str):
+        """Přepne aktivní Ollama model a uloží do config."""
+        from config import save_config
+        CONFIG["ollama_model"] = model
+        self.llm.model = model
+        try:
+            save_config(CONFIG)
+        except Exception:
+            pass
+        self._gui(lambda m=model: self.gui.add_message(f"Model přepnut na: {m}", "jarvis"))
+        logger.info(f"Model přepnut na: {model}")
 
     # ── OLLAMA CHECK ─────────────────────────────────
 

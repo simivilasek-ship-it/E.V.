@@ -470,7 +470,8 @@ class JarvisGUI:
     def __init__(self):
         # Callbacky pro integraci se zbytkem systému
         self.on_mic_click: callable = None
-        self.on_send:      callable = None
+        self.on_send:         callable = None
+        self.on_model_change: callable = None   # callback(model_name: str)
 
         self._state      = "idle"
         self._chat_open  = False
@@ -616,13 +617,13 @@ class JarvisGUI:
             command=self._toggle_chat,
         ).place(relx=0.16, rely=0.42, anchor="center")
 
-        # Settings vpravo
+        # Settings — otvírá model dialog vpravo
         ctk.CTkButton(
             ctrl, text="⚙",
             font=("DM Sans", 16), fg_color=BG3,
             hover_color=BORDER, text_color=FG2,
             corner_radius=8, width=38, height=38,
-            command=lambda: None,   # placeholder pro settings dialog
+            command=self._open_model_dialog,
         ).place(relx=0.84, rely=0.42, anchor="center")
 
     # ── CHAT PANEL ───────────────────────────────────
@@ -767,6 +768,63 @@ class JarvisGUI:
     def _on_mic(self):
         if self.on_mic_click:
             self.on_mic_click()
+
+    def _open_model_dialog(self):
+        """Dialog pro výběr Ollama modelu — stáhne seznam z Ollama."""
+        import threading, requests as _req
+
+        win = ctk.CTkToplevel(self.root)
+        win.title("Výběr modelu")
+        win.geometry("340x220")
+        win.configure(fg_color=BG2)
+        win.grab_set()
+        win.lift()
+
+        ctk.CTkLabel(win, text="VÝBĚR MODELU", font=("Courier New", 11),
+                     text_color=CYAN).pack(pady=(16, 8))
+
+        var = ctk.StringVar(value="Načítám...")
+        opt = ctk.CTkOptionMenu(
+            win, variable=var, values=["Načítám..."],
+            fg_color=BG3, button_color=BLUE, button_hover_color=BORDER,
+            text_color=FG, dropdown_text_color=FG, width=280,
+        )
+        opt.pack(pady=6)
+
+        status_lbl = ctk.CTkLabel(win, text="", font=("Courier New", 9),
+                                   text_color=FG2)
+        status_lbl.pack(pady=4)
+
+        def _load():
+            try:
+                r = _req.get("http://localhost:11434/api/tags", timeout=4)
+                models = [m["name"] for m in r.json().get("models", [])]
+                if not models:
+                    models = ["Žádné modely"]
+                win.after(0, lambda: opt.configure(values=models))
+                win.after(0, lambda: var.set(models[0]))
+                win.after(0, lambda: status_lbl.configure(
+                    text=f"{len(models)} modelů dostupných"))
+            except Exception as e:
+                win.after(0, lambda: status_lbl.configure(
+                    text=f"Chyba: {e}", text_color="#ef5350"))
+
+        threading.Thread(target=_load, daemon=True).start()
+
+        def _apply():
+            model = var.get()
+            if model and model != "Načítám..." and model != "Žádné modely":
+                if self.on_model_change:
+                    self.on_model_change(model)
+                status_lbl.configure(text=f"✓ Model: {model}", text_color=CYAN)
+            win.after(800, win.destroy)
+
+        ctk.CTkButton(
+            win, text="Použít",
+            fg_color=BLUE, hover_color=BORDER, text_color=FG,
+            corner_radius=6, width=140, height=34,
+            command=_apply,
+        ).pack(pady=12)
 
     def _on_chat_enter(self, event=None):
         text = self._chat_input.get().strip()

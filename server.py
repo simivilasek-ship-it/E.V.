@@ -12,6 +12,7 @@ import sys
 import tempfile
 import threading
 import time
+import requests
 import uvicorn
 import webbrowser
 
@@ -260,6 +261,34 @@ async def status():
         "ollama_ok": llm.is_available(),
         "voice":     _TTS_VOICE,
     }
+
+
+@app.get("/api/models")
+async def get_models():
+    """Vrátí seznam dostupných Ollama modelů"""
+    try:
+        base = llm.url.replace("/api/chat", "/api/tags")
+        resp = requests.get(base, timeout=4)
+        if resp.status_code == 200:
+            models = [m["name"] for m in resp.json().get("models", [])]
+            return {"models": models, "current": CONFIG["ollama_model"]}
+    except Exception:
+        pass
+    return {"models": [], "current": CONFIG["ollama_model"]}
+
+
+@app.post("/api/model/{model_name:path}")
+async def set_model(model_name: str):
+    """Přepne aktivní Ollama model"""
+    from config import save_config
+    CONFIG["ollama_model"] = model_name
+    llm.model = model_name
+    try:
+        save_config(CONFIG)
+    except Exception:
+        pass
+    await _broadcast({"type": "info", "model": model_name})
+    return {"ok": True, "model": model_name}
 
 
 @app.get("/")
