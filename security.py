@@ -12,7 +12,8 @@ ALLOWED_ACTIONS = {
     # Základní odpovědi a konverzace
     "answer", "clear_history",
     # Aplikace a weby
-    "open_app", "open_url", "search_web", "youtube_play",
+    "open_app", "open_url", "search_web",
+    "youtube_play", "youtube_download", "youtube_info", "youtube_subtitles",
     # Soubory
     "open_file", "vscode_open", "vscode_new_file",
     "create_folder", "create_file", "move_file", "find_files",

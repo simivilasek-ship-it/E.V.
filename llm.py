@@ -97,7 +97,10 @@ def _parse_args(command: str, args: str) -> dict:
             "restart":        lambda: {"delay": int(re.sub(r"[^\d]","",a) or "0")},
             "find_files":     lambda: {"name": a, "path": _HOME},
             "set_timer":      lambda: _parse_timer(a),
-            "youtube_play":   lambda: {"query": a, "index": 1, "audio_only": False},
+            "youtube_play":     lambda: {"query": a, "index": 1, "audio_only": False},
+            "youtube_download": lambda: {"query": a, "audio_only": False, "quality": "best"},
+            "youtube_info":     lambda: {"query": a},
+            "youtube_subtitles":lambda: {"query": a, "lang": "cs"},
             "move_file":      lambda: _parse_move(a),
             "write_email":    lambda: {"to": a, "subject": "", "body": ""},
             "calculate":      lambda: {"expression": a},
@@ -320,8 +323,29 @@ class LocalRouter:
                 return f"Ukončuji {app_name}.", {
                     "action": "kill_process", "params": {"name": proc}}
 
+        # ── YT-DLP: STÁHNOUT ──────────────────────────
+        if re.search(r"\b(stahni|download|stahnout|uloz\s+video|uloz\s+audio)\b", t):
+            audio = bool(re.search(r"\b(audio|mp3|hudbu|zvuk)\b", t))
+            quality = "720p" if "720" in t else "1080p" if "1080" in t else "480p" if "480" in t else "best"
+            query = re.sub(r"\b(stahni|download|stahnout|uloz|video|audio|mp3|hudbu|zvuk|z\s+youtube)\b",
+                           "", text, flags=re.IGNORECASE).strip(" ,.-")
+            if query:
+                mode = "audio MP3" if audio else f"video {quality}"
+                return f"Stahuji {mode}: {query}", {
+                    "action": "youtube_download",
+                    "params": {"query": query, "audio_only": audio, "quality": quality}}
+
+        # ── YT-DLP: INFO O VIDEU ──────────────────────
+        if re.search(r"\b(info\s+o\s+videu|informace\s+o\s+videu|jak\s+dlouhe|delka\s+videa)\b", t):
+            query = re.sub(r"\b(info|informace|o\s+videu|jak\s+dlouhe|delka)\b",
+                           "", text, flags=re.IGNORECASE).strip(" ,.-")
+            if query:
+                return f"Zjišťuji info: {query}", {
+                    "action": "youtube_info", "params": {"query": query}}
+
         # ── HUDBA ─────────────────────────────────────
         if re.search(r"\b(pust|zahraj|prehraj|spust|play)\b", t):
+            audio_only = bool(re.search(r"\b(jen\s+zvuk|audio|mp3|poslouchat)\b", t))
             for site, url in _SITES.items():
                 if site in t:
                     rest = re.sub(rf"\b{site}\b", "", t)
@@ -333,7 +357,7 @@ class LocalRouter:
             if len(query) > 2:
                 return f"Přehrávám: {query}.", {
                     "action": "youtube_play",
-                    "params": {"query": query, "index": 1, "audio_only": False}}
+                    "params": {"query": query, "index": 1, "audio_only": audio_only}}
 
         # ── POČASÍ ────────────────────────────────────
         if re.search(r"\b(pocasi|weather|bude\s+prset|teplota\s+v)\b", t):

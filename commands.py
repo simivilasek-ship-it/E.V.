@@ -132,13 +132,143 @@ class CommandExecutor:
                 return f"Chyba: {exc}"
 
     def _cmd_youtube_play(self, query: str, index: int = 1, audio_only: bool = False) -> str:
-        """Přehrát video na YouTube"""
+        """Přehraje video/audio pomocí yt-dlp + ffplay (bez prohlížeče)."""
         if not query:
             return self._cmd_open_url("https://www.youtube.com")
+
+        def _play():
+            try:
+                import yt_dlp
+                fmt = "bestaudio/best" if audio_only else "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
+                ydl_opts = {
+                    "quiet": True,
+                    "no_warnings": True,
+                    "format": fmt,
+                    "noplaylist": True,
+                    "default_search": f"ytsearch{index}",
+                    "extract_flat": False,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info    = ydl.extract_info(query, download=False)
+                    entries = info.get("entries") or [info]
+                    entry   = entries[min(index - 1, len(entries) - 1)]
+                    url     = entry.get("url") or entry.get("webpage_url")
+                    title   = entry.get("title", query)
+
+                logger.info(f"Přehrávám: {title}")
+
+                if audio_only:
+                    subprocess.Popen(["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", url])
+                else:
+                    subprocess.Popen(["ffplay", "-loglevel", "quiet", url])
+
+            except ImportError:
+                # Fallback: otevři v prohlížeči
+                webbrowser.open(f"https://www.youtube.com/results?search_query={quote(query)}")
+            except Exception as e:
+                logger.error(f"youtube_play chyba: {e}")
+
+        import threading
+        threading.Thread(target=_play, daemon=True).start()
+        mode = "🎵 audio" if audio_only else "🎬 video"
+        return f"Přehrávám {mode}: {query}"
+
+    def _cmd_youtube_download(self, query: str, path: str = "", audio_only: bool = False,
+                              quality: str = "best") -> str:
+        """Stáhne video nebo audio z YouTube pomocí yt-dlp."""
         try:
-            url = f"https://www.youtube.com/results?search_query={quote(query)}"
-            webbrowser.open(url)
-            return "ok"
+            import yt_dlp
+        except ImportError:
+            return "yt-dlp není nainstalován: pip install yt-dlp"
+
+        dest = Path(path).expanduser() if path else Path.home() / "Stažené"
+        dest.mkdir(parents=True, exist_ok=True)
+
+        def _download():
+            try:
+                if audio_only:
+                    ydl_opts = {
+                        "format": "bestaudio/best",
+                        "outtmpl": str(dest / "%(title)s.%(ext)s"),
+                        "postprocessors": [{
+                            "key": "FFmpegExtractAudio",
+                            "preferredcodec": "mp3",
+                            "preferredquality": "192",
+                        }],
+                        "quiet": True,
+                        "default_search": "ytsearch1",
+                    }
+                else:
+                    fmt_map = {"best": "bestvideo+bestaudio", "720p": "bestvideo[height<=720]+bestaudio",
+                               "1080p": "bestvideo[height<=1080]+bestaudio", "480p": "bestvideo[height<=480]+bestaudio"}
+                    ydl_opts = {
+                        "format": fmt_map.get(quality, "bestvideo+bestaudio"),
+                        "outtmpl": str(dest / "%(title)s.%(ext)s"),
+                        "merge_output_format": "mp4",
+                        "quiet": True,
+                        "default_search": "ytsearch1",
+                    }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([query])
+                logger.info(f"Staženo do: {dest}")
+            except Exception as e:
+                logger.error(f"Download chyba: {e}")
+
+        import threading
+        threading.Thread(target=_download, daemon=True).start()
+        mode = "audio (MP3)" if audio_only else f"video ({quality})"
+        return f"Stahuji {mode}: {query} → {dest}"
+
+    def _cmd_youtube_info(self, query: str) -> str:
+        """Vrátí informace o videu (název, délka, autor, views)."""
+        try:
+            import yt_dlp
+        except ImportError:
+            return "yt-dlp není nainstalován"
+
+        try:
+            ydl_opts = {"quiet": True, "no_warnings": True,
+                        "extract_flat": True, "default_search": "ytsearch1"}
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info    = ydl.extract_info(query, download=False)
+                entries = info.get("entries") or [info]
+                e       = entries[0]
+
+            dur  = e.get("duration", 0)
+            mins, secs = divmod(int(dur), 60)
+            views = e.get("view_count", 0)
+            views_str = f"{views:,}".replace(",", " ") if views else "?"
+
+            return (f"📹 {e.get('title', '?')}\n"
+                    f"👤 {e.get('uploader', '?')}\n"
+                    f"⏱ {mins}:{secs:02d}\n"
+                    f"👁 {views_str} zhlédnutí")
+        except Exception as e:
+            return f"Chyba: {e}"
+
+    def _cmd_youtube_subtitles(self, query: str, lang: str = "cs", path: str = "") -> str:
+        """Stáhne titulky k videu."""
+        try:
+            import yt_dlp
+        except ImportError:
+            return "yt-dlp není nainstalován"
+
+        dest = Path(path).expanduser() if path else Path.home() / "Stažené"
+        dest.mkdir(parents=True, exist_ok=True)
+
+        try:
+            ydl_opts = {
+                "writesubtitles": True,
+                "writeautomaticsub": True,
+                "subtitleslangs": [lang],
+                "skip_download": True,
+                "outtmpl": str(dest / "%(title)s.%(ext)s"),
+                "quiet": True,
+                "default_search": "ytsearch1",
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([query])
+            return f"Titulky ({lang}) staženy do: {dest}"
         except Exception as e:
             return f"Chyba: {e}"
 
