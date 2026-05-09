@@ -15,18 +15,18 @@ from llm import LLMEngine
 from commands import CommandExecutor
 from gui import JarvisGUI
 from logging_setup import setup_logging
-from security import confirm_action  # dialog pro potvrzení uživatele
 
 # Nové moduly
-from async_utils import AsyncEngine, get_async_engine, shutdown_async_engine, TaskPriority
-from error_handling import ErrorHandler, get_error_handler, ErrorSeverity, ErrorCategory
-from plugin_system import PluginManager, create_plugin_manager
+from async_utils import get_async_engine, shutdown_async_engine, TaskPriority
+from error_handling import get_error_handler, ErrorSeverity, ErrorCategory
+from plugin_system import create_plugin_manager
 # v2.0 moduly
-from event_bus import EventBus, EventType, Event, get_event_bus, shutdown_event_bus
+from event_bus import EventType, Event, get_event_bus
 from agents import AgentManager
-from scheduler import Scheduler, get_scheduler
-from security_v2 import SecurityManager, get_security_manager, PermissionLevel
-from llm_router import LLMRouter, TaskType
+from scheduler import get_scheduler
+from security_v2 import get_security_manager, confirm_action
+from llm_router import LLMRouter
+from wake_word_detector import WakeWordDetector
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,7 @@ class JarvisApp:
         )
 
         self.gui.root.after(800, self._check_ollama)
+        self._schedule_memory_maintenance()
         logger.info("JARVIS připraven.")
 
     def _init_new_systems(self):
@@ -117,7 +118,15 @@ class JarvisApp:
             default_model=CONFIG.get("ollama_model", "qwen2.5:3b"),
         )
 
-        logger.info("Systémy v2.0 inicializovány (EventBus, Agents, Scheduler, LLMRouter, Security)")
+        # ── Wake Word ─────────────────────────────────
+        self.wake_word = WakeWordDetector(
+            wake_word=CONFIG.get("wake_word", "jarvis"),
+            on_wake=self._on_wake_word,
+        )
+        if CONFIG.get("wake_word_enabled", True):
+            self.wake_word.start()
+
+        logger.info("Systémy v2.0 inicializovány (EventBus, Agents, Scheduler, LLMRouter, Security, WakeWord)")
 
     def _load_plugins(self):
         """Načte plugin systém a pluginy"""
@@ -179,13 +188,6 @@ class JarvisApp:
             exception=error,
         )
 
-    def _on_task_complete(self, result):
-        if not result.success and result.error_message:
-            logger.debug(f"Úloha {result.task_id} selhala: {result.error_message}")
-
-    def _on_task_error(self, task_id: str, error: Exception) -> None:
-        logger.debug(f"Chyba úlohy {task_id}: {error}")
-
     # ── v2.0: Agent & Scheduler callbacks ────────────
 
     def _on_agent_alert(self, event: Event):
@@ -201,6 +203,12 @@ class JarvisApp:
         data = event.data or {}
         name = data.get("name", "?")
         self._gui(lambda n=name: self.gui.set_status(f"⏰ {n}"))
+
+    def _on_wake_word(self):
+        """Wake word detekován — spustí naslouchání jako klik na mikrofon."""
+        logger.info("Wake word detekován, spouštím naslouchání")
+        self._gui(lambda: self.gui.set_status("Wake word detekován..."))
+        self._on_mic_click()
 
     def _on_mic_click(self):
         if not self.stt.is_available():
@@ -460,6 +468,17 @@ class JarvisApp:
                 task_name="tts_speak",
             )
 
+    def _schedule_memory_maintenance(self):
+        """Naplánuje automatické čištění paměti každých 6 hodin."""
+        try:
+            from memory import JarvisMemory
+            mem = JarvisMemory(CONFIG)
+            self.scheduler.every(6 * 3600, mem.run_maintenance,
+                                 name="memory_maintenance")
+            logger.info("Auto-maintenance paměti naplánována (každých 6h)")
+        except Exception as e:
+            logger.debug(f"Memory maintenance skip: {e}")
+
     def _check_ollama(self):
         def _chk():
             import requests as _req
@@ -493,6 +512,12 @@ class JarvisApp:
             shutdown_async_engine(timeout=3.0)
         except Exception as e:
             logger.warning(f"Chyba při zastavování async engine: {e}")
+
+        # Zastav wake word
+        try:
+            self.wake_word.stop()
+        except Exception:
+            pass
 
         # Zastav GUI
         self.gui.orb.stop()

@@ -631,17 +631,26 @@ class CommandExecutor:
             return f"Chyba výpočtu: {e}"
 
     def _cmd_translate(self, text: str, from_lang: str = "auto", to_lang: str = "cs") -> str:
-        """Přeloží text (jednoduchá implementace, může být rozšířena)"""
+        """Přeloží text pomocí Ollama."""
         try:
-            # Zjednodušený překlad - v reálu by použil API jako Google Translate
-            # Pro demo jen základní slova
-            translations = {
-                "hello": "ahoj", "world": "svět", "computer": "počítač",
-                "time": "čas", "day": "den", "night": "noc"
+            import requests as _req
+            lang_map = {
+                "cs": "češtiny", "en": "angličtiny", "de": "němčiny",
+                "fr": "francouzštiny", "es": "španělštiny", "sk": "slovenštiny",
             }
-            words = text.lower().split()
-            translated = [translations.get(w, w) for w in words]
-            return f"Překlad: {' '.join(translated)}"
+            to_name = lang_map.get(to_lang, to_lang)
+            prompt = f"Přelož přesně do {to_name}, vrať pouze překlad bez vysvětlení:\n{text}"
+            model = self.config.get("ollama_model", "qwen2.5:3b")
+            payload = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False,
+                "options": {"temperature": 0.1, "num_predict": 500},
+            }
+            r = _req.post("http://localhost:11434/api/chat", json=payload, timeout=30)
+            r.raise_for_status()
+            translated = r.json().get("message", {}).get("content", "").strip()
+            return f"Překlad: {translated}"
         except Exception as e:
             return f"Chyba překladu: {e}"
 

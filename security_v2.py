@@ -238,6 +238,26 @@ class SecurityManager:
 # Typový hint
 from typing import Tuple
 
+# ── Potvrzovací dialog ────────────────────────────────
+
+def confirm_action(action: str, params: Dict[str, Any], parent=None) -> bool:
+    """Zobrazí dialog pro potvrzení nebezpečné akce."""
+    level = ACTION_PERMISSIONS.get(action, PermissionLevel.RESTRICTED)
+    if level not in (PermissionLevel.ELEVATED, PermissionLevel.RESTRICTED):
+        return True
+
+    try:
+        import tkinter.messagebox as msgbox
+        prompt = f"Opravdu chcete provést akci '{action}'?"
+        if params:
+            details = ", ".join(f"{k}={v}" for k, v in params.items())
+            prompt += f"\n{details}"
+        return msgbox.askyesno("Potvrzení akce", prompt, parent=parent)
+    except Exception as e:
+        logger.warning(f"Dialog potvrzení selhal: {e}")
+        return False
+
+
 # ── Singleton ─────────────────────────────────────────
 
 _security: Optional[SecurityManager] = None
