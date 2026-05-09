@@ -15,12 +15,18 @@ from llm import LLMEngine
 from commands import CommandExecutor
 from gui import JarvisGUI
 from logging_setup import setup_logging
-from security import is_action_allowed, requires_confirmation, confirm_action
+from security import confirm_action  # dialog pro potvrzení uživatele
 
 # Nové moduly
 from async_utils import AsyncEngine, get_async_engine, shutdown_async_engine, TaskPriority
 from error_handling import ErrorHandler, get_error_handler, ErrorSeverity, ErrorCategory
 from plugin_system import PluginManager, create_plugin_manager
+# v2.0 moduly
+from event_bus import EventBus, EventType, Event, get_event_bus, shutdown_event_bus
+from agents import AgentManager
+from scheduler import Scheduler, get_scheduler
+from security_v2 import SecurityManager, get_security_manager, PermissionLevel
+from llm_router import LLMRouter, TaskType
 
 logger = logging.getLogger(__name__)
 
@@ -76,18 +82,42 @@ class JarvisApp:
         logger.info("JARVIS připraven.")
 
     def _init_new_systems(self):
-        """Inicializuje nové systémy (async, error handling, plugins)"""
+        """Inicializuje všechny systémy v2.0."""
         # Error handler
         self.error_handler = get_error_handler()
-        self.error_handler.on_error = self._on_error
+        self.error_handler.on_error    = self._on_error
         self.error_handler.on_recovery = self._on_recovery
 
         # Async engine
         self.async_engine = get_async_engine()
         self.async_engine.on_task_complete = self._on_task_complete
-        self.async_engine.on_task_error = self._on_task_error
+        self.async_engine.on_task_error    = self._on_task_error
 
-        logger.info("Nové systémy inicializovány")
+        # ── v2.0: Event Bus ──────────────────────────
+        self.bus = get_event_bus()
+        self.bus.subscribe(EventType.AGENT_ALERT,  self._on_agent_alert)
+        self.bus.subscribe(EventType.CPU_HIGH,      self._on_agent_alert)
+        self.bus.subscribe(EventType.RAM_HIGH,      self._on_agent_alert)
+        self.bus.subscribe(EventType.DISK_LOW,      self._on_agent_alert)
+        self.bus.subscribe(EventType.TASK_FIRED,    self._on_task_fired)
+
+        # ── v2.0: Background Agents ──────────────────
+        self.agent_manager = AgentManager.create_default(self.bus)
+        self.agent_manager.start_all()
+
+        # ── v2.0: Scheduler ──────────────────────────
+        self.scheduler = get_scheduler()
+
+        # ── v2.0: Security Manager ───────────────────
+        self.security = get_security_manager()
+
+        # ── v2.0: LLM Router ─────────────────────────
+        self.llm_router = LLMRouter(
+            ollama_url=CONFIG.get("ollama_url", "http://localhost:11434/api/chat"),
+            default_model=CONFIG.get("ollama_model", "qwen2.5:3b"),
+        )
+
+        logger.info("Systémy v2.0 inicializovány (EventBus, Agents, Scheduler, LLMRouter, Security)")
 
     def _load_plugins(self):
         """Načte plugin systém a pluginy"""
@@ -155,6 +185,22 @@ class JarvisApp:
 
     def _on_task_error(self, task_id: str, error: Exception) -> None:
         logger.debug(f"Chyba úlohy {task_id}: {error}")
+
+    # ── v2.0: Agent & Scheduler callbacks ────────────
+
+    def _on_agent_alert(self, event: Event):
+        """Zobrazí alert od background agenta v GUI."""
+        data = event.data or {}
+        msg  = data.get("message", str(data))
+        logger.warning(f"[Agent] {msg}")
+        self._gui(lambda m=msg: self.gui.add_message(f"⚠ {m}", "jarvis"))
+        self._gui(lambda m=msg: self.gui.set_status(f"⚠ {m[:50]}"))
+
+    def _on_task_fired(self, event: Event):
+        """Notifikace při spuštění naplánované úlohy."""
+        data = event.data or {}
+        name = data.get("name", "?")
+        self._gui(lambda n=name: self.gui.set_status(f"⏰ {n}"))
 
     def _on_mic_click(self):
         if not self.stt.is_available():
@@ -339,16 +385,24 @@ class JarvisApp:
         action = action_data.get("action", "answer")
         params = action_data.get("params", {})
 
-        if not is_action_allowed(action):
-            logger.warning(f"Akce není povolena: {action}")
-            self._gui(lambda: self.gui.add_message("Tato akce není povolena.", "jarvis"))
+        # Security 2.0 — audit log + permission check
+        allowed, reason = self.security.check(action, params)
+        if not allowed:
+            logger.warning(f"Security: {action} zamítnuto — {reason}")
+            self._gui(lambda r=reason: self.gui.add_message(
+                f"Akce zamítnuta: {r}", "jarvis"))
             return
 
-        if requires_confirmation(action, params):
+        # Potvrzení pro nebezpečné akce
+        if self.security.needs_confirmation(action):
             confirmed = confirm_action(action, params, parent=self.gui.root)
             if not confirmed:
-                self._gui(lambda: self.gui.add_message("Akce zrušena uživatelem.", "jarvis"))
+                self._gui(lambda: self.gui.add_message("Akce zrušena.", "jarvis"))
                 return
+
+        # Publikuj event o vykonání akce
+        self.bus.emit(EventType.CMD_EXECUTE, {"action": action, "params": params},
+                      source="execute_result")
 
         if not message and action not in ("answer", ""):
             message = self.llm._default_message(action, str(params))
