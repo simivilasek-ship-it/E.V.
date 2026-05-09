@@ -302,6 +302,32 @@ JARVIS nyní používá whitelist akcí a potvrzovací logiku pro rizikové oper
 - **Potvrzení:** `delete_file`, `shutdown`, `restart`, `install_app`, `uninstall_app`, `run_script`, `kill_process` a podobné akce vyžadují uživatelské potvrzení.
 - **Sandbox režim:** nebezpečné akce je možné blokovat bez změny zbytku systému.
 
+## Nastavení (Settings)
+
+JARVIS nyní poskytuje interaktivní panel s nastavením přístupný přes tlačítko **⚙** v levém panelu GUI.
+
+### Nastavitelné parametry
+
+#### 1. Jazyk rozpoznávání řeči (STT)
+- **Výběr z 10 jazyků:** Čeština, Angličtina, Španělština, Francouzština, Němčina, Italština, Portugalština, Polština, Ruština
+- **Změna bez restartování:** Nový jazyk se aplikuje okamžitě
+- **Google STT API:** Podporuje všechny jazyky
+- **Offline fallback:** Pouze pro češtinu (Sphinx)
+
+#### 2. Citlivost mikrofonu (Energetický práh)
+- **Rozsah:** 100–4000 (nižší = citlivější)
+- **Výchozí:** 300
+- **Dopad:** Kontroluje, jak tichý zvuk se musí detekovat jako řeč
+- **Užitečné pro:** hlučná/tichá prostředí
+
+#### 3. Rychlost TTS
+- **Rozsah:** 100–250
+- **Výchozí:** 170
+- **Dopad:** Řídí, jak rychle mluví JARVIS
+- **Užitečné pro:** sluchové potíže, různé preferencí
+
+Všechna nastavení se automaticky ukládají do `config.json` a zůstávají zachována po restartu.
+
 ## Vývoj
 
 ### Spuštění testů
