@@ -164,6 +164,7 @@ def _parse_memory_store(a: str) -> dict:
 
 # Webové stránky
 _SITES = {
+    "dashboard": "http://localhost:8002",
     "youtube": "https://www.youtube.com",
     "google":  "https://www.google.com",
     "github":  "https://github.com",
