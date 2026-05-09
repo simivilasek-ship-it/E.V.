@@ -18,7 +18,7 @@ AVAILABLE_OLLAMA_MODELS = [
 
 DEFAULT_CONFIG = {
     "ollama_url": "http://localhost:11434/api/chat",
-    "ollama_model": "qwen2.5:3b",   # výchozí — lepší než llama3.1:8b
+    "ollama_model": "qwen2.5:3b",
     "tts_enabled": True,
     "tts_voice": "cs-CZ-AntoninNeural",
     "tts_rate": 170,
@@ -28,6 +28,30 @@ DEFAULT_CONFIG = {
     "stt_timeout": 10,
     "stt_phrase_limit": 15,
     "stt_energy_threshold": 300,
+    "stt_language": "cs-CZ",
+    "available_languages": {
+        "cs-CZ": "Čeština",
+        "en-US": "English (US)",
+        "en-GB": "English (UK)",
+        "es-ES": "Español",
+        "fr-FR": "Français",
+        "de-DE": "Deutsch",
+        "it-IT": "Italiano",
+        "pt-BR": "Português (BR)",
+        "pl-PL": "Polski",
+        "ru-RU": "Русский",
+    },
+    # Plugin systém
+    "plugins_enabled": True,
+    "disabled_plugins": [],
+    "plugins_dir": "plugins",
+    # Async engine
+    "async_max_workers": 4,
+    "async_max_queue": 100,
+    # Error handling
+    "max_error_log": 1000,
+    "rate_limit_window": 60.0,
+    "rate_limit_max": 10,
 }
 
 def load_config() -> Dict[str, Any]:
@@ -65,6 +89,9 @@ def _validate_config(config: Dict[str, Any]) -> None:
 
     if config["tts_rate"] < 50 or config["tts_rate"] > 400:
         raise ValueError("tts_rate musí být mezi 50-400")
+
+    if config["stt_energy_threshold"] < 100 or config["stt_energy_threshold"] > 4000:
+        raise ValueError("stt_energy_threshold musí být mezi 100-4000")
 
 
 def save_config(config: Dict[str, Any]) -> None:

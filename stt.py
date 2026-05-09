@@ -1,6 +1,6 @@
 """
-JARVIS v3.0 — Speech-to-Text (STT)
-Rozpoznávání řeči s podporou více jazyků
+JARVIS v2.0 — Speech-to-Text (STT)
+Rozpoznávání řeči pomocí SpeechRecognition
 """
 
 import logging
@@ -16,7 +16,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class STTEngine:
-    """Engine pro rozpoznávání řeči s multi-language supportem"""
+    """Engine pro rozpoznávání řeči"""
 
     def __init__(self, config: dict):
         self.config = config
@@ -32,20 +32,11 @@ class STTEngine:
         else:
             logger.warning("SpeechRecognition není nainstalován - STT nebude fungovat")
 
-    def set_language(self, language_code: str) -> bool:
-        """Změní jazyk rozpoznávání řeči."""
-        available = self.config.get("available_languages", {})
-        if language_code not in available:
-            logger.warning(f"Jazyk {language_code} není dostupný")
-            return False
-        self.language = language_code
-        self.config["stt_language"] = language_code
-        logger.info(f"Jazyk změněn na {language_code}")
+    def set_language(self, language: str) -> bool:
+        """Nastaví jazyk rozpoznávání."""
+        self.language = language
+        logger.info(f"Jazyk STT změněn na: {language}")
         return True
-
-    def get_language(self) -> str:
-        """Vrátí aktuálně nastaveného jazyka."""
-        return self.language
 
     def listen(self) -> Optional[str]:
         """
@@ -61,7 +52,7 @@ class STTEngine:
                 logger.debug("Přizpůsobuji se okolnímu hluku...")
                 self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
 
-                logger.info(f"Poslouchám... ({self.language})")
+                logger.info("Poslouchám...")
                 audio = self.recognizer.listen(
                     source,
                     timeout=self.config.get("stt_timeout", 10),
@@ -75,15 +66,11 @@ class STTEngine:
                 return text
             except sr.UnknownValueError:
                 logger.warning("Nerozuměl jsem - zkouším offline...")
-                # Fallback na offline rozpoznávání (omezeno na češtinu)
+                # Fallback na offline rozpoznávání
                 try:
-                    if self.language.startswith("cs"):
-                        text = self.recognizer.recognize_sphinx(audio, language="cs-CZ")
-                        logger.info(f"Offline rozpoznáno: {text}")
-                        return text
-                    else:
-                        logger.warning(f"Offline rozpoznávání není dostupné pro {self.language}")
-                        return None
+                    text = self.recognizer.recognize_sphinx(audio, language=self.language)
+                    logger.info(f"Offline rozpoznáno: {text}")
+                    return text
                 except sr.UnknownValueError:
                     logger.warning("Offline rozpoznávání také selhalo")
                     return None
@@ -97,19 +84,6 @@ class STTEngine:
         except Exception as e:
             logger.error(f"Chyba mikrofonu: {e}")
             return None
-
-    def is_available(self) -> bool:
-        """Ověří dostupnost mikrofonu."""
-        if not HAS_STT:
-            return False
-        try:
-            with sr.Microphone() as source:
-                logger.debug("Mikrofon dostupný")
-                return True
-        except Exception as e:
-            logger.error(f"Mikrofon není dostupný: {e}")
-            return False
-
 
     def is_available(self) -> bool:
         """Vrátí True pokud STT funguje"""
