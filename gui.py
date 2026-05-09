@@ -509,17 +509,58 @@ class JarvisGUI:
             pady=(2, 0),
         )
 
-        ctk.CTkLabel(
-            bubble, text=text,
-            font=("DM Sans", 12),
-            text_color=FG if is_user else FG2,
-            wraplength=300,
-            justify="right" if is_user else "left",
-            anchor="e" if is_user else "w",
-        ).pack(padx=12, pady=7)
+        # Markdown rendering — kódové bloky dostanu vlastní widget
+        self._render_message(bubble, text, is_user)
 
-        # Scroll dolů
         self.root.after(60, lambda: self._chat._parent_canvas.yview_moveto(1.0))
+
+    def _render_message(self, parent, text: str, is_user: bool):
+        """Renderuje text s podporou kódových bloků a základního markdownu."""
+        import re
+
+        # Rozděl na části: normální text a kódové bloky
+        parts = re.split(r"(```[\s\S]*?```)", text)
+
+        for part in parts:
+            if part.startswith("```") and part.endswith("```"):
+                # Kódový blok — monospace textbox
+                code = re.sub(r"^```\w*\n?", "", part).rstrip("`").strip()
+                lines = code.count("\n") + 1
+                height = min(max(lines, 2), 15)
+
+                code_box = ctk.CTkTextbox(
+                    parent,
+                    font=("Courier New", 11),
+                    fg_color="#050c18",
+                    text_color="#80d8ff",
+                    border_color="#1a3a5c",
+                    border_width=1,
+                    corner_radius=6,
+                    height=height * 18 + 16,
+                    wrap="none",
+                    state="normal",
+                )
+                code_box.pack(fill="x", padx=8, pady=(4, 4))
+                code_box.insert("end", code)
+                code_box.configure(state="disabled")
+            else:
+                # Normální text — aplikuj jednoduché formátování
+                if not part.strip():
+                    continue
+                # Zpracuj **tučné** → zobrazit bez hvězdiček
+                clean = re.sub(r"\*\*(.+?)\*\*", r"\1", part)
+                clean = re.sub(r"\*(.+?)\*", r"\1", clean)
+                clean = re.sub(r"`([^`]+)`", r"[\1]", clean)
+                clean = clean.strip()
+                if clean:
+                    ctk.CTkLabel(
+                        parent, text=clean,
+                        font=("DM Sans", 12),
+                        text_color=FG if is_user else FG2,
+                        wraplength=310,
+                        justify="right" if is_user else "left",
+                        anchor="e" if is_user else "w",
+                    ).pack(padx=12, pady=(6, 6))
 
     # ── HODINY ───────────────────────────────────────
 

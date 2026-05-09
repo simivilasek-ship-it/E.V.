@@ -12,9 +12,10 @@ import platform
 import logging
 import shutil
 import math
+from pathlib import Path
 from datetime import datetime
 from urllib.parse import quote
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 
 try:
     import pyautogui
@@ -218,10 +219,10 @@ class CommandExecutor:
     def _cmd_screenshot(self) -> str:
         """Udělá screenshot"""
         try:
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            home = os.path.expanduser("~")
-            desk = os.path.join(home, "Desktop")
-            dest = os.path.join(desk if os.path.isdir(desk) else home, f"screenshot_{ts}.png")
+            ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
+            home = Path.home()
+            desk = home / "Desktop"
+            dest = (desk if desk.is_dir() else home) / f"screenshot_{ts}.png"
             pyautogui.screenshot().save(dest)
             return f"Uloženo: {dest}"
         except Exception as e:
@@ -386,37 +387,35 @@ class CommandExecutor:
         return "Spouštím aktualizaci..."
 
     def _cmd_create_folder(self, path: str = "") -> str:
-        path = os.path.expanduser(path)
-        os.makedirs(path, exist_ok=True)
-        return f"Složka vytvořena: {path}"
+        p = Path(path).expanduser()
+        p.mkdir(parents=True, exist_ok=True)
+        return f"Složka vytvořena: {p}"
 
     def _cmd_create_file(self, path: str = "") -> str:
-        path = os.path.expanduser(path)
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        open(path, "a").close()
-        return f"Soubor vytvořen: {path}"
+        p = Path(path).expanduser()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        return f"Soubor vytvořen: {p}"
 
     def _cmd_delete_file(self, path: str = "") -> str:
-        path = os.path.expanduser(path)
-        result = subprocess.run(["gio", "trash", path], capture_output=True)
+        p = Path(path).expanduser()
+        result = subprocess.run(["gio", "trash", str(p)], capture_output=True)
         if result.returncode == 0:
-            return f"Přesunuto do koše: {path}"
-        if os.path.isfile(path):
-            os.remove(path)
-        elif os.path.isdir(path):
-            import shutil as _sh
-            _sh.rmtree(path)
-        return f"Smazáno: {path}"
+            return f"Přesunuto do koše: {p}"
+        if p.is_file():
+            p.unlink()
+        elif p.is_dir():
+            shutil.rmtree(p)
+        return f"Smazáno: {p}"
 
     def _cmd_move_file(self, src: str = "", dst: str = "") -> str:
-        import shutil as _sh
-        _sh.move(os.path.expanduser(src), os.path.expanduser(dst))
+        shutil.move(str(Path(src).expanduser()), str(Path(dst).expanduser()))
         return f"Přesunuto: {src} → {dst}"
 
     def _cmd_find_files(self, name: str = "", path: str = "~") -> str:
-        path = os.path.expanduser(path)
+        search_path = Path(path).expanduser()
         result = subprocess.run(
-            ["find", path, "-iname", f"*{name}*", "-maxdepth", "6"],
+            ["find", str(search_path), "-iname", f"*{name}*", "-maxdepth", "6"],
             capture_output=True, text=True, timeout=10,
         )
         files = [f for f in result.stdout.strip().split("\n") if f][:10]
@@ -431,7 +430,7 @@ class CommandExecutor:
         return f"Odinstaluji: {name}"
 
     def _cmd_run_script(self, path: str = "") -> str:
-        subprocess.Popen(["bash", os.path.expanduser(path)])
+        subprocess.Popen(["bash", str(Path(path).expanduser())])
         return f"Spouštím: {path}"
 
     def _cmd_memory_recall(self, query: str = "", top_k: int = 5) -> str:

@@ -102,24 +102,14 @@ class JarvisApp:
     # ── ERROR HANDLING CALLBACKS ─────────────────────
 
     def _on_error(self, error_record):
-        """Callback pro error handler - zobrazí chybu v GUI"""
-        severity_map = {
-            ErrorSeverity.DEBUG: "DEBUG",
-            ErrorSeverity.INFO: "INFO",
-            ErrorSeverity.WARNING: "VAROVÁNÍ",
-            ErrorSeverity.ERROR: "CHYBA",
-            ErrorSeverity.CRITICAL: "KRITICKÁ CHYBA"
-        }
-
-        severity_str = severity_map.get(error_record.severity, "NEZNÁMÁ")
-        message = f"[{severity_str}] {error_record.category.value}: {error_record.message}"
-
-        # Zobraz v GUI
-        self._gui(lambda: self.gui.add_message(message, "jarvis"))
-
-        # Pro kritické chyby zobraz dialog
-        if error_record.severity == ErrorSeverity.CRITICAL:
-            self._gui(lambda: self._show_error_dialog(error_record))
+        """Callback pro error handler — aktualizuje status bar, pro CRITICAL zobrazí dialog."""
+        try:
+            self._gui(lambda: self.gui.set_status(
+                f"⚠ {error_record.message[:60]}"))
+            if error_record.severity == ErrorSeverity.CRITICAL:
+                self._gui(lambda: self._show_error_dialog(error_record))
+        except Exception:
+            pass
 
     def _on_recovery(self, error_record):
         """Callback pro úspěšnou recovery"""
@@ -159,33 +149,11 @@ class JarvisApp:
             exception=error,
         )
 
-    # ── GUI CALLBACKS ────────────────────────────────
-
-    def _on_error(self, record):
-        """Callback při chybě"""
-        try:
-            self._gui(lambda: self.gui.set_status(
-                f"⚠ {record.message[:50]}..."
-            ))
-        except Exception:
-            pass
-
-    def _on_recovery(self, record):
-        """Callback při úspěšné recovery"""
-        try:
-            self._gui(lambda: self.gui.set_status(
-                f"✓ Obnoveno: {record.recovery_action[:50]}..."
-            ))
-        except Exception:
-            pass
-
     def _on_task_complete(self, result):
-        """Callback při dokončení úlohy"""
         if not result.success and result.error_message:
             logger.debug(f"Úloha {result.task_id} selhala: {result.error_message}")
 
-    def _on_task_error(self, task_id, error):
-        """Callback při chybě úlohy"""
+    def _on_task_error(self, task_id: str, error: Exception) -> None:
         logger.debug(f"Chyba úlohy {task_id}: {error}")
 
     def _on_mic_click(self):
@@ -437,12 +405,22 @@ class JarvisApp:
 
     def _check_ollama(self):
         def _chk():
-            ok = self.llm.is_available()
-            if ok:
-                self._gui(lambda: self.gui.add_message(
-                    f"Připojen [{CONFIG['ollama_model']}]. Jak ti mohu pomoci?", "jarvis"))
-                self._gui(lambda: self.gui.set_status(f"● {CONFIG['ollama_model']}"))
-            else:
+            import requests as _req
+            try:
+                r = _req.get(self.llm.url.replace("/api/chat", "/api/tags"), timeout=4)
+                if r.status_code == 200:
+                    models = [m["name"] for m in r.json().get("models", [])]
+                    current = CONFIG["ollama_model"]
+                    # Aktualizuj dropdown v GUI
+                    if models:
+                        self._gui(lambda ml=models, c=current:
+                                  self.gui.update_model_list(ml, c))
+                    self._gui(lambda: self.gui.add_message(
+                        f"Připojen [{CONFIG['ollama_model']}]. Jak ti mohu pomoci?", "jarvis"))
+                    self._gui(lambda: self.gui.set_status(f"● {CONFIG['ollama_model']}"))
+                else:
+                    raise ConnectionError()
+            except Exception:
                 self._gui(lambda: self.gui.add_message(
                     "Ollama není dostupná. Spusť: ollama serve", "jarvis"))
         threading.Thread(target=_chk, daemon=True).start()

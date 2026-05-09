@@ -680,3 +680,37 @@ class LLMEngine:
         except Exception:
             pass
         return False
+
+
+# ══════════════════════════════════════════════════════
+#  MULTIMODÁLNÍ PODPORA (LLaVA / BakLLaVA)
+# ══════════════════════════════════════════════════════
+
+import base64
+import tempfile
+
+def ask_vision(prompt: str, image_path: str, model: str = "llava:7b",
+               ollama_url: str = "http://localhost:11434/api/chat") -> str:
+    """
+    Pošle screenshot + otázku do multimodálního modelu (LLaVA).
+    Použití: ask_vision("Co vidíš na obrazovce?", "/tmp/screen.png")
+    """
+    try:
+        with open(image_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode()
+
+        payload = {
+            "model": model,
+            "messages": [{
+                "role": "user",
+                "content": prompt,
+                "images": [img_b64],
+            }],
+            "stream": False,
+            "options": {"temperature": 0.2},
+        }
+        resp = requests.post(ollama_url, json=payload, timeout=60)
+        resp.raise_for_status()
+        return resp.json().get("message", {}).get("content", "Žádná odpověď.")
+    except Exception as e:
+        return f"Chyba vision modelu: {e}"
