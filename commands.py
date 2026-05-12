@@ -15,7 +15,7 @@ import math
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import quote
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, List, Tuple, Union
 
 try:
     import pyautogui
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 #  MAPA APLIKACÍ
 # ══════════════════════════════════════════════════════
 
-APP_MAP = {
+APP_MAP: Dict[str, List[str]] = {
     "chrome":     ["chrome", "google chrome"],
     "firefox":    ["firefox", "mozilla firefox"],
     "msedge":     ["edge", "microsoft edge"],
@@ -55,17 +55,17 @@ APP_MAP = {
 class CommandExecutor:
     """Vykonává příkazy JARVIS"""
 
-    def __init__(self, config: dict):
-        self.config = config
-        self.is_windows = platform.system() == "Windows"
-        self.is_linux = platform.system() == "Linux"
+    def __init__(self, config: Dict[str, Any]) -> None:
+        self.config: Dict[str, Any] = config
+        self.is_windows: bool = platform.system() == "Windows"
+        self.is_linux: bool = platform.system() == "Linux"
 
     def execute(self, action: str, params: Dict[str, Any]) -> str:
         """Vykoná příkaz a vrátí výsledek"""
         try:
-            method_name = f"_cmd_{action}"
+            method_name: str = f"_cmd_{action}"
             if hasattr(self, method_name):
-                method = getattr(self, method_name)
+                method: Callable = getattr(self, method_name)
                 return method(**params)
             else:
                 logger.warning(f"Neznámá akce: {action}")
@@ -74,10 +74,202 @@ class CommandExecutor:
             logger.error(f"Chyba při vykonávání {action}: {e}")
             return f"Chyba: {e}"
 
-    def _cmd_open_app(self, app: str, args: Optional[list] = None) -> str:
+    def _find_app(self, app: str) -> Optional[str]:
+        """Najde aplikaci v APP_MAP (vrátí command nebo None)"""
+        app_lower: str = app.lower()
+        
+        # Přímý match
+        if app_lower in APP_MAP:
+            return APP_MAP[app_lower][0]
+        
+        # Match v aliasech
+        for app_cmd, aliases in APP_MAP.items():
+            if app_lower in [alias.lower() for alias in aliases]:
+                return app_cmd
+        
+        return None
+
+    def _cmd_open_app(self, app: str, args: Optional[List[str]] = None) -> str:
         """Otevře aplikaci"""
-        app_cmd = self._find_app(app)
+        app_cmd: Optional[str] = self._find_app(app)
         if not app_cmd:
+            return f"Aplikace '{app}' nenalezena"
+
+        if app_cmd == "spotify":
+            if args:
+                query: str = " ".join(str(a) for a in args)
+                return self._cmd_spotify_play(query)
+            return self._launch_spotify()
+
+        cmd: str = f"{app_cmd} {' '.join(str(a) for a in (args or []))}"
+        try:
+            subprocess.Popen(cmd, shell=True)
+            return "ok"
+        except Exception as e:
+            logger.error(f"Chyba při otevírání aplikace: {e}")
+            return f"Chyba: {e}"
+
+    def _launch_spotify(self) -> str:
+        """Otevře Spotify aplikaci nebo web"""
+        uri: str = "spotify:"
+        try:
+            if shutil.which("spotify"):
+                subprocess.Popen(["spotify"])
+            else:
+                subprocess.Popen(["xdg-open", uri])
+            return "ok"
+        except Exception as e:
+            logger.warning(f"Spotify launch fallback selhal: {e}")
+            try:
+                webbrowser.open("https://open.spotify.com/")
+                return "ok"
+            except Exception as exc:
+                return f"Chyba: {exc}"
+
+    def _cmd_spotify_play(self, query: str, index: int = 1, audio_only: bool = False) -> str:
+        """Přehrát skladbu na Spotify"""
+        if not query:
+            return self._launch_spotify()
+
+        uri: str = f"spotify:search:{quote(query)}"
+        try:
+            if shutil.which("spotify"):
+                subprocess.Popen(["xdg-open", uri])
+                return "ok"
+            subprocess.Popen(["xdg-open", uri])
+            return "ok"
+        except Exception as e:
+            logger.warning(f"Spotify search selhalo: {e}")
+            try:
+                webbrowser.open(f"https://open.spotify.com/search/{quote(query)}")
+                return "ok"
+            except Exception as exc:
+                return f"Chyba: {exc}"
+
+    def _cmd_get_time(self) -> str:
+        """Vrátí aktuální čas"""
+        return datetime.now().strftime("%H:%M:%S")
+
+    def _cmd_get_date(self) -> str:
+        """Vrátí aktuální datum"""
+        return datetime.now().strftime("%d.%m.%Y")
+
+    def _cmd_calculate(self, expr: str) -> str:
+        """Vypočítá matematický výraz"""
+        try:
+            result: Union[int, float] = eval(expr)
+            return str(result)
+        except Exception as e:
+            logger.error(f"Chyba při výpočtu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_system_info(self) -> str:
+        """Vrátí informace o systému"""
+        try:
+            cpu_percent: float = psutil.cpu_percent(interval=1)
+            mem: Any = psutil.virtual_memory()
+            disk: Any = psutil.disk_usage('/')
+            
+            info: str = (
+                f"CPU: {cpu_percent}% | "
+                f"RAM: {mem.percent}% ({mem.available // (1024**3)} GB) | "
+                f"Disk: {disk.percent}% ({disk.free // (1024**3)} GB volného)"
+            )
+            return info
+        except Exception as e:
+            logger.error(f"Chyba při zjišťování systému: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_open_url(self, url: str) -> str:
+        """Otevře URL v prohlížeči"""
+        try:
+            webbrowser.open(url)
+            return "ok"
+        except Exception as e:
+            logger.error(f"Chyba při otevírání URL: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_search_web(self, query: str) -> str:
+        """Vyhledá na Googlu"""
+        try:
+            url: str = f"https://www.google.com/search?q={quote(query)}"
+            webbrowser.open(url)
+            return "ok"
+        except Exception as e:
+            logger.error(f"Chyba při vyhledávání: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_screenshot(self) -> str:
+        """Vytvoří screenshot"""
+        if not HAS_PYAUTOGUI:
+            return "pyautogui není nainstalován"
+        
+        try:
+            timestamp: str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename: str = f"screenshot_{timestamp}.png"
+            desktop_path: str = os.path.expanduser("~/Plocha")
+            if not os.path.exists(desktop_path):
+                desktop_path = os.path.expanduser("~/Desktop")
+            
+            filepath: str = os.path.join(desktop_path, filename)
+            img: Any = pyautogui.screenshot()
+            img.save(filepath)
+            return f"Uloženo: {filepath}"
+        except Exception as e:
+            logger.error(f"Chyba při screenshotu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_type_key(self, key: str) -> str:
+        """Stiskne klávesu"""
+        if not HAS_PYAUTOGUI:
+            return "pyautogui není nainstalován"
+        
+        try:
+            pyautogui.press(key)
+            return "ok"
+        except Exception as e:
+            logger.error(f"Chyba při stisku klávesy: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_write_text(self, text: str) -> str:
+        """Napíše text"""
+        if not HAS_PYAUTOGUI:
+            return "pyautogui není nainstalován"
+        
+        try:
+            pyautogui.typewrite(text, interval=0.05)
+            return "ok"
+        except Exception as e:
+            logger.error(f"Chyba při psaní textu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_clipboard_set(self, text: str) -> str:
+        """Zkopíruje text do schránky"""
+        try:
+            import pyperclip
+            pyperclip.copy(text)
+            return "ok"
+        except Exception as e:
+            logger.error(f"Chyba při kopírování do schránky: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_create_file(self, path: str) -> str:
+        """Vytvoří soubor"""
+        try:
+            Path(path).touch()
+            return "ok"
+        except Exception as e:
+            logger.error(f"Chyba při vytváření souboru: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_move_file(self, src: str, dst: str) -> str:
+        """Přesune soubor"""
+        try:
+            shutil.move(src, dst)
+            return "ok"
+        except Exception as e:
+            logger.error(f"Chyba při přesunování souboru: {e}")
+            return f"Chyba: {e}"
             return f"Aplikace '{app}' nenalezena"
 
         if app_cmd == "spotify":

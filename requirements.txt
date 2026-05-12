@@ -1,25 +1,90 @@
 # JARVIS v2.0 — závislosti
 # Instalace: pip install -r requirements.txt
 
-# Povinné
+# ═════════════════════════════════════════════════════
+# POVINNÉ BALÍČKY
+# ═════════════════════════════════════════════════════
+
 customtkinter>=5.2.0
 requests>=2.31.0
 pyautogui>=0.9.54
 psutil>=5.9.0
 Pillow>=10.0.0
 
-# TTS — kvalitní český hlas (potřebuje internet)
+# ═════════════════════════════════════════════════════
+# TEXT-TO-SPEECH (TTS) — kvalitní český hlas
+# ═════════════════════════════════════════════════════
+
 edge-tts>=7.0.0
 
-# Hlasové ovládání (mikrofon) — volitelné
+# ═════════════════════════════════════════════════════
+# SPEECH-TO-TEXT (STT) — volitelné
+# ═════════════════════════════════════════════════════
+
 SpeechRecognition>=3.10.0
 PyAudio>=0.2.13
 
-# Schránka — správné psaní českých znaků
+# ═════════════════════════════════════════════════════
+# SCHRÁNKA — správné psaní českých znaků
+# ═════════════════════════════════════════════════════
+
 pyperclip>=1.8.2
 
-# Přesné nastavení hlasitosti (pouze Windows, volitelné)
-# pip install pycaw comtypes
+# ═════════════════════════════════════════════════════
+# LOGGING — structured logging s JSON
+# ═════════════════════════════════════════════════════
 
-# Neural AI Memory System — pokročilá paměť
+loguru>=0.7.0
+
+# ═════════════════════════════════════════════════════
+# ENVIRONMENT — bezpečné načítání secrets
+# ═════════════════════════════════════════════════════
+
+python-dotenv>=1.0.0
+
+# ═════════════════════════════════════════════════════
+# TESTING — unit testy a CI/CD
+# ═════════════════════════════════════════════════════
+
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-timeout>=2.1.0
+pytest-mock>=3.12.0
+
+# ═════════════════════════════════════════════════════
+# CODE QUALITY — linting a type checking
+# ═════════════════════════════════════════════════════
+
+black>=23.11.0
+pylint>=3.0.0
+mypy>=1.7.0
+isort>=5.13.0
+flake8>=6.1.0
+
+# ═════════════════════════════════════════════════════
+# SECURITY — bandit pro security scanning
+# ═════════════════════════════════════════════════════
+
+bandit>=1.7.5
+safety>=2.3.0
+
+# ═════════════════════════════════════════════════════
+# PERFORMANCE & CACHING — volitelné
+# ═════════════════════════════════════════════════════
+
+# redis>=5.0.0  # Pro distributed caching
+# diskcache>=5.6.0  # Pro local disk caching
+
+# ═════════════════════════════════════════════════════
+# NEURAL AI MEMORY — pokročilá paměť
+# ═════════════════════════════════════════════════════
+
 neural-ai-memory[local]>=0.1.0
+
+# ═════════════════════════════════════════════════════
+# VOLITELNĚ — Windows hlasitost
+# ═════════════════════════════════════════════════════
+
+# pycaw>=20221226.0
+# comtypes>=1.2.0

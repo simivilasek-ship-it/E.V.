@@ -1,11 +1,17 @@
 """
-JARVIS v2.0 — Konfigurace
-Načítání a validace config.json
+JARVIS v3.0 — Konfigurace
+Načítání a validace z .env, config.json s fallbackem na defaults
 """
 
 import os
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
+try:
+    from dotenv import load_dotenv
+    HAS_DOTENV = True
+except ImportError:
+    HAS_DOTENV = False
 
 AVAILABLE_OLLAMA_MODELS = [
     "qwen2.5:3b",
@@ -25,6 +31,8 @@ DEFAULT_CONFIG = {
     "history_size": 20,
     "window_size": "560x760",
     "log_level": "INFO",
+    "log_file": "jarvis.log",
+    "log_json_format": True,
     "stt_timeout": 10,
     "stt_phrase_limit": 15,
     "stt_energy_threshold": 300,
@@ -52,27 +60,112 @@ DEFAULT_CONFIG = {
     "max_error_log": 1000,
     "rate_limit_window": 60.0,
     "rate_limit_max": 10,
+    # Security
+    "audit_log_file": "audit.log",
+    "audit_enabled": True,
+    # Memory
+    "memory_dir": "memory_data",
 }
 
-def load_config() -> Dict[str, Any]:
-    """Načte konfiguraci z config.json s validací"""
+
+def _load_env() -> Dict[str, Any]:
+    """
+    Načte konfiguraci z .env souboru
+    Vrátí slovník s env proměnnými
+    """
+    if not HAS_DOTENV:
+        return {}
+    
+    # Hledej .env v aktuálním adresáři
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    if not os.path.exists(env_path):
+        return {}
+    
+    load_dotenv(env_path)
+    
+    # Mapování env proměnných → config klíče
+    env_mapping = {
+        "OLLAMA_URL": "ollama_url",
+        "OLLAMA_MODEL": "ollama_model",
+        "TTS_ENABLED": ("tts_enabled", lambda x: x.lower() == "true"),
+        "TTS_VOICE": "tts_voice",
+        "TTS_RATE": ("tts_rate", int),
+        "STT_LANGUAGE": "stt_language",
+        "STT_ENERGY_THRESHOLD": ("stt_energy_threshold", int),
+        "STT_TIMEOUT": ("stt_timeout", int),
+        "STT_PHRASE_LIMIT": ("stt_phrase_limit", int),
+        "WINDOW_SIZE": "window_size",
+        "HISTORY_SIZE": ("history_size", int),
+        "LOG_LEVEL": "log_level",
+        "LOG_FILE": "log_file",
+        "LOG_JSON_FORMAT": ("log_json_format", lambda x: x.lower() == "true"),
+        "PLUGINS_ENABLED": ("plugins_enabled", lambda x: x.lower() == "true"),
+        "PLUGINS_DIR": "plugins_dir",
+        "ASYNC_MAX_WORKERS": ("async_max_workers", int),
+        "ASYNC_MAX_QUEUE": ("async_max_queue", int),
+        "MAX_ERROR_LOG": ("max_error_log", int),
+        "RATE_LIMIT_WINDOW": ("rate_limit_window", float),
+        "RATE_LIMIT_MAX": ("rate_limit_max", int),
+        "AUDIT_LOG_FILE": "audit_log_file",
+        "AUDIT_ENABLED": ("audit_enabled", lambda x: x.lower() == "true"),
+        "MEMORY_DIR": "memory_dir",
+    }
+    
+    config = {}
+    for env_key, config_key in env_mapping.items():
+        value = os.getenv(env_key)
+        if value is None:
+            continue
+        
+        # Zjisti config key a converter
+        if isinstance(config_key, tuple):
+            key, converter = config_key
+            try:
+                config[key] = converter(value)
+            except (ValueError, TypeError):
+                pass  # Ignoruj neplatné hodnoty
+        else:
+            config[config_key] = value
+    
+    return config
+
+
+def _load_json_config() -> Dict[str, Any]:
+    """Načte konfiguraci z config.json"""
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
 
     try:
         with open(config_path, "r", encoding="utf-8") as f:
-            user_config = json.load(f)
+            return json.load(f)
     except FileNotFoundError:
-        user_config = {}
+        return {}
     except json.JSONDecodeError as e:
         raise ValueError(f"Neplatný config.json: {e}")
 
-    # Sloučit s výchozími hodnotami
-    config = {**DEFAULT_CONFIG, **user_config}
 
+def load_config() -> Dict[str, Any]:
+    """
+    Načte konfiguraci v pořadí (priorita):
+    1. .env soubor (environment variables — nejvyšší priorita)
+    2. config.json soubor
+    3. DEFAULT_CONFIG (fallback)
+    """
+    # Začni s defaults
+    config = {**DEFAULT_CONFIG}
+    
+    # Aplikuj JSON konfiguraci
+    json_config = _load_json_config()
+    config.update(json_config)
+    
+    # Aplikuj ENV konfiguraci (nejvyšší priorita)
+    env_config = _load_env()
+    config.update(env_config)
+    
     # Validace
     _validate_config(config)
 
     return config
+
 
 def _validate_config(config: Dict[str, Any]) -> None:
     """Validuje konfiguraci"""

@@ -32,6 +32,233 @@ cp jarvis.desktop ~/.local/share/applications/
 cp jarvis.desktop ~/Plocha/   # nebo ~/Desktop/
 ```
 
+## Konfigurace
+
+### Environment Setup (Doporučeno)
+
+Kopíruj `.env.example` na `.env` a vyplň své hodnoty:
+
+```bash
+cp .env.example .env
+```
+
+Soubor `.env` obsahuje všechny konfigurační proměnné s prioritou:
+1. **Proměnné prostředí** (`.env`) — nejvyšší priorita
+2. **config.json** — středová priorita
+3. **Defaults** — fallback
+
+```bash
+# .env
+OLLAMA_MODEL=llama3.1:8b
+OLLAMA_URL=http://localhost:11434/api/chat
+LOG_LEVEL=DEBUG
+TTS_VOICE=cs-CZ-ZuzanaNeural
+```
+
+⚠️ **BEZPEČNOST:** Nikdy necommituj `.env` do Git! Je v `.gitignore`.
+
+### Konfigurace (`config.json`)
+
+Model `ollama_model` lze upravit přímo v uživatelském rozhraní pomocí výběru v horní části okna, konfigurace se uloží automaticky do `config.json`.
+
+```json
+{
+  "ollama_url":   "http://localhost:11434/api/chat",
+  "ollama_model": "llama3.1:8b",
+  "tts_enabled":  true,
+  "tts_voice":    "cs-CZ-AntoninNeural",
+  "history_size": 20,
+  "window_size":  "600x820",
+  "log_level":    "INFO",
+  "log_json_format": true
+}
+```
+
+## Vývoj — Developer Setup Guide
+
+### 1. Příprava prostředí
+
+```bash
+# Clone projekt
+git clone <repo>
+cd jarvis
+
+# Vytvoř virtual environment
+python3.11 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# nebo
+venv\Scripts\activate  # Windows
+
+# Nainstaluj závislosti
+pip install -r requirements.txt
+```
+
+### 2. Konfigurování projektu
+
+```bash
+# Kopíruj .env.example
+cp .env.example .env
+
+# Upravit pro dev
+cat .env
+# Změň:
+# LOG_LEVEL=DEBUG
+# DEBUG_MODE=true
+# AUTO_RELOAD=true
+```
+
+### 3. Spuštění Ollama
+
+```bash
+# V samostatném terminálu
+ollama serve
+
+# V jiném terminálu: stáhni model
+ollama pull qwen2.5:3b  # nebo jiný model
+```
+
+### 4. Spuštění JARVIS
+
+```bash
+# Aktivace venv
+source venv/bin/activate
+
+# Spuštění
+python jarvis.py
+```
+
+### 5. Běhěm vývoje
+
+#### Logování (Structured Logging)
+
+Projekt používá `loguru` pro structured JSON logging. Příklady:
+
+```python
+from logging_setup import get_logger
+
+logger = get_logger(__name__)
+
+# Jednoduchý log
+logger.info("Zpráva")
+
+# Log s contextem (JSON)
+logger.info("STT request", extra={
+    "language": "cs-CZ",
+    "energy": 300,
+    "duration": 1.5
+})
+
+# Error s traceback
+try:
+    something()
+except Exception as e:
+    logger.exception("Chyba v něčem", extra={"user": "admin"})
+```
+
+Logy se ukládají do `jarvis.log` v JSON formátu pro snadnější analýzu.
+
+#### Testování
+
+```bash
+# Spusť všechny testy
+pytest tests/
+
+# Spusť test konkrétního modulu
+pytest tests/test_commands.py -v
+
+# Spusť s pokrytím kódu
+pytest --cov=. tests/
+```
+
+#### Přidání nové funkce
+
+1. **Psaní kódu:**
+   ```python
+   # 1. Implementuj funkcionalitu
+   # 2. Přidej type hints
+   # 3. Piš testy
+   
+   def my_feature(text: str) -> str:
+       """Moje nová funkce."""
+       return text.upper()
+   ```
+
+2. **Testy:**
+   ```python
+   # tests/test_my_feature.py
+   from src.my_module import my_feature
+   
+   def test_my_feature():
+       assert my_feature("hello") == "HELLO"
+   ```
+
+3. **Dokumentace:**
+   ```python
+   def my_feature(text: str) -> str:
+       """
+       Stručný popis.
+       
+       Args:
+           text: Vstupní text
+       
+       Returns:
+           Transformovaný text
+       
+       Example:
+           >>> my_feature("hello")
+           "HELLO"
+       """
+   ```
+
+#### Plugin development
+
+Vytvoř plugin v `plugins/custom/`:
+
+```python
+# plugins/custom/my_plugin.py
+from plugin_system import PluginBase, PluginMetadata
+
+class MyPlugin(PluginBase):
+    def __init__(self):
+        metadata = PluginMetadata(
+            name="my-plugin",
+            version="1.0.0",
+            description="Popis",
+            author="Tvoje jméno"
+        )
+        super().__init__(metadata)
+    
+    def execute(self, action: str, params: dict):
+        if action == "hello":
+            return f"Hello {params.get('name', 'World')}"
+        return None
+```
+
+### 6. CI/CD (GitHub Actions)
+
+Projekt by měl mít `.github/workflows/` pro:
+- ✅ Unit testy (`pytest`)
+- ✅ Linting (`pylint`, `black`)
+- ✅ Type checking (`mypy`)
+- ✅ Security scanning (`bandit`, `safety`)
+
+```bash
+# Spustit lokálně:
+pylint src/
+black --check src/
+mypy src/
+bandit -r src/
+```
+
+### 7. Dokumentace kódu
+
+```bash
+# Generuj dokumentaci
+pip install sphinx
+sphinx-quickstart docs
+cd docs && make html
+```
+
 ## Co umí
 
 ### Systém
@@ -99,21 +326,6 @@ cp jarvis.desktop ~/Plocha/   # nebo ~/Desktop/
 | „Co si pamatuješ o uživateli?" | Vyhledávání v paměti |
 | „Statistiky paměti" | Info o neural memory |
 | Obecné otázky | Ollama AI odpověď s kontextem z paměti |
-
-## Konfigurace (`config.json`)
-
-Model `ollama_model` lze upravit přímo v uživatelském rozhraní pomocí výběru v horní části okna, konfigurace se uloží automaticky do `config.json`.
-
-```json
-{
-  "ollama_url":   "http://localhost:11434/api/chat",
-  "ollama_model": "llama3.1:8b",
-  "tts_enabled":  true,
-  "tts_voice":    "cs-CZ-AntoninNeural",
-  "history_size": 20,
-  "window_size":  "600x820"
-}
-```
 
 ## Deployment
 

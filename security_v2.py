@@ -108,22 +108,23 @@ class AuditEntry:
     user_text:  str = ""
     result:     str = ""
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
 
 class AuditLog:
     """Persistentní audit log všech akcí."""
 
-    def __init__(self, path: Optional[Path] = None):
-        self._path    = path or Path.home() / ".jarvis_audit.jsonl"
+    def __init__(self, path: Optional[Path] = None) -> None:
+        self._path: Path = path or Path.home() / ".jarvis_audit.jsonl"
         self._entries: List[AuditEntry] = []
-        self._lock    = threading.Lock()
+        self._lock: threading.Lock = threading.Lock()
         self._load_recent()
 
-    def log(self, action: str, params: Dict, allowed: bool,
-            reason: str = "", user_text: str = "", result: str = ""):
-        entry = AuditEntry(
+    def log(self, action: str, params: Dict[str, Any], allowed: bool,
+            reason: str = "", user_text: str = "", result: str = "") -> None:
+        """Záznam akce do audit logu"""
+        entry: AuditEntry = AuditEntry(
             timestamp=time.time(), action=action, params=params,
             allowed=allowed, reason=reason, user_text=user_text, result=result,
         )
@@ -137,26 +138,28 @@ class AuditLog:
                 logger.warning(f"Audit log chyba: {e}")
 
     def get_recent(self, limit: int = 50) -> List[AuditEntry]:
+        """Vrátí posledních N záznamů"""
         with self._lock:
             return self._entries[-limit:]
 
     def get_stats(self) -> Dict[str, Any]:
+        """Vrátí statistiky audit logu"""
         with self._lock:
-            total    = len(self._entries)
-            blocked  = sum(1 for e in self._entries if not e.allowed)
+            total: int = len(self._entries)
+            blocked: int = sum(1 for e in self._entries if not e.allowed)
             by_action: Dict[str, int] = {}
             for e in self._entries:
                 by_action[e.action] = by_action.get(e.action, 0) + 1
         return {"total": total, "blocked": blocked, "by_action": by_action}
 
-    def _load_recent(self):
+    def _load_recent(self) -> None:
         """Načte posledních 1000 záznamů ze souboru."""
         try:
             if self._path.exists():
-                lines = self._path.read_text(encoding="utf-8").strip().split("\n")
+                lines: List[str] = self._path.read_text(encoding="utf-8").strip().split("\n")
                 for line in lines[-1000:]:
                     if line:
-                        d = json.loads(line)
+                        d: Dict[str, Any] = json.loads(line)
                         self._entries.append(AuditEntry(**d))
         except Exception:
             pass
@@ -167,14 +170,14 @@ class AuditLog:
 class SecurityManager:
     """Hlavní bezpečnostní vrstva JARVIS 2.0."""
 
-    def __init__(self, max_permission: PermissionLevel = PermissionLevel.ELEVATED):
-        self._max_permission = max_permission
-        self._audit = AuditLog()
+    def __init__(self, max_permission: PermissionLevel = PermissionLevel.ELEVATED) -> None:
+        self._max_permission: PermissionLevel = max_permission
+        self._audit: AuditLog = AuditLog()
         self._whitelist: Set[str] = set()
         self._blacklist: Set[str] = set()
 
     def check(self, action: str, params: Dict[str, Any],
-              user_text: str = "") -> Tuple[bool, str]:
+              user_text: str = "") -> tuple[bool, str]:
         """
         Zkontroluje zda je akce povolena.
         Vrátí (allowed, reason).

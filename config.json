@@ -1,12 +1,14 @@
 {
   "ollama_url": "http://localhost:11434/api/chat",
-  "ollama_model": "qwen2.5:3b",
+  "ollama_model": "llama3.1:8b",
   "tts_enabled": true,
   "tts_voice": "cs-CZ-AntoninNeural",
   "tts_rate": 170,
   "history_size": 20,
   "window_size": "600x820",
   "log_level": "INFO",
+  "log_file": "jarvis.log",
+  "log_json_format": true,
   "stt_timeout": 10,
   "stt_phrase_limit": 15,
   "stt_energy_threshold": 300,
@@ -23,5 +25,16 @@
     "pl-PL": "Polski",
     "ru-RU": "Русский"
   },
+  "plugins_enabled": true,
+  "disabled_plugins": [],
+  "plugins_dir": "plugins",
+  "async_max_workers": 4,
+  "async_max_queue": 100,
+  "max_error_log": 1000,
+  "rate_limit_window": 60.0,
+  "rate_limit_max": 10,
+  "audit_log_file": "audit.log",
+  "audit_enabled": true,
+  "memory_dir": "memory_data",
   "theme": "dark"
 }
