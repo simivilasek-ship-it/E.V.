@@ -34,6 +34,9 @@ class TTSEngine:
         self.voice = config.get("tts_voice", "cs-CZ-AntoninNeural")
         self.rate = config.get("tts_rate", 170)
 
+        self._lock = threading.Lock()   # jen jedno přehrávání najednou
+        self._current_proc = None       # reference na subprocess pro stop()
+
         # Najdi audio přehrávač pro Linux
         self._player = self._find_player()
 
@@ -79,14 +82,19 @@ class TTSEngine:
 
             try:
                 if os.name == "nt":  # Windows
-                    subprocess.run(["start", "/wait", "", temp_path], shell=True, check=True)
+                    proc = subprocess.Popen(["start", "/wait", "", temp_path], shell=True)
                 else:  # Linux/Mac
                     if self._player == "ffplay":
-                        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", temp_path], check=True)
+                        proc = subprocess.Popen(
+                            ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", temp_path])
                     elif self._player:
-                        subprocess.run([self._player, "-q", temp_path], check=True)
+                        proc = subprocess.Popen([self._player, "-q", temp_path])
                     else:
                         logger.error("Žádný audio přehrávač nenalezen")
+                        return
+                self._current_proc = proc
+                proc.wait()
+                self._current_proc = None
             finally:
                 try:
                     os.unlink(temp_path)
@@ -110,12 +118,22 @@ class TTSEngine:
             logger.error(f"Pyttsx3 chyba: {e}")
             raise
 
+    def stop(self):
+        """Zastaví aktuální přehrávání."""
+        proc = self._current_proc
+        if proc:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+            self._current_proc = None
+
     def speak(self, text: str) -> None:
-        """Přečte text hlasem"""
+        """Přečte text hlasem — blokující, fronty. Volej stop() pro přerušení."""
         if not self.enabled or not text:
             return
 
-        def _run():
+        with self._lock:  # Věty se přehrávají postupně, ne souběžně
             try:
                 if HAS_EDGE_TTS:
                     asyncio.run(self._speak_edge_tts(text))
@@ -125,10 +143,6 @@ class TTSEngine:
                     logger.warning("TTS není dostupný")
             except Exception as e:
                 logger.error(f"TTS selhal: {e}")
-
-        # Spusť v samostatném vlákně
-        thread = threading.Thread(target=_run, daemon=True)
-        thread.start()
 
     def is_available(self) -> bool:
         """Vrátí True pokud TTS funguje"""

@@ -214,8 +214,7 @@ class JarvisApp:
         if not self.stt.is_available():
             self._gui(lambda: self.gui.add_message("Mikrofon není k dispozici.", "jarvis"))
             return
-
-        # Použij async engine místo raw thread
+        self.tts.stop()  # Přeruš mluvení, nový příkaz přichází
         self.async_engine.run_sync(
             self._listen_and_process,
             priority=TaskPriority.HIGH,
@@ -223,7 +222,7 @@ class JarvisApp:
         )
 
     def _on_send(self, text: str):
-        # Použij async engine místo raw thread
+        self.tts.stop()  # Přeruš mluvení, nový příkaz přichází
         self.async_engine.run_sync(
             self._process_command,
             text,
@@ -459,14 +458,9 @@ class JarvisApp:
         has_code = any(k in text for k in ("```", "def ", "import ", "class "))
         if not has_code and len(text) < 400:
             self._gui(lambda: self.gui.set_state("speaking"))
-
-            # Použij async engine pro TTS (nové)
-            self.async_engine.run_sync(
-                self.tts.speak,
-                text,
-                priority=TaskPriority.LOW,
-                task_name="tts_speak",
-            )
+            # tts.speak je blokující → spusť ve vlastním vlákně
+            import threading as _t
+            _t.Thread(target=self.tts.speak, args=(text,), daemon=True).start()
 
     def _schedule_memory_maintenance(self):
         """Naplánuje automatické čištění paměti každých 6 hodin."""

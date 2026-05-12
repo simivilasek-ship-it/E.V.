@@ -542,11 +542,12 @@ class LLMEngine:
     def ask(self, user_text: str) -> Tuple[str, Dict]:
         msg, action = self._quick_match(user_text)
         if action is not None:
-            self.history.append({"role": "user",      "content": user_text})
-            self.history.append({"role": "assistant",  "content": msg or ""})
-            # Ulož konverzaci do neural memory
-            if msg:
-                self.memory.store_conversation(user_text, msg or "", importance=0.3)
+            # Do LLM history ukládáme jen informační odpovědi, ne akce (otevři, zavři…)
+            action_name = action.get("action", "")
+            if action_name == "answer" and msg:
+                self.history.append({"role": "user",     "content": user_text})
+                self.history.append({"role": "assistant", "content": msg})
+                self.memory.store_conversation(user_text, msg, importance=0.4)
             return msg or "", action
 
         self.history.append({"role": "user", "content": user_text})
@@ -586,11 +587,12 @@ class LLMEngine:
     def stream_ask(self, user_text: str):
         msg, action = self._quick_match(user_text)
         if action is not None:
-            self.history.append({"role": "user",     "content": user_text})
-            self.history.append({"role": "assistant", "content": msg or ""})
-            # Ulož konverzaci do neural memory
-            if msg:
-                self.memory.store_conversation(user_text, msg or "", importance=0.3)
+            # Do LLM history ukládáme jen informační odpovědi, ne akce (otevři, zavři…)
+            action_name = action.get("action", "")
+            if action_name == "answer" and msg:
+                self.history.append({"role": "user",     "content": user_text})
+                self.history.append({"role": "assistant", "content": msg})
+                self.memory.store_conversation(user_text, msg, importance=0.4)
             if msg:
                 yield msg
             return
