@@ -24,147 +24,237 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# ══════════════════════════════════════════════════════
+#  VESTAVĚNÁ JSON PAMĚŤ (fallback — bez závislostí)
+# ══════════════════════════════════════════════════════
+
+import uuid
+import math as _math
+
+
+class _JSONMemoryStore:
+    """
+    Jednoduchá persistentní paměť v JSON.
+    Funguje vždy — bez externích závislostí.
+    Keyword-based recall (TF-IDF aproximace přes word overlap).
+    """
+
+    def __init__(self, path: Path):
+        self._path = path
+        self._path.mkdir(parents=True, exist_ok=True)
+        self._file = self._path / "memories.json"
+        self._lock = threading.Lock()
+        self._data: List[dict] = []
+        self._load()
+
+    def _load(self) -> None:
+        try:
+            if self._file.exists():
+                self._data = json.loads(self._file.read_text(encoding="utf-8"))
+        except Exception:
+            self._data = []
+
+    def _save(self) -> None:
+        try:
+            self._file.write_text(
+                json.dumps(self._data, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            logger.warning(f"JSON memory save chyba: {e}")
+
+    def store(self, content: str, importance: float, tags: List[str],
+              metadata: dict) -> str:
+        mid = str(uuid.uuid4())[:8]
+        entry = {
+            "id": mid,
+            "content": content,
+            "importance": importance,
+            "tags": tags,
+            "metadata": metadata,
+            "created_at": time.time(),
+            "last_access": time.time(),
+            "access_count": 0,
+        }
+        with self._lock:
+            self._data.append(entry)
+            self._save()
+        return mid
+
+    def recall(self, query: str, top_k: int, min_importance: float) -> List[dict]:
+        q_words = set(query.lower().split())
+        results = []
+        with self._lock:
+            for entry in self._data:
+                if entry["importance"] < min_importance:
+                    continue
+                c_words = set(entry["content"].lower().split())
+                overlap = len(q_words & c_words)
+                if overlap == 0:
+                    continue
+                # Recency bonus: půlnoc 14 dní
+                age_days = (time.time() - entry["created_at"]) / 86400
+                recency = _math.exp(-age_days / 14)
+                score = 0.5 * (overlap / max(len(q_words), 1)) + \
+                        0.3 * entry["importance"] + \
+                        0.2 * recency
+                results.append({**entry, "_score": score})
+        results.sort(key=lambda x: x["_score"], reverse=True)
+        # Aktualizuj last_access
+        ids = {r["id"] for r in results[:top_k]}
+        with self._lock:
+            for e in self._data:
+                if e["id"] in ids:
+                    e["last_access"] = time.time()
+                    e["access_count"] += 1
+            if ids:
+                self._save()
+        return results[:top_k]
+
+    def forget(self, mid: str) -> bool:
+        with self._lock:
+            before = len(self._data)
+            self._data = [e for e in self._data if e["id"] != mid]
+            changed = len(self._data) < before
+            if changed:
+                self._save()
+        return changed
+
+    def maintenance(self, decay_rate: float = 0.01,
+                    min_importance: float = 0.05) -> dict:
+        """Sníží importance starých vzpomínek, odstraní pod prahem."""
+        removed = 0
+        with self._lock:
+            for entry in self._data:
+                age_days = (time.time() - entry["created_at"]) / 86400
+                entry["importance"] *= _math.exp(-decay_rate * age_days)
+            before = len(self._data)
+            self._data = [e for e in self._data
+                          if e["importance"] >= min_importance]
+            removed = before - len(self._data)
+            self._save()
+        logger.info(f"Memory maintenance: odstraněno {removed} vzpomínek")
+        return {"removed": removed, "remaining": len(self._data)}
+
+    def stats(self) -> dict:
+        with self._lock:
+            total = len(self._data)
+            avg_imp = sum(e["importance"] for e in self._data) / total if total else 0.0
+        return {"total_memories": total, "avg_importance": round(avg_imp, 3)}
+
+
+# ══════════════════════════════════════════════════════
+#  JARVIS MEMORY (unifikovaná fasáda)
+# ══════════════════════════════════════════════════════
+
 class JarvisMemory:
-    """Neural memory systém pro JARVIS"""
+    """
+    Paměťová fasáda pro JARVIS.
+    Preferuje neural-ai-memory pokud je nainstalovaná,
+    jinak používá vestavěný JSON store (vždy funkční).
+    """
 
     def __init__(self, config: dict):
         self.config = config
-        self.memory_dir = os.path.join(os.path.dirname(__file__), "memory_data")
+        mem_dir = Path(os.path.dirname(os.path.abspath(__file__))) / "memory_data"
 
-        if not HAS_NEURAL_MEMORY:
-            logger.warning("neural-ai-memory není nainstalován. Používám fallback.")
-            self.system = None
-            return
+        if HAS_NEURAL_MEMORY:
+            try:
+                mem_cfg = MemoryConfig(
+                    persist_directory=str(mem_dir),
+                    retrieval=RetrievalWeights(relevance=0.4, importance=0.4, recency=0.2),
+                    lifecycle=LifecycleConfig(
+                        decay_rate=0.02, decay_threshold=0.1,
+                        merge_similarity_threshold=0.85,
+                        abstraction_cluster_size=3,
+                        auto_maintenance_interval=20,
+                    ),
+                    use_llm_importance_scoring=False,
+                    recency_half_life_days=14.0,
+                )
+                self.system = MemorySystem(provider=LocalProvider(), config=mem_cfg)
+                self._store: Optional[_JSONMemoryStore] = None
+                logger.info(f"Neural memory inicializován v: {mem_dir}")
+                return
+            except Exception as e:
+                logger.warning(f"Neural memory init selhal: {e}, používám JSON fallback")
 
-        # Konfigurace pro JARVIS
-        mem_config = MemoryConfig(
-            persist_directory=self.memory_dir,
-            retrieval=RetrievalWeights(
-                relevance=0.4,    # sémantická relevance
-                importance=0.4,   # důležitost
-                recency=0.2       # časovost
-            ),
-            lifecycle=LifecycleConfig(
-                decay_rate=0.02,           # pomalý decay
-                decay_threshold=0.1,       # nízky práh pro uchování
-                merge_similarity_threshold=0.85,
-                abstraction_cluster_size=3,
-                auto_maintenance_interval=20,  # častější údržba
-            ),
-            use_llm_importance_scoring=False,  # zatím bez LLM scoring
-            recency_half_life_days=14.0,       # delší paměť
-        )
+        self.system = None
+        self._store = _JSONMemoryStore(mem_dir)
+        logger.info(f"JSON memory inicializován v: {mem_dir}")
 
-        self.system = MemorySystem(provider=LocalProvider(), config=mem_config)
-        logger.info(f"Neural memory inicializován v: {self.memory_dir}")
+    # ── Store ──────────────────────────────────────────
 
     def store(self, content: str, importance: float = 0.5, context: str = None,
               tags: List[str] = None, metadata: dict = None) -> Optional[str]:
-        """Uloží informaci do paměti"""
-        if not self.system:
-            return None
+        if self.system:
+            try:
+                mem = self.system.store(content=content, importance=importance,
+                                        context=context, tags=tags or [],
+                                        metadata=metadata or {})
+                return mem.id
+            except Exception as e:
+                logger.error(f"Neural memory store chyba: {e}")
+                return None
+        return self._store.store(content, importance, tags or [], metadata or {})
 
-        try:
-            memory = self.system.store(
-                content=content,
-                importance=importance,
-                context=context,
-                tags=tags or [],
-                metadata=metadata or {}
-            )
-            logger.info(f"Uloženo do paměti: {content[:50]}...")
-            return memory.id
-        except Exception as e:
-            logger.error(f"Chyba při ukládání do paměti: {e}")
-            return None
+    # ── Recall ─────────────────────────────────────────
 
-    def recall(self, query: str, top_k: int = 5, min_importance: float = 0.0) -> List[dict]:
-        """Vyhledá relevantní vzpomínky"""
-        if not self.system:
-            return []
-
-        try:
-            results = self.system.recall(
-                query=query,
-                top_k=top_k,
-                min_importance=min_importance
-            )
-
-            memories = []
-            for r in results:
-                memories.append({
+    def recall(self, query: str, top_k: int = 5,
+               min_importance: float = 0.0) -> List[dict]:
+        if self.system:
+            try:
+                results = self.system.recall(query=query, top_k=top_k,
+                                             min_importance=min_importance)
+                return [{
                     "content": r.memory.content,
                     "importance": r.memory.importance,
                     "score": r.final_score,
                     "tags": r.memory.tags,
                     "metadata": r.memory.metadata,
-                    "created_at": r.memory.created_at.isoformat() if r.memory.created_at else None
-                })
+                    "created_at": r.memory.created_at.isoformat() if r.memory.created_at else None,
+                } for r in results]
+            except Exception as e:
+                logger.error(f"Neural memory recall chyba: {e}")
+                return []
+        return self._store.recall(query, top_k, min_importance)
 
-            logger.info(f"Nalezeno {len(memories)} vzpomínek pro: {query}")
-            return memories
-        except Exception as e:
-            logger.error(f"Chyba při vyhledávání v paměti: {e}")
-            return []
-
-    def get(self, memory_id: str) -> Optional[dict]:
-        """Získá konkrétní vzpomínku"""
-        if not self.system:
-            return None
-
-        try:
-            memory = self.system.get(memory_id)
-            if memory:
-                return {
-                    "content": memory.content,
-                    "importance": memory.importance,
-                    "tags": memory.tags,
-                    "metadata": memory.metadata,
-                    "created_at": memory.created_at.isoformat() if memory.created_at else None
-                }
-        except Exception as e:
-            logger.error(f"Chyba při získávání vzpomínky {memory_id}: {e}")
-        return None
+    # ── Forget ─────────────────────────────────────────
 
     def forget(self, memory_id: str) -> bool:
-        """Zapomene vzpomínku"""
-        if not self.system:
-            return False
+        if self.system:
+            try:
+                self.system.forget(memory_id)
+                return True
+            except Exception as e:
+                logger.error(f"Neural memory forget chyba: {e}")
+                return False
+        return self._store.forget(memory_id)
 
-        try:
-            self.system.forget(memory_id)
-            logger.info(f"Zapomenuto: {memory_id}")
-            return True
-        except Exception as e:
-            logger.error(f"Chyba při zapomínání {memory_id}: {e}")
-            return False
+    # ── Maintenance ────────────────────────────────────
 
     def run_maintenance(self) -> dict:
-        """Spustí údržbu paměti"""
-        if not self.system:
-            return {"error": "Neural memory není dostupná"}
+        if self.system:
+            try:
+                return self.system.run_maintenance()
+            except Exception as e:
+                return {"error": str(e)}
+        return self._store.maintenance()
 
-        try:
-            return self.system.run_maintenance()
-        except Exception as e:
-            logger.error(f"Chyba při údržbě paměti: {e}")
-            return {"error": str(e)}
+    # ── Stats ──────────────────────────────────────────
 
     def stats(self) -> dict:
-        """Statistiky paměti"""
-        if not self.system:
-            return {"error": "Neural memory není dostupná"}
-
-        try:
-            s = self.system.stats()
-            return {
-                "total_memories": s.total_memories,
-                "avg_importance": s.avg_importance,
-                "by_category": dict(s.by_category) if s.by_category else {}
-            }
-        except Exception as e:
-            logger.error(f"Chyba při získávání statistik: {e}")
-            return {"error": str(e)}
+        if self.system:
+            try:
+                s = self.system.stats()
+                return {
+                    "total_memories": s.total_memories,
+                    "avg_importance": s.avg_importance,
+                    "by_category": dict(s.by_category) if s.by_category else {},
+                }
+            except Exception as e:
+                return {"error": str(e)}
+        return self._store.stats()
 
     def store_conversation(self, user_message: str, ai_response: str, importance: float = 0.3):
         """Uloží konverzační pár"""

@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install system deps
+        run: sudo apt-get install -y portaudio19-dev ffmpeg
+
+      - name: Install Python deps
+        run: |
+          pip install --upgrade pip
+          # Nainstaluj jen to co testy potřebují (bez GUI, audio HW)
+          pip install \
+            requests psutil edge-tts \
+            customtkinter \
+            SpeechRecognition \
+            fastapi uvicorn \
+            pytest pytest-timeout
+
+      - name: Run tests
+        run: python -m pytest test_jarvis.py -q --timeout=30
+        env:
+          DISPLAY: ""          # headless — žádné GUI okno

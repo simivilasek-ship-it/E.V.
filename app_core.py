@@ -25,7 +25,6 @@ from event_bus import EventType, Event, get_event_bus
 from agents import AgentManager
 from scheduler import get_scheduler
 from security_v2 import get_security_manager, confirm_action
-from llm_router import LLMRouter
 from wake_word_detector import WakeWordDetector
 from user_profile import get_user_profile
 
@@ -59,8 +58,9 @@ class JarvisApp:
             )
             sys.exit(1)
 
-        # Načti pluginy
+        # Načti pluginy a navař callbacks
         self._load_plugins()
+        self._wire_skill_callbacks()
 
         # GUI
         self.gui = JarvisGUI()
@@ -113,12 +113,6 @@ class JarvisApp:
         # ── v2.0: Security Manager ───────────────────
         self.security = get_security_manager()
 
-        # ── v2.0: LLM Router ─────────────────────────
-        self.llm_router = LLMRouter(
-            ollama_url=CONFIG.get("ollama_url", "http://localhost:11434/api/chat"),
-            default_model=CONFIG.get("ollama_model", "qwen2.5:3b"),
-        )
-
         # ── Wake Word ─────────────────────────────────
         self.wake_word = WakeWordDetector(
             wake_word=CONFIG.get("wake_word", "jarvis"),
@@ -127,7 +121,7 @@ class JarvisApp:
         if CONFIG.get("wake_word_enabled", True):
             self.wake_word.start()
 
-        logger.info("Systémy v2.0 inicializovány (EventBus, Agents, Scheduler, LLMRouter, Security, WakeWord)")
+        logger.info("Systémy v2.0 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord)")
 
     def _load_plugins(self):
         """Načte plugin systém a pluginy"""
@@ -138,6 +132,18 @@ class JarvisApp:
         except Exception as e:
             logger.warning(f"Plugin systém selhal: {e}")
             self.plugin_manager = None
+
+    def _wire_skill_callbacks(self):
+        """Naváže callbacks do skill modulů po jejich načtení."""
+        import sys as _sys
+        # Timer skill — callback pro hlasové upozornění při vypršení
+        timer_mod = _sys.modules.get("jarvis_skill_timer")
+        if timer_mod and hasattr(timer_mod, "_on_timer_done"):
+            def _timer_done(msg: str):
+                self._gui(lambda m=msg: self.gui.add_message(m, "jarvis"))
+                self._speak(msg)
+            timer_mod._on_timer_done = _timer_done
+            logger.info("Timer skill callback navázan")
 
     # ── ERROR HANDLING CALLBACKS ─────────────────────
 
