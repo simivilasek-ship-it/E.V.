@@ -284,13 +284,23 @@ class JarvisApp:
         self._gui(lambda: self.gui.set_state("listening"))
         self._gui(lambda: self.gui.set_status("Poslouchám..."))
 
-        # Použij error handler s fallbackem pro STT
+        # Pozastav wake word — uvolni mikrofon pro STT
+        try:
+            self.wake_word.pause()
+        except Exception:
+            pass
+
         result = self.error_handler.execute_with_fallback(
             "stt_listen",
             self.stt.listen,
         )
-
         text = result.result if result.success else None
+
+        # Obnov wake word detektor
+        try:
+            self.wake_word.resume()
+        except Exception:
+            pass
 
         self._gui(lambda: self.gui.set_state("idle"))
         self._gui(lambda: self.gui.set_status(""))
@@ -459,9 +469,7 @@ class JarvisApp:
         has_code = any(k in text for k in ("```", "def ", "import ", "class "))
         if not has_code and len(text) < 400:
             self._gui(lambda: self.gui.set_state("speaking"))
-            # tts.speak je blokující → spusť ve vlastním vlákně
-            import threading as _t
-            _t.Thread(target=self.tts.speak, args=(text,), daemon=True).start()
+            self.tts.speak(text)  # neblokující — přidá do fronty workeru
 
     def _schedule_memory_maintenance(self):
         """Naplánuje auto-maintenance paměti a denní shrnutí."""
@@ -521,6 +529,12 @@ class JarvisApp:
             shutdown_async_engine(timeout=3.0)
         except Exception as e:
             logger.warning(f"Chyba při zastavování async engine: {e}")
+
+        # Zastav TTS worker
+        try:
+            self.tts.shutdown()
+        except Exception:
+            pass
 
         # Zastav wake word
         try:

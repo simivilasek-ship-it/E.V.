@@ -32,12 +32,13 @@ except ImportError:
 class WakeWordDetector:
     """
     Detekuje wake word "JARVISe" v pozadí.
-    
+    pause() / resume() uvolní mikrofon když STT poslouchá příkaz.
+
     Používá:
     1. porpoise (nejlehčí, nejrychlejší)
     2. Fallback: SpeechRecognition s detekcí klíčových slov
     """
-    
+
     def __init__(
         self,
         wake_word: str = "jarvis",
@@ -47,9 +48,11 @@ class WakeWordDetector:
         self.wake_word = wake_word.lower()
         self.on_wake = on_wake
         self.sensitivity = sensitivity
-        
+
         self._running = False
-        self._thread = None
+        self._paused  = threading.Event()   # set = aktivní, clear = pauza
+        self._paused.set()                  # výchozí stav: aktivní
+        self._thread  = None
         self._detector = None
         
         # Inicializovat detektor
@@ -89,9 +92,20 @@ class WakeWordDetector:
         self._thread.start()
         logger.info(f"Wake word detektor spuštěn (slovo: '{self.wake_word}')")
     
-    def stop(self):
-        """Zastaví detekci"""
+    def pause(self) -> None:
+        """Pozastaví detekci — mikrofon uvolněn pro STT."""
+        self._paused.clear()
+        logger.debug("Wake word detektor pozastaven")
+
+    def resume(self) -> None:
+        """Obnoví detekci po dokončení STT příkazu."""
+        self._paused.set()
+        logger.debug("Wake word detektor obnoven")
+
+    def stop(self) -> None:
+        """Zastaví detekci úplně."""
         self._running = False
+        self._paused.set()   # odblokuj čekající vlákno aby mohlo skončit
         logger.debug("Wake word detektor zastaven")
     
     def _run(self):
@@ -105,6 +119,9 @@ class WakeWordDetector:
         """Detekce pomocí porpoise"""
         try:
             while self._running:
+                self._paused.wait()          # čekej pokud je pauza
+                if not self._running:
+                    break
                 result = self._detector.listen(timeout=0.5)
                 if result and result.keyword == self.wake_word:
                     logger.info(f"Wake word detekován: '{self.wake_word}'")
@@ -112,19 +129,22 @@ class WakeWordDetector:
                         self.on_wake()
         except Exception as e:
             logger.error(f"porpoise chyba: {e}")
-    
+
     def _run_sr_fallback(self):
         """Fallback detekce pomocí SpeechRecognition"""
         recognizer = sr.Recognizer()
         recognizer.energy_threshold = 300
         recognizer.dynamic_energy_threshold = True
-        
+
         while self._running:
+            self._paused.wait()              # čekej pokud je pauza (STT poslouchá)
+            if not self._running:
+                break
             try:
                 with sr.Microphone() as source:
                     recognizer.adjust_for_ambient_noise(source, duration=0.3)
                     audio = recognizer.listen(source, timeout=1, phrase_time_limit=3)
-                
+
                 try:
                     text = recognizer.recognize_google(audio, language="cs-CZ")
                     if self.wake_word in text.lower():

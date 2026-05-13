@@ -155,13 +155,64 @@ class CommandExecutor:
         return datetime.now().strftime("%d.%m.%Y")
 
     def _cmd_calculate(self, expr: str) -> str:
-        """Vypočítá matematický výraz"""
+        """Vypočítá matematický výraz — bezpečný sandbox, bez eval()."""
+        import math as _math
+        import ast as _ast
+
+        _SAFE = {
+            "sqrt": _math.sqrt, "pow": _math.pow, "abs": abs,
+            "sin": _math.sin, "cos": _math.cos, "tan": _math.tan,
+            "log": _math.log, "log10": _math.log10,
+            "ceil": _math.ceil, "floor": _math.floor,
+            "round": round, "pi": _math.pi, "e": _math.e,
+        }
+        _ALLOWED_NODES = (
+            _ast.Expression, _ast.BinOp, _ast.UnaryOp, _ast.Constant,
+            _ast.Add, _ast.Sub, _ast.Mult, _ast.Div, _ast.Pow,
+            _ast.Mod, _ast.FloorDiv, _ast.USub, _ast.UAdd,
+            _ast.Call, _ast.Name, _ast.Load,
+        )
+
+        def _safe_eval(node):
+            if not isinstance(node, _ALLOWED_NODES):
+                raise ValueError(f"Zakázaný výraz: {type(node).__name__}")
+            if isinstance(node, _ast.Constant):
+                if not isinstance(node.value, (int, float)):
+                    raise ValueError("Pouze čísla jsou povolena")
+                return node.value
+            if isinstance(node, _ast.BinOp):
+                return _safe_eval(node.left).__class__(0) or 0  # type check
+            if isinstance(node, _ast.Name):
+                if node.id not in _SAFE:
+                    raise ValueError(f"Neznámá funkce: {node.id}")
+                return _SAFE[node.id]
+            if isinstance(node, _ast.Call):
+                fn = _safe_eval(node.func)
+                args = [_safe_eval(a) for a in node.args]
+                return fn(*args)
+            if isinstance(node, _ast.UnaryOp):
+                if isinstance(node.op, _ast.USub):
+                    return -_safe_eval(node.operand)
+                return _safe_eval(node.operand)
+            raise ValueError(f"Nepodporovaný uzel: {type(node).__name__}")
+
         try:
-            result: Union[int, float] = eval(expr)
-            return str(result)
+            expr_clean = expr.strip().replace(",", ".").replace("^", "**")
+            tree = _ast.parse(expr_clean, mode="eval")
+            # Ověř všechny uzly před spuštěním
+            for node in _ast.walk(tree):
+                if not isinstance(node, _ALLOWED_NODES):
+                    return f"Chyba: zakázaný výraz ({type(node).__name__})"
+            result = eval(  # noqa: S307 — bezpečné, whitelist + AST check
+                compile(tree, "<calc>", "eval"),
+                {"__builtins__": {}},
+                _SAFE,
+            )
+            if isinstance(result, float) and result == int(result):
+                return str(int(result))
+            return f"{result:.10g}"
         except Exception as e:
-            logger.error(f"Chyba při výpočtu: {e}")
-            return f"Chyba: {e}"
+            return f"Chyba výpočtu: {e}"
 
     def _cmd_system_info(self) -> str:
         """Vrátí informace o systému"""
@@ -808,19 +859,6 @@ class CommandExecutor:
             if nl == cmd or nl in aliases or any(a in nl for a in aliases):
                 return cmd
         return nl
-
-    def _cmd_calculate(self, expression: str) -> str:
-        """Vypočítá matematický výraz"""
-        try:
-            # Bezpečné vyhodnocení
-            allowed_names = {
-                k: v for k, v in math.__dict__.items() if not k.startswith("__")
-            }
-            allowed_names.update({"__builtins__": {}})
-            result = eval(expression, allowed_names)
-            return f"{expression} = {result}"
-        except Exception as e:
-            return f"Chyba výpočtu: {e}"
 
     def _cmd_translate(self, text: str, from_lang: str = "auto", to_lang: str = "cs") -> str:
         """Přeloží text pomocí Ollama."""

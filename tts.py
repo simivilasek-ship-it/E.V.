@@ -1,10 +1,12 @@
 """
-JARVIS v2.0 — Text-to-Speech (TTS)
-Syntéza řeči pomocí edge-tts nebo pyttsx3
+JARVIS v3.1 — Text-to-Speech (TTS)
+Jeden worker vlákno + queue → věty se přehrávají sériově,
+žádné souběžné přehrávání, žádné blokování více vláken.
 """
 
 import asyncio
 import logging
+import queue
 import tempfile
 import subprocess
 import os
@@ -25,101 +27,105 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+_STOP_SENTINEL = object()  # speciální hodnota pro zastavení workeru
+
+
 class TTSEngine:
-    """Engine pro syntézu řeči"""
+    """Engine pro syntézu řeči — jeden worker, neblokující fronta."""
 
     def __init__(self, config: dict):
         self.config = config
         self.enabled = config.get("tts_enabled", True)
-        self.voice = config.get("tts_voice", "cs-CZ-AntoninNeural")
-        self.rate = config.get("tts_rate", 170)
+        self.voice   = config.get("tts_voice", "cs-CZ-AntoninNeural")
+        self.rate    = config.get("tts_rate", 170)
 
-        self._lock = threading.Lock()   # jen jedno přehrávání najednou
-        self._current_proc = None       # reference na subprocess pro stop()
+        self._queue:        queue.Queue = queue.Queue()
+        self._current_proc: Optional[subprocess.Popen] = None
+        self._worker:       Optional[threading.Thread] = None
+        self._running:      bool = False
 
-        # Najdi audio přehrávač pro Linux
         self._player = self._find_player()
-
-        # Pyttsx3 fallback
         self._pyttsx3_engine = None
         self._has_pyttsx3 = False
+
         if HAS_PYTTSX3:
             try:
                 self._pyttsx3_engine = pyttsx3.init()
                 self._pyttsx3_engine.setProperty("rate", self.rate)
-                # Najdi český hlas
                 for voice in self._pyttsx3_engine.getProperty("voices"):
-                    if any(x in (voice.id + voice.name).lower() for x in ("czech", "cs-cz", "zuzana", "jakub")):
+                    if any(x in (voice.id + voice.name).lower()
+                           for x in ("czech", "cs-cz", "zuzana", "jakub")):
                         self._pyttsx3_engine.setProperty("voice", voice.id)
                         break
                 self._has_pyttsx3 = True
-                logger.info("Pyttsx3 TTS inicializován")
             except Exception as e:
-                logger.warning(f"Pyttsx3 inicializace selhala: {e}")
+                logger.warning(f"Pyttsx3 init selhal: {e}")
+
+        if self.enabled:
+            self._start_worker()
 
         if HAS_EDGE_TTS:
-            logger.info("Edge-tts TTS inicializován")
+            logger.info("TTS: edge-tts + worker fronta")
         elif self._has_pyttsx3:
-            logger.info("Používám pyttsx3 jako fallback")
+            logger.info("TTS: pyttsx3 + worker fronta")
         else:
-            logger.warning("Žádný TTS engine není dostupný")
+            logger.warning("TTS: žádný engine není dostupný")
 
-    def _find_player(self) -> Optional[str]:
-        """Najde audio přehrávač na Linuxu"""
-        for player in ("mpg123", "ffplay", "cvlc", "mplayer"):
-            if subprocess.run(["which", player], capture_output=True, text=True).returncode == 0:
-                return player
-        return None
+    # ── Worker ────────────────────────────────────────
 
-    async def _speak_edge_tts(self, text: str) -> None:
-        """Syntéza pomocí edge-tts"""
-        try:
-            communicate = edge_tts.Communicate(text, self.voice)
-            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-                temp_path = f.name
+    def _start_worker(self) -> None:
+        self._running = True
+        self._worker = threading.Thread(target=self._worker_loop,
+                                        daemon=True, name="tts-worker")
+        self._worker.start()
 
-            await communicate.save(temp_path)
-
+    def _worker_loop(self) -> None:
+        """Jeden vlákno zpracovává frontu sériově."""
+        while self._running:
             try:
-                if os.name == "nt":  # Windows
-                    proc = subprocess.Popen(["start", "/wait", "", temp_path], shell=True)
-                else:  # Linux/Mac
-                    if self._player == "ffplay":
-                        proc = subprocess.Popen(
-                            ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", temp_path])
-                    elif self._player:
-                        proc = subprocess.Popen([self._player, "-q", temp_path])
-                    else:
-                        logger.error("Žádný audio přehrávač nenalezen")
-                        return
-                self._current_proc = proc
-                proc.wait()
-                self._current_proc = None
+                item = self._queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+
+            if item is _STOP_SENTINEL:
+                self._queue.task_done()
+                break
+
+            text = item
+            try:
+                self._play(text)
+            except Exception as e:
+                logger.error(f"TTS worker chyba: {e}")
             finally:
-                try:
-                    os.unlink(temp_path)
-                except Exception:
-                    pass
+                self._queue.task_done()
 
-        except Exception as e:
-            logger.error(f"Edge-tts chyba: {e}")
-            raise
+    def _play(self, text: str) -> None:
+        """Blokující přehrávání — volá se výhradně z worker vlákna."""
+        if HAS_EDGE_TTS:
+            asyncio.run(self._speak_edge_tts(text))
+        elif self._has_pyttsx3:
+            self._speak_pyttsx3(text)
+        else:
+            logger.warning("TTS není dostupný")
 
-    def _speak_pyttsx3(self, text: str) -> None:
-        """Syntéza pomocí pyttsx3"""
-        try:
-            if self._pyttsx3_engine:
-                self._pyttsx3_engine.setProperty("rate", self.rate)
-                self._pyttsx3_engine.say(text)
-                self._pyttsx3_engine.runAndWait()
-            else:
-                raise RuntimeError("Pyttsx3 engine není inicializován")
-        except Exception as e:
-            logger.error(f"Pyttsx3 chyba: {e}")
-            raise
+    # ── Veřejné API ───────────────────────────────────
 
-    def stop(self):
-        """Zastaví aktuální přehrávání."""
+    def speak(self, text: str) -> None:
+        """Neblokující — přidá text do fronty pro worker."""
+        if not self.enabled or not text:
+            return
+        self._queue.put(text)
+
+    def stop(self) -> None:
+        """Zastaví aktuální přehrávání a vymaže frontu."""
+        # Vyprázdni frontu
+        while not self._queue.empty():
+            try:
+                self._queue.get_nowait()
+                self._queue.task_done()
+            except queue.Empty:
+                break
+        # Zabit aktuální subprocess
         proc = self._current_proc
         if proc:
             try:
@@ -128,22 +134,60 @@ class TTSEngine:
                 pass
             self._current_proc = None
 
-    def speak(self, text: str) -> None:
-        """Přečte text hlasem — blokující, fronty. Volej stop() pro přerušení."""
-        if not self.enabled or not text:
-            return
-
-        with self._lock:  # Věty se přehrávají postupně, ne souběžně
-            try:
-                if HAS_EDGE_TTS:
-                    asyncio.run(self._speak_edge_tts(text))
-                elif self._has_pyttsx3:
-                    self._speak_pyttsx3(text)
-                else:
-                    logger.warning("TTS není dostupný")
-            except Exception as e:
-                logger.error(f"TTS selhal: {e}")
+    def shutdown(self) -> None:
+        """Zastaví worker vlákno při ukončení aplikace."""
+        self._running = False
+        self._queue.put(_STOP_SENTINEL)
+        if self._worker:
+            self._worker.join(timeout=3)
 
     def is_available(self) -> bool:
-        """Vrátí True pokud TTS funguje"""
         return self.enabled and (HAS_EDGE_TTS or self._has_pyttsx3)
+
+    # ── Interní přehrávání ────────────────────────────
+
+    async def _speak_edge_tts(self, text: str) -> None:
+        try:
+            communicate = edge_tts.Communicate(text, self.voice)
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+                temp_path = f.name
+            await communicate.save(temp_path)
+            try:
+                if os.name == "nt":
+                    proc = subprocess.Popen(["start", "/wait", "", temp_path],
+                                            shell=True)
+                elif self._player == "ffplay":
+                    proc = subprocess.Popen(
+                        ["ffplay", "-nodisp", "-autoexit",
+                         "-loglevel", "quiet", temp_path])
+                elif self._player:
+                    proc = subprocess.Popen([self._player, "-q", temp_path])
+                else:
+                    logger.error("Žádný audio přehrávač")
+                    return
+                self._current_proc = proc
+                proc.wait()
+                self._current_proc = None
+            finally:
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.error(f"edge-tts chyba: {e}")
+
+    def _speak_pyttsx3(self, text: str) -> None:
+        try:
+            if self._pyttsx3_engine:
+                self._pyttsx3_engine.setProperty("rate", self.rate)
+                self._pyttsx3_engine.say(text)
+                self._pyttsx3_engine.runAndWait()
+        except Exception as e:
+            logger.error(f"pyttsx3 chyba: {e}")
+
+    def _find_player(self) -> Optional[str]:
+        for player in ("mpg123", "ffplay", "cvlc", "mplayer"):
+            if subprocess.run(["which", player],
+                              capture_output=True).returncode == 0:
+                return player
+        return None

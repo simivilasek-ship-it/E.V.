@@ -16,29 +16,41 @@ import json
 import logging
 import threading
 import time
+import unicodedata
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List, Optional
+
+
+def _norm(text: str) -> str:
+    """Odstraní diakritiku — stejná funkce jako v llm.py."""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", text.lower())
+        if unicodedata.category(c) != "Mn"
+    )
 
 logger = logging.getLogger(__name__)
 
 _PROFILE_PATH = Path.home() / ".jarvis_user_profile.json"
 
-# Regex patterny pro automatickou extrakci faktů z textu
+# Regex patterny pro automatickou extrakci faktů — BEZ diakritiky (STT text je normalizovaný)
+# Všechny patterny jsou bez diakritiky — aplikují se na _norm(text)
 _FACT_PATTERNS = [
     # Jméno
     (r"jmenuji?\s+se\s+(\w+)", "jméno"),
-    (r"jsem\s+(\w+)\b(?!\s+z\b)", "jméno"),
+    (r"jmenuju\s+se\s+(\w+)", "jméno"),
     # Město / lokace
-    (r"bydl[ií][mt]?\s+v\s+([\w\s]+?)(?:\.|,|$)", "město"),
+    (r"bydlim?\s+v\s+([\w\s]+?)(?:\.|,|$)", "město"),
     (r"jsem\s+z\s+([\w\s]+?)(?:\.|,|$)", "město"),
-    # Profese
-    (r"jsem\s+(programátor|developer|učitel|doktor|inženýr|student|designér|manažer|freelancer)", "profese"),
+    # Profese (bez diakritiky)
+    (r"jsem\s+(programator|developer|ucitel|doktor|inzenyr|student|designer|manazer|freelancer)", "profese"),
     (r"pracuji\s+jako\s+([\w\s]+?)(?:\.|,|$)", "profese"),
+    (r"delam\s+jako\s+([\w\s]+?)(?:\.|,|$)", "profese"),
     # Preference
-    (r"nerad\s+mám\s+([\w\s]+?)(?:\.|,|$)", "nelíbí"),
-    (r"mám\s+rád\s+([\w\s]+?)(?:\.|,|$)", "zájmy"),
-    (r"baví\s+mě\s+([\w\s]+?)(?:\.|,|$)", "zájmy"),
+    (r"nerad\s+mam\s+([\w\s]+?)(?:\.|,|$)", "nelíbí"),
+    (r"mam\s+rad\s+([\w\s]+?)(?:\.|,|$)", "zájmy"),
+    (r"bavi\s+me\s+([\w\s]+?)(?:\.|,|$)", "zájmy"),
+    (r"zajima\s+me\s+([\w\s]+?)(?:\.|,|$)", "zájmy"),
 ]
 
 
@@ -125,9 +137,10 @@ class UserProfile:
     def extract_from_text(self, text: str) -> List[str]:
         """Zkusí extrahovat fakta z textu uživatele. Vrátí seznam nalezených klíčů."""
         import re
+        normalized = _norm(text)   # odstraň diakritiku — STT text může být bez ní
         found = []
         for pattern, key in _FACT_PATTERNS:
-            m = re.search(pattern, text, re.IGNORECASE)
+            m = re.search(pattern, normalized, re.IGNORECASE)
             if m:
                 value = m.group(1).strip().rstrip(".,!")
                 if len(value) > 1:

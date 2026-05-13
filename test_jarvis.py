@@ -400,25 +400,53 @@ class TestPluginManager(unittest.TestCase):
 #  TTS — LOCK A STOP
 # ══════════════════════════════════════════════════════
 
-class TestTTSLock(unittest.TestCase):
+class TestTTSQueue(unittest.TestCase):
+    """TTS worker fronta — neblokující, sériové přehrávání."""
 
     def setUp(self):
         cfg = {**_CFG, "tts_enabled": True, "tts_voice": "cs-CZ-AntoninNeural", "tts_rate": 170}
         self.tts = TTSEngine(cfg)
 
-    def test_has_lock(self):
-        """TTS musí mít threading.Lock pro serializaci."""
-        import threading
-        self.assertIsInstance(self.tts._lock, type(threading.Lock()))
+    def tearDown(self):
+        self.tts.shutdown()
+
+    def test_has_queue(self):
+        """TTS musí mít interní frontu."""
+        import queue
+        self.assertIsInstance(self.tts._queue, queue.Queue)
+
+    def test_has_worker_thread(self):
+        """TTS musí mít worker vlákno."""
+        self.assertIsNotNone(self.tts._worker)
+        self.assertTrue(self.tts._worker.is_alive())
+
+    def test_speak_nonblocking(self):
+        """speak() musí vrátit okamžitě (neblokující)."""
+        self.tts.enabled = False   # nepřehrávej audio, jen testuj neblokování
+        import time
+        t0 = time.time()
+        self.tts.speak("toto je dlouhý testovací text který by blokoval")
+        elapsed = time.time() - t0
+        self.assertLess(elapsed, 0.1, "speak() musí být neblokující")
+
+    def test_stop_clears_queue(self):
+        """stop() musí vyprázdnit frontu."""
+        self.tts.enabled = False
+        for i in range(5):
+            self.tts.speak(f"věta {i}")
+        self.tts.stop()
+        self.assertTrue(self.tts._queue.empty())
 
     def test_stop_no_error_when_idle(self):
         """stop() nesmí vyhodit výjimku když nic nehraje."""
-        self.tts.stop()  # _current_proc je None → nesmí crash
+        self.tts.stop()
 
     def test_speak_disabled_does_nothing(self):
-        """speak() s tts_enabled=False nesmí nic dělat."""
+        """speak() s tts_enabled=False nesmí přidat do fronty."""
         self.tts.enabled = False
-        self.tts.speak("test")  # Nesmí vyhodit výjimku ani spustit audio
+        before = self.tts._queue.qsize()
+        self.tts.speak("test")
+        self.assertEqual(self.tts._queue.qsize(), before)
 
 
 # ══════════════════════════════════════════════════════
@@ -458,6 +486,187 @@ class TestSecurityV2(unittest.TestCase):
         from security_v2 import confirm_action
         result = confirm_action("get_time", {})
         self.assertTrue(result)
+
+
+# ══════════════════════════════════════════════════════
+#  CALCULATE — SANDBOX SECURITY
+# ══════════════════════════════════════════════════════
+
+class TestCalculateSandbox(unittest.TestCase):
+    """_cmd_calculate nesmí dovolit spuštění libovolného kódu."""
+
+    def setUp(self):
+        self.cmds = CommandExecutor(_CFG)
+
+    def test_basic_math(self):
+        self.assertEqual(self.cmds._cmd_calculate("2 + 2"), "4")
+
+    def test_multiplication(self):
+        self.assertEqual(self.cmds._cmd_calculate("3 * 7"), "21")
+
+    def test_power(self):
+        self.assertEqual(self.cmds._cmd_calculate("2 ** 10"), "1024")
+
+    def test_sqrt(self):
+        self.assertEqual(self.cmds._cmd_calculate("sqrt(144)"), "12")
+
+    def test_float_result(self):
+        result = self.cmds._cmd_calculate("1 / 3")
+        self.assertIn("0.333", result)
+
+    def test_dangerous_import_blocked(self):
+        """__import__ nesmí projít."""
+        result = self.cmds._cmd_calculate("__import__('os').system('id')")
+        self.assertIn("Chyba", result)
+
+    def test_dangerous_open_blocked(self):
+        """open() nesmí projít."""
+        result = self.cmds._cmd_calculate("open('/etc/passwd').read()")
+        self.assertIn("Chyba", result)
+
+    def test_dangerous_exec_blocked(self):
+        """exec() nesmí projít."""
+        result = self.cmds._cmd_calculate("exec('import os')")
+        self.assertIn("Chyba", result)
+
+    def test_string_literal_blocked(self):
+        """Řetězcové literály nesmí projít."""
+        result = self.cmds._cmd_calculate("'hello'")
+        self.assertIn("Chyba", result)
+
+
+# ══════════════════════════════════════════════════════
+#  WAKE WORD — PAUSE / RESUME
+# ══════════════════════════════════════════════════════
+
+class TestWakeWordPauseResume(unittest.TestCase):
+
+    def setUp(self):
+        from wake_word_detector import WakeWordDetector
+        # Neposíláme on_wake callback → detektor se nespustí bez porpoise/SR
+        self.detector = WakeWordDetector(wake_word="jarvis", on_wake=None)
+
+    def test_initially_active(self):
+        """Detektor musí být po inicializaci aktivní (ne pozastavený)."""
+        self.assertTrue(self.detector._paused.is_set())
+
+    def test_pause_clears_event(self):
+        """pause() musí vyčistit event (blokovat vlákno)."""
+        self.detector.pause()
+        self.assertFalse(self.detector._paused.is_set())
+
+    def test_resume_sets_event(self):
+        """resume() musí obnovit event."""
+        self.detector.pause()
+        self.detector.resume()
+        self.assertTrue(self.detector._paused.is_set())
+
+    def test_stop_sets_event(self):
+        """stop() musí nastavit event aby vlákno mohlo skončit."""
+        self.detector.pause()
+        self.detector.stop()
+        self.assertTrue(self.detector._paused.is_set())
+
+
+# ══════════════════════════════════════════════════════
+#  USER PROFILE — NORMALIZACE DIAKRITIKY
+# ══════════════════════════════════════════════════════
+
+class TestUserProfileExtraction(unittest.TestCase):
+
+    def setUp(self):
+        import tempfile, pathlib
+        tmp = tempfile.mktemp(suffix=".json")
+        from user_profile import UserProfile
+        self.profile = UserProfile(path=pathlib.Path(tmp))
+
+    def test_extract_name_with_diacritics(self):
+        """Extrakce jména s diakritikou (normalizovaný text → lowercase hodnota)."""
+        found = self.profile.extract_from_text("Jmenuji se Petr")
+        self.assertIn("jméno", found)
+        # _norm() vrátí lowercase, jméno bude "petr"
+        self.assertEqual(self.profile.get("jméno").lower(), "petr")
+
+    def test_extract_name_without_diacritics(self):
+        """Extrakce jména BEZ diakritiky (STT výstup)."""
+        self.profile._facts.clear()
+        found = self.profile.extract_from_text("jmenuji se Honza")
+        self.assertIn("jméno", found)
+
+    def test_extract_city(self):
+        """Extrakce města z textu bez diakritiky."""
+        self.profile._facts.clear()
+        found = self.profile.extract_from_text("bydlim v Brne")
+        self.assertIn("město", found)
+
+    def test_extract_hobby(self):
+        """Extrakce zájmů."""
+        self.profile._facts.clear()
+        found = self.profile.extract_from_text("bavi me python a gaming")
+        self.assertIn("zájmy", found)
+
+    def test_higher_confidence_overwrites(self):
+        """Vyšší confidence přepíše nižší."""
+        self.profile.set("jméno", "Stará hodnota", confidence=0.3)
+        self.profile.set("jméno", "Nová hodnota", confidence=0.9)
+        self.assertEqual(self.profile.get("jméno"), "Nová hodnota")
+
+    def test_lower_confidence_does_not_overwrite(self):
+        """Nižší confidence nepřepíše vyšší."""
+        self.profile.set("jméno", "Petr", confidence=0.9)
+        self.profile.set("jméno", "Jiný", confidence=0.4)
+        self.assertEqual(self.profile.get("jméno"), "Petr")
+
+
+# ══════════════════════════════════════════════════════
+#  GUI — HEADLESS (bez zobrazení okna)
+# ══════════════════════════════════════════════════════
+
+class TestGUIHeadless(unittest.TestCase):
+    """Testy GUI logiky bez otevření okna (mockovaný tkinter)."""
+
+    def test_blend_function(self):
+        """blend() musí vrátit validní hex barvu."""
+        from gui import blend
+        result = blend("#00d4ff", "#070b12", 0.5)
+        self.assertRegex(result, r"^#[0-9a-f]{6}$")
+
+    def test_blend_alpha_zero(self):
+        """blend() s alpha=0 musí vrátit barvu pozadí."""
+        from gui import blend
+        result = blend("#ffffff", "#000000", 0.0)
+        self.assertEqual(result, "#000000")
+
+    def test_blend_alpha_one(self):
+        """blend() s alpha=1 musí vrátit barvu popředí."""
+        from gui import blend
+        result = blend("#ffffff", "#000000", 1.0)
+        self.assertEqual(result, "#ffffff")
+
+    def test_orb_colors_defined(self):
+        """Všechny stavy mají definované barvy."""
+        from gui import ORB_COLORS, STATE_LABELS
+        for state in ("idle", "listening", "thinking", "speaking"):
+            self.assertIn(state, ORB_COLORS)
+            self.assertIn(state, STATE_LABELS)
+
+    def test_particle_pos_returns_tuple(self):
+        """Particle.pos() musí vrátit 3-tuple čísel."""
+        from gui import Particle
+        p = Particle(120, 120)
+        result = p.pos(frame=10, speed_mult=1.0, orbit_mult=1.0)
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 3)
+        for v in result:
+            self.assertIsInstance(v, float)
+
+    def test_particle_orbit_radius_range(self):
+        """Particle orbit radius musí být v rozsahu 50–110."""
+        from gui import Particle
+        for _ in range(20):
+            p = Particle(0, 0)
+            self.assertGreaterEqual(p.orbit_r, 50)
+            self.assertLessEqual(p.orbit_r, 110)
 
 
 if __name__ == "__main__":
