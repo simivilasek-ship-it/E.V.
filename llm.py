@@ -411,7 +411,7 @@ class LocalRouter:
                 "params": {"path": os.path.expanduser(path) if path else _HOME}}
 
         # ── VYTVOŘ SLOŽKU ─────────────────────────────
-        m = re.search(r"\b(vytvoř|vytvořit|mkdir)\s+složku\s+(.+)", t)
+        m = re.search(r"\b(vytvor|vytvorit|mkdir)\s+slozku\s+(.+)", t)
         if m:
             name = m.group(2).strip()
             path = os.path.join(_HOME, name)

@@ -396,5 +396,69 @@ class TestPluginManager(unittest.TestCase):
         self.assertIsInstance(actions, (list, dict))
 
 
+# ══════════════════════════════════════════════════════
+#  TTS — LOCK A STOP
+# ══════════════════════════════════════════════════════
+
+class TestTTSLock(unittest.TestCase):
+
+    def setUp(self):
+        cfg = {**_CFG, "tts_enabled": True, "tts_voice": "cs-CZ-AntoninNeural", "tts_rate": 170}
+        self.tts = TTSEngine(cfg)
+
+    def test_has_lock(self):
+        """TTS musí mít threading.Lock pro serializaci."""
+        import threading
+        self.assertIsInstance(self.tts._lock, type(threading.Lock()))
+
+    def test_stop_no_error_when_idle(self):
+        """stop() nesmí vyhodit výjimku když nic nehraje."""
+        self.tts.stop()  # _current_proc je None → nesmí crash
+
+    def test_speak_disabled_does_nothing(self):
+        """speak() s tts_enabled=False nesmí nic dělat."""
+        self.tts.enabled = False
+        self.tts.speak("test")  # Nesmí vyhodit výjimku ani spustit audio
+
+
+# ══════════════════════════════════════════════════════
+#  SECURITY — CONFIRM ACTION A AUDIT
+# ══════════════════════════════════════════════════════
+
+class TestSecurityV2(unittest.TestCase):
+
+    def setUp(self):
+        from security_v2 import SecurityManager, PermissionLevel
+        self.sec = SecurityManager()
+
+    def test_safe_action_allowed(self):
+        """Akce na úrovni SAFE musí projít bez potvrzení."""
+        allowed, reason = self.sec.check("get_time", {})
+        self.assertTrue(allowed)
+
+    def test_unknown_action_blocked(self):
+        """Neznámá akce musí být blokována."""
+        allowed, reason = self.sec.check("destroy_everything", {})
+        self.assertFalse(allowed)
+
+    def test_dangerous_pattern_blocked(self):
+        """Parametry s rm -rf musí být blokované."""
+        allowed, reason = self.sec.check("run_script", {"path": "rm -rf /home"})
+        self.assertFalse(allowed)
+
+    def test_audit_log_records(self):
+        """Audit log musí zaznamenat každou kontrolu."""
+        before = len(self.sec.get_audit_log(100))
+        self.sec.check("get_date", {})
+        after = len(self.sec.get_audit_log(100))
+        self.assertGreater(after, before)
+
+    def test_confirm_action_safe_no_dialog(self):
+        """confirm_action pro SAFE akci musí vrátit True bez dialogu."""
+        from security_v2 import confirm_action
+        result = confirm_action("get_time", {})
+        self.assertTrue(result)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
