@@ -1,0 +1,8 @@
+{
+  "name": "greeting",
+  "version": "1.1.0",
+  "description": "Reaguje na pozdravy a rozloučení — vrací přivítání podle denní doby.",
+  "author": "JARVIS",
+  "permissions": ["answer"],
+  "triggers": ["ahoj", "nazdar", "čau", "nashle", "dobrý den"]
+}

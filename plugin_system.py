@@ -1,24 +1,31 @@
 """
-JARVIS v3.0 — Plugin System
-Extensible plugin architecture for JARVIS commands and features.
+JARVIS v3.1 — Plugin / Skill System
+Podporuje dva formáty:
+  1. Složka se skill.py + manifest.json  (Leon-style)
+  2. Jednoduchý .py soubor s get_routes() / get_actions()
+
+Skills se načítají lazy — pouze pokud manifest existuje nebo .py soubor nalezen.
 """
 
-import os
+from __future__ import annotations
 import sys
 import json
 import importlib
+import importlib.util
 import inspect
 import logging
-from typing import Dict, Any, List, Optional, Callable
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
+# ── Datové struktury ──────────────────────────────────
+
 @dataclass
 class PluginMetadata:
-    """Metadata o pluginu"""
     name: str
     version: str
     description: str
@@ -28,23 +35,22 @@ class PluginMetadata:
 
 
 @dataclass
-class PluginManifest:
-    """Manifest pluginu načtený z manifest.json"""
+class SkillManifest:
     name: str
-    version: str
-    description: str
+    version: str = "1.0.0"
+    description: str = ""
     author: str = ""
-    entry_point: str = "main"
-    dependencies: List[str] = field(default_factory=list)
+    entry_point: str = "skill"          # soubor bez .py
     permissions: List[str] = field(default_factory=list)
-    config_schema: Dict[str, Any] = field(default_factory=dict)
+    triggers: List[str] = field(default_factory=list)
+    dependencies: List[str] = field(default_factory=list)
+    path: str = ""                       # absolutní cesta ke složce / souboru
 
+
+# ── PluginBase (třídní API — zpětná kompatibilita) ────
 
 class PluginBase:
-    """
-    Základní třída pro všechny pluginy.
-    Každý plugin musí dědit z této třídy a implementovat požadované metody.
-    """
+    """Základní třída pro class-based pluginy."""
 
     def __init__(self, metadata: PluginMetadata, config: Dict[str, Any] = None):
         self.metadata = metadata
@@ -60,59 +66,84 @@ class PluginBase:
     def enabled(self) -> bool:
         return self._enabled
 
-    def enable(self):
-        """Povolí plugin"""
-        self._enabled = True
-        self._logger.info(f"Plugin '{self.name}' povolen")
+    def enable(self):  self._enabled = True
+    def disable(self): self._enabled = False
 
-    def disable(self):
-        """Zakáže plugin"""
-        self._enabled = False
-        self._logger.info(f"Plugin '{self.name}' zakázán")
+    def on_load(self): pass
+    def on_unload(self): pass
 
-    def on_load(self):
-        """Volá se při načtení pluginu"""
-        pass
+    def get_commands(self) -> Dict[str, Callable]: return {}
+    def get_actions(self)  -> Dict[str, Callable]: return {}
+    def get_routes(self)   -> List[Dict[str, Any]]: return []
+    def get_ui_elements(self) -> List[Dict[str, Any]]: return []
 
-    def on_unload(self):
-        """Volá se při odpojení pluginu"""
-        pass
 
-    def on_config_change(self, key: str, value: Any):
-        """Volá se při změně konfigurace"""
-        pass
+# ── Wrapper pro module-level skills ───────────────────
 
-    def get_commands(self) -> Dict[str, Callable]:
-        """
-        Vrátí slovník příkazů poskytovaných pluginem.
-        Klíč = název příkazu, hodnota = callable.
-        """
-        return {}
+class ModuleSkillWrapper(PluginBase):
+    """Obalí modul s get_routes()/get_actions() do PluginBase rozhraní."""
 
-    def get_actions(self) -> Dict[str, Callable]:
-        """
-        Vrátí slovník akcí poskytovaných pluginem.
-        Klíč = název akce, hodnota = callable(params) -> str.
-        """
-        return {}
+    def __init__(self, module, manifest: SkillManifest):
+        meta = PluginMetadata(
+            name=manifest.name,
+            version=manifest.version,
+            description=manifest.description,
+            author=manifest.author,
+        )
+        super().__init__(meta)
+        self._module = module
+        self._manifest = manifest
 
     def get_routes(self) -> List[Dict[str, Any]]:
-        """
-        Vrátí seznam routovacích pravidel.
-        Každé pravidlo: {"pattern": regex, "action": str, "handler": callable(text) -> tuple}
-        """
-        return []
+        fn = getattr(self._module, "get_routes", None)
+        return fn() if callable(fn) else []
 
-    def get_ui_elements(self) -> List[Dict[str, Any]]:
-        """
-        Vrátí seznam UI elementů pro GUI.
-        """
-        return []
+    def get_actions(self) -> Dict[str, Callable]:
+        fn = getattr(self._module, "get_actions", None)
+        return fn() if callable(fn) else {}
 
+    def get_commands(self) -> Dict[str, Callable]:
+        fn = getattr(self._module, "get_commands", None)
+        return fn() if callable(fn) else {}
+
+
+# ── Skill Loader ──────────────────────────────────────
+
+class SkillLoader:
+    """Statická třída pro načítání skill modulů."""
+
+    @staticmethod
+    def load_module(path: str, module_name: str):
+        """Načte Python modul ze souboru."""
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        if spec is None:
+            raise ImportError(f"Nelze načíst spec pro {path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def find_plugin_class(module) -> Optional[type]:
+        """Najde třídu dědící z PluginBase v modulu."""
+        for _, obj in inspect.getmembers(module, inspect.isclass):
+            if issubclass(obj, PluginBase) and obj is not PluginBase:
+                return obj
+        return None
+
+    @staticmethod
+    def has_module_api(module) -> bool:
+        """Vrátí True pokud modul má get_routes nebo get_actions."""
+        return callable(getattr(module, "get_routes", None)) or \
+               callable(getattr(module, "get_actions", None))
+
+
+# ── Plugin Manager ────────────────────────────────────
 
 class PluginManager:
     """
-    Správce pluginů — načítá, spravuje a poskytuje pluginy.
+    Správce skills/pluginů.
+    Skenuje plugins/ adresáře, načítá manifest.json i standalone .py soubory.
     """
 
     def __init__(self, config: Dict[str, Any] = None):
@@ -121,326 +152,254 @@ class PluginManager:
         self._commands: Dict[str, Callable] = {}
         self._actions: Dict[str, Callable] = {}
         self._routes: List[Dict[str, Any]] = []
-        self._ui_elements: List[Dict[str, Any]] = []
-        self._plugin_dirs: List[str] = []
-        self._disabled_plugins: set = set()
+        self._disabled: set = set(self.config.get("disabled_plugins", []))
 
-        # Výchozí adresáře pro pluginy
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        self._plugin_dirs = [
-            os.path.join(base_dir, "plugins"),
-            os.path.join(base_dir, "plugins", "builtin"),
+        base = Path(__file__).parent
+        self._skill_dirs: List[Path] = [
+            base / "plugins" / "custom",
+            base / "plugins" / "builtin",
+            base / "plugins" / "system",
+            base / "plugins" / "web",
+            base / "plugins" / "media",
         ]
 
-        # Načti seznam zakázaných pluginů z konfigurace
-        self._disabled_plugins = set(
-            self.config.get("disabled_plugins", [])
-        )
+    # ── Discovery ─────────────────────────────────────
 
-    def discover_plugins(self) -> List[PluginManifest]:
-        """
-        Prohledá adresáře pluginů a vrátí seznam manifestů.
-        """
-        manifests = []
+    def discover_skills(self) -> List[SkillManifest]:
+        """Prohledá skill adresáře a vrátí seznam manifestů."""
+        manifests: List[SkillManifest] = []
+        seen = set()
 
-        for plugin_dir in self._plugin_dirs:
-            if not os.path.isdir(plugin_dir):
+        for skill_dir in self._skill_dirs:
+            if not skill_dir.is_dir():
                 continue
 
-            for item in os.listdir(plugin_dir):
-                plugin_path = os.path.join(plugin_dir, item)
+            for item in sorted(skill_dir.iterdir()):
+                # Složka se skill.py nebo manifest.json
+                if item.is_dir():
+                    manifest_file = item / "manifest.json"
+                    skill_file = item / "skill.py"
+                    init_file = item / "__init__.py"
 
-                # Podpora pro jednotlivé soubory i adresáře
-                manifest_path = None
-                if os.path.isdir(plugin_path):
-                    manifest_path = os.path.join(plugin_path, "manifest.json")
-                elif item.endswith(".py") and item != "__init__.py":
-                    # Python soubor bez manifestu
-                    manifest_path = plugin_path
+                    if manifest_file.exists():
+                        m = self._parse_manifest(manifest_file, item)
+                    elif skill_file.exists() or init_file.exists():
+                        m = SkillManifest(
+                            name=item.name,
+                            description=f"Skill: {item.name}",
+                            path=str(item),
+                        )
+                    else:
+                        continue
 
-                if manifest_path and os.path.isfile(manifest_path):
-                    try:
-                        manifest = self._load_manifest(manifest_path, plugin_path)
-                        if manifest:
-                            manifests.append(manifest)
-                    except Exception as e:
-                        logger.warning(f"Chyba načítání manifestu {manifest_path}: {e}")
+                    if m and m.name not in seen:
+                        seen.add(m.name)
+                        manifests.append(m)
+
+                # Standalone .py soubor
+                elif item.suffix == ".py" and item.name != "__init__.py":
+                    name = item.stem
+                    if name not in seen:
+                        seen.add(name)
+                        manifests.append(SkillManifest(
+                            name=name,
+                            description=f"Skill: {name}",
+                            entry_point=name,
+                            path=str(item),
+                        ))
 
         return manifests
 
-    def _load_manifest(self, manifest_path: str, plugin_path: str) -> Optional[PluginManifest]:
-        """Načte manifest pluginu"""
-        if manifest_path.endswith(".json"):
-            with open(manifest_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            return PluginManifest(
-                name=data.get("name", os.path.basename(plugin_path)),
-                version=data.get("version", "0.1.0"),
+    def _parse_manifest(self, manifest_file: Path, skill_dir: Path) -> Optional[SkillManifest]:
+        try:
+            data = json.loads(manifest_file.read_text(encoding="utf-8"))
+            return SkillManifest(
+                name=data.get("name", skill_dir.name),
+                version=data.get("version", "1.0.0"),
                 description=data.get("description", ""),
                 author=data.get("author", ""),
-                entry_point=data.get("entry_point", "main"),
-                dependencies=data.get("dependencies", []),
+                entry_point=data.get("entry_point", "skill"),
                 permissions=data.get("permissions", []),
-                config_schema=data.get("config_schema", {}),
+                triggers=data.get("triggers", []),
+                dependencies=data.get("dependencies", []),
+                path=str(skill_dir),
             )
-        elif manifest_path.endswith(".py"):
-            # Python soubor bez manifestu — vytvoř základní manifest
-            name = os.path.splitext(os.path.basename(manifest_path))[0]
-            return PluginManifest(
-                name=name,
-                version="0.1.0",
-                description=f"Plugin: {name}",
-                entry_point=name,
-            )
-        return None
+        except Exception as e:
+            logger.warning(f"Chyba manifestu {manifest_file}: {e}")
+            return None
 
-    def load_plugin(self, manifest: PluginManifest) -> Optional[PluginBase]:
-        """
-        Načte plugin podle manifestu.
-        """
+    # ── Loading ───────────────────────────────────────
+
+    def load_skill(self, manifest: SkillManifest) -> Optional[PluginBase]:
+        """Načte skill — podporuje složku+skill.py i standalone .py."""
         if manifest.name in self.plugins:
-            logger.warning(f"Plugin '{manifest.name}' je již načten")
             return self.plugins[manifest.name]
-
-        if manifest.name in self._disabled_plugins:
-            logger.info(f"Plugin '{manifest.name}' je zakázán, přeskočen")
+        if manifest.name in self._disabled:
+            logger.debug(f"Skill '{manifest.name}' je zakázán")
             return None
 
         try:
-            # Najdi cestu k pluginu
-            plugin_path = self._find_plugin_path(manifest.name)
-            if not plugin_path:
-                logger.error(f"Plugin '{manifest.name}' nenalezen")
+            skill_path = Path(manifest.path)
+
+            # Najdi Python soubor
+            if skill_path.is_dir():
+                py_file = skill_path / f"{manifest.entry_point}.py"
+                if not py_file.exists():
+                    py_file = skill_path / "__init__.py"
+                if not py_file.exists():
+                    # Vezmi první .py soubor
+                    py_files = list(skill_path.glob("*.py"))
+                    if not py_files:
+                        logger.error(f"Skill '{manifest.name}': žádný .py soubor v {skill_path}")
+                        return None
+                    py_file = py_files[0]
+            else:
+                py_file = skill_path  # standalone soubor
+
+            module_name = f"jarvis_skill_{manifest.name}"
+            module = SkillLoader.load_module(str(py_file), module_name)
+
+            # Preferuj PluginBase třídu, fallback na module-level API
+            plugin_class = SkillLoader.find_plugin_class(module)
+            if plugin_class:
+                meta = PluginMetadata(
+                    name=manifest.name, version=manifest.version,
+                    description=manifest.description, author=manifest.author,
+                )
+                cfg = self.config.get("plugins", {}).get(manifest.name, {})
+                plugin = plugin_class(metadata=meta, config=cfg)
+            elif SkillLoader.has_module_api(module):
+                plugin = ModuleSkillWrapper(module, manifest)
+            else:
+                logger.warning(f"Skill '{manifest.name}': žádné get_routes() ani PluginBase třída")
                 return None
 
-            # Přidej cestu do sys.path
-            plugin_dir = os.path.dirname(plugin_path) if os.path.isfile(plugin_path) else plugin_path
-            if plugin_dir not in sys.path:
-                sys.path.insert(0, plugin_dir)
-
-            # Importuj modul
-            module_name = os.path.splitext(os.path.basename(plugin_path))[0] if os.path.isfile(plugin_path) else manifest.entry_point
-            try:
-                module = importlib.import_module(module_name)
-            except ImportError as e:
-                logger.error(f"Import pluginu '{manifest.name}' selhal: {e}")
-                return None
-
-            # Najdi třídu pluginu
-            plugin_class = None
-            for name, obj in inspect.getmembers(module):
-                if (inspect.isclass(obj) and
-                    issubclass(obj, PluginBase) and
-                    obj is not PluginBase):
-                    plugin_class = obj
-                    break
-
-            if not plugin_class:
-                logger.error(f"Plugin '{manifest.name}' neobsahuje třídu dědící z PluginBase")
-                return None
-
-            # Vytvoř instanci
-            metadata = PluginMetadata(
-                name=manifest.name,
-                version=manifest.version,
-                description=manifest.description,
-                author=manifest.author,
-                dependencies=manifest.dependencies,
-            )
-
-            plugin_config = self.config.get("plugins", {}).get(manifest.name, {})
-            plugin = plugin_class(metadata=metadata, config=plugin_config)
-
-            # Zaregistruj
             self.plugins[manifest.name] = plugin
             plugin.on_load()
-
-            # Registruj příkazy a akce
-            self._register_plugin_commands(plugin)
-            self._register_plugin_actions(plugin)
-            self._register_plugin_routes(plugin)
-            self._register_plugin_ui(plugin)
-
-            logger.info(f"Plugin '{manifest.name}' v{manifest.version} načten")
+            self._register(plugin)
+            logger.info(f"Skill '{manifest.name}' v{manifest.version} načten ✓")
             return plugin
 
         except Exception as e:
-            logger.error(f"Chyba načítání pluginu '{manifest.name}': {e}", exc_info=True)
+            logger.error(f"Chyba načítání skill '{manifest.name}': {e}", exc_info=True)
             return None
 
-    def _find_plugin_path(self, name: str) -> Optional[str]:
-        """Najde cestu k souboru/adresáři pluginu"""
-        for plugin_dir in self._plugin_dirs:
-            # Jako adresář
-            dir_path = os.path.join(plugin_dir, name)
-            if os.path.isdir(dir_path):
-                main_file = os.path.join(dir_path, "__init__.py")
-                if os.path.isfile(main_file):
-                    return main_file
-                # Hledej hlavní soubor
-                for f in os.listdir(dir_path):
-                    if f.endswith(".py") and f != "__init__.py":
-                        return os.path.join(dir_path, f)
+    def load_all_plugins(self) -> List[PluginBase]:
+        """Načte všechny dostupné skills."""
+        loaded = []
+        for manifest in self.discover_skills():
+            plugin = self.load_skill(manifest)
+            if plugin:
+                loaded.append(plugin)
+        logger.info(f"Skills načteny: {len(loaded)}")
+        return loaded
 
-            # Jako soubor
-            file_path = os.path.join(plugin_dir, f"{name}.py")
-            if os.path.isfile(file_path):
-                return file_path
+    # Alias pro zpětnou kompatibilitu
+    def load_plugin(self, manifest) -> Optional[PluginBase]:
+        if isinstance(manifest, SkillManifest):
+            return self.load_skill(manifest)
+        # Starý PluginManifest formát
+        sm = SkillManifest(
+            name=getattr(manifest, "name", "unknown"),
+            version=getattr(manifest, "version", "1.0.0"),
+            description=getattr(manifest, "description", ""),
+            author=getattr(manifest, "author", ""),
+            path="",
+        )
+        return self.load_skill(sm)
 
-        return None
+    # ── Registration ──────────────────────────────────
 
-    def _register_plugin_commands(self, plugin: PluginBase):
-        """Zaregistruje příkazy pluginu"""
-        for cmd_name, cmd_func in plugin.get_commands().items():
-            full_name = f"{plugin.name}.{cmd_name}"
-            self._commands[full_name] = cmd_func
-            logger.debug(f"Příkaz registrován: {full_name}")
-
-    def _register_plugin_actions(self, plugin: PluginBase):
-        """Zaregistruje akce pluginu"""
-        for action_name, action_func in plugin.get_actions().items():
-            full_name = f"{plugin.name}.{action_name}"
-            self._actions[full_name] = action_func
-            logger.debug(f"Akce registrována: {full_name}")
-
-    def _register_plugin_routes(self, plugin: PluginBase):
-        """Zaregistruje routovací pravidla pluginu"""
+    def _register(self, plugin: PluginBase):
+        for name, fn in plugin.get_commands().items():
+            self._commands[f"{plugin.name}.{name}"] = fn
+        for name, fn in plugin.get_actions().items():
+            self._actions[name] = fn           # bez prefixu pro přímé volání
         for route in plugin.get_routes():
             route["plugin"] = plugin.name
             self._routes.append(route)
-            logger.debug(f"Route registrována: {route.get('pattern')}")
 
-    def _register_plugin_ui(self, plugin: PluginBase):
-        """Zaregistruje UI elementy pluginu"""
-        for element in plugin.get_ui_elements():
-            element["plugin"] = plugin.name
-            self._ui_elements.append(element)
+    # ── Unload / Reload ───────────────────────────────
 
     def unload_plugin(self, name: str) -> bool:
-        """Odpojí plugin"""
         if name not in self.plugins:
-            logger.warning(f"Plugin '{name}' není načten")
             return False
-
-        plugin = self.plugins[name]
-        plugin.on_unload()
-
-        # Odstraň příkazy
-        self._commands = {k: v for k, v in self._commands.items() if not k.startswith(f"{name}.")}
-        self._actions = {k: v for k, v in self._actions.items() if not k.startswith(f"{name}.")}
-        self._routes = [r for r in self._routes if r.get("plugin") != name]
-        self._ui_elements = [e for e in self._ui_elements if e.get("plugin") != name]
-
+        self.plugins[name].on_unload()
+        self._routes  = [r for r in self._routes if r.get("plugin") != name]
+        self._actions = {k: v for k, v in self._actions.items()
+                         if not k.startswith(f"{name}.")}
         del self.plugins[name]
-        logger.info(f"Plugin '{name}' odpojen")
+        logger.info(f"Skill '{name}' odpojen")
         return True
 
     def reload_plugin(self, name: str) -> Optional[PluginBase]:
-        """Znovu načte plugin"""
         self.unload_plugin(name)
-
-        # Najdi manifest
-        manifests = self.discover_plugins()
-        for manifest in manifests:
-            if manifest.name == name:
-                return self.load_plugin(manifest)
-
-        logger.error(f"Plugin '{name}' nelze znovu načíst — manifest nenalezen")
+        for m in self.discover_skills():
+            if m.name == name:
+                return self.load_skill(m)
         return None
 
-    def load_all_plugins(self) -> List[PluginBase]:
-        """Načte všechny dostupné pluginy"""
-        loaded = []
-        manifests = self.discover_plugins()
-
-        for manifest in manifests:
-            plugin = self.load_plugin(manifest)
-            if plugin:
-                loaded.append(plugin)
-
-        logger.info(f"Načteno {len(loaded)}/{len(manifests)} pluginů")
-        return loaded
-
-    def get_command(self, name: str) -> Optional[Callable]:
-        """Získá příkaz podle názvu"""
-        return self._commands.get(name)
-
-    def get_action(self, name: str) -> Optional[Callable]:
-        """Získá akci podle názvu"""
-        return self._actions.get(name)
-
-    def get_all_commands(self) -> Dict[str, Callable]:
-        """Vrátí všechny registrované příkazy"""
-        return dict(self._commands)
-
-    def get_all_actions(self) -> Dict[str, Callable]:
-        """Vrátí všechny registrované akce"""
-        return dict(self._actions)
+    # ── Getters ───────────────────────────────────────
 
     def get_routes(self) -> List[Dict[str, Any]]:
-        """Vrátí všechna routovací pravidla"""
         return list(self._routes)
 
-    def get_ui_elements(self) -> List[Dict[str, Any]]:
-        """Vrátí všechny UI elementy"""
-        return list(self._ui_elements)
+    def get_action(self, name: str) -> Optional[Callable]:
+        return self._actions.get(name)
 
-    def get_plugin_info(self, name: str) -> Optional[Dict[str, Any]]:
-        """Vrátí informace o pluginu"""
-        if name not in self.plugins:
-            return None
+    def get_all_actions(self) -> Dict[str, Callable]:
+        return dict(self._actions)
 
-        plugin = self.plugins[name]
-        return {
-            "name": plugin.name,
-            "metadata": {
-                "version": plugin.metadata.version,
-                "description": plugin.metadata.description,
-                "author": plugin.metadata.author,
-            },
-            "enabled": plugin.enabled,
-            "commands": list(plugin.get_commands().keys()),
-            "actions": list(plugin.get_actions().keys()),
-            "routes": len(plugin.get_routes()),
-        }
+    def get_all_commands(self) -> Dict[str, Callable]:
+        return dict(self._commands)
 
     def list_plugins(self) -> List[Dict[str, Any]]:
-        """Vypíše všechny načtené pluginy"""
         return [
-            self.get_plugin_info(name)
-            for name in sorted(self.plugins.keys())
-            if self.get_plugin_info(name)
+            {
+                "name": p.name,
+                "version": p.metadata.version,
+                "description": p.metadata.description,
+                "routes": len(p.get_routes()),
+                "enabled": p.enabled,
+            }
+            for p in self.plugins.values()
         ]
 
+    def get_plugin_info(self, name: str) -> Optional[Dict[str, Any]]:
+        p = self.plugins.get(name)
+        if not p:
+            return None
+        return {
+            "name": p.name,
+            "metadata": {
+                "version": p.metadata.version,
+                "description": p.metadata.description,
+                "author": p.metadata.author,
+            },
+            "enabled": p.enabled,
+            "routes": len(p.get_routes()),
+        }
+
     def disable_plugin(self, name: str) -> bool:
-        """Zakáže plugin"""
         if name in self.plugins:
             self.plugins[name].disable()
-            self._disabled_plugins.add(name)
+            self._disabled.add(name)
             return True
         return False
 
     def enable_plugin(self, name: str) -> bool:
-        """Povolí plugin"""
         if name in self.plugins:
             self.plugins[name].enable()
-            self._disabled_plugins.discard(name)
+            self._disabled.discard(name)
             return True
         return False
 
 
-# ══════════════════════════════════════════════════════
-#  BUILT-IN PLUGIN: System
-# ══════════════════════════════════════════════════════
+# ── Built-in skills (class-based) ─────────────────────
 
 class SystemPlugin(PluginBase):
-    """Základní systémový plugin — poskytuje jádrové funkce"""
-
     def __init__(self, metadata: PluginMetadata, config: Dict[str, Any] = None):
         super().__init__(metadata, config)
-        self._notes_file = os.path.join(
-            os.path.expanduser("~"), "jarvis_notes.txt"
-        )
 
     def get_commands(self) -> Dict[str, Callable]:
         return {
@@ -460,11 +419,8 @@ class SystemPlugin(PluginBase):
         cpu = psutil.cpu_percent(interval=0.5)
         ram = psutil.virtual_memory()
         disk = psutil.disk_usage("/")
-        return (
-            f"CPU: {cpu:.0f}% | "
-            f"RAM: {ram.percent:.0f}% ({ram.used // 1024 // 1024}/{ram.total // 1024 // 1024} MB) | "
-            f"Disk: {disk.percent:.0f}%"
-        )
+        return (f"CPU: {cpu:.0f}% | RAM: {ram.percent:.0f}% | "
+                f"Disk: {disk.percent:.0f}%")
 
     def _cmd_get_time(self) -> str:
         return datetime.now().strftime("%H:%M:%S")
@@ -473,89 +429,35 @@ class SystemPlugin(PluginBase):
         return datetime.now().strftime("%d. %m. %Y")
 
     def _action_note_add(self, note: str) -> str:
-        with open(self._notes_file, "a", encoding="utf-8") as f:
+        path = Path.home() / "jarvis_notes.txt"
+        with open(path, "a", encoding="utf-8") as f:
             f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] {note}\n")
         return "Poznámka uložena."
 
     def _action_note_list(self) -> str:
-        if os.path.exists(self._notes_file):
-            with open(self._notes_file, "r", encoding="utf-8") as f:
-                return f.read().strip() or "Žádné poznámky."
+        path = Path.home() / "jarvis_notes.txt"
+        if path.exists():
+            return path.read_text(encoding="utf-8").strip() or "Žádné poznámky."
         return "Žádné poznámky."
 
 
-# ══════════════════════════════════════════════════════
-#  BUILT-IN PLUGIN: Web Search
-# ══════════════════════════════════════════════════════
-
-class WebSearchPlugin(PluginBase):
-    """Plugin pro webové vyhledávání"""
-
-    def get_routes(self) -> List[Dict[str, Any]]:
-        import re
-        return [
-            {
-                "pattern": re.compile(r"\b(hledej|vyhledej|search)\b", re.IGNORECASE),
-                "action": "search_web",
-                "handler": self._route_search,
-            },
-            {
-                "pattern": re.compile(r"\b(wiki|wikipedia)\b", re.IGNORECASE),
-                "action": "wiki_search",
-                "handler": self._route_wiki,
-            },
-        ]
-
-    def _route_search(self, text: str) -> tuple:
-        import re
-        query = re.sub(r"\b(hledej|vyhledej|search)\b\s*", "", text, flags=re.IGNORECASE).strip()
-        if query:
-            return f"Hledám: {query}.", {"action": "search_web", "params": {"query": query}}
-        return None, None
-
-    def _route_wiki(self, text: str) -> tuple:
-        import re
-        query = re.sub(r"\b(wiki|wikipedia|co\s+je)\b\s*", "", text, flags=re.IGNORECASE).strip()
-        if query:
-            return f"Hledám na Wikipedii: {query}", {"action": "wiki_search", "params": {"query": query}}
-        return None, None
-
-
-# ══════════════════════════════════════════════════════
-#  FACTORY
-# ══════════════════════════════════════════════════════
+# ── Factory ───────────────────────────────────────────
 
 def create_plugin_manager(config: Dict[str, Any] = None) -> PluginManager:
-    """Vytvoří a inicializuje PluginManager s built-in pluginy"""
+    """Vytvoří PluginManager s built-in pluginy + načte custom skills."""
     manager = PluginManager(config)
 
-    # Zaregistruj built-in pluginy
-    builtin_plugins = [
-        SystemPlugin(
-            PluginMetadata(
-                name="system",
-                version="3.0.0",
-                description="Základní systémové funkce",
-                author="JARVIS Team",
-            )
-        ),
-        WebSearchPlugin(
-            PluginMetadata(
-                name="web_search",
-                version="1.0.0",
-                description="Webové vyhledávání",
-                author="JARVIS Team",
-            )
-        ),
-    ]
+    # Vestavěný systémový plugin
+    sys_plugin = SystemPlugin(PluginMetadata(
+        name="system", version="3.1.0",
+        description="Základní systémové funkce", author="JARVIS",
+    ))
+    manager.plugins["system"] = sys_plugin
+    sys_plugin.on_load()
+    manager._register(sys_plugin)
+    logger.info("Built-in skill 'system' načten")
 
-    for plugin in builtin_plugins:
-        manager.plugins[plugin.name] = plugin
-        plugin.on_load()
-        manager._register_plugin_commands(plugin)
-        manager._register_plugin_actions(plugin)
-        manager._register_plugin_routes(plugin)
-        manager._register_plugin_ui(plugin)
-        logger.info(f"Built-in plugin '{plugin.name}' v{plugin.metadata.version} načten")
+    # Načti custom skills ze složek
+    manager.load_all_plugins()
 
     return manager

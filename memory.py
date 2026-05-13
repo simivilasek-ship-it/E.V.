@@ -1,10 +1,17 @@
 """
-JARVIS v3.0 — Neural Memory System
-Integrovaný brain-inspired memory layer pro JARVIS
+JARVIS v3.0 — Neural Memory System + Daily Summarizer
+Integrovaný brain-inspired memory layer pro JARVIS.
+DailySummarizer extrahuje fakta z dnešních konverzací a ukládá do UserProfile.
 """
 
+from __future__ import annotations
 import os
+import json
 import logging
+import threading
+import time
+from datetime import datetime, date
+from pathlib import Path
 from typing import List, Optional
 
 try:
@@ -170,19 +177,159 @@ class JarvisMemory:
         )
 
     def recall_context(self, current_query: str, top_k: int = 3) -> str:
-        """Získá kontext z paměti pro aktuální dotaz"""
+        """Získá kontext z paměti pro aktuální dotaz."""
         memories = self.recall(current_query, top_k=top_k, min_importance=0.2)
-
         if not memories:
             return ""
-
-        context_parts = []
+        parts = []
         for mem in memories:
             if mem["tags"] and "conversation" in mem["tags"]:
-                context_parts.append(f"Previous: {mem['content']}")
+                parts.append(f"Previous: {mem['content']}")
             else:
-                context_parts.append(f"Memory: {mem['content']}")
-
-        context = "\n".join(context_parts)
+                parts.append(f"Memory: {mem['content']}")
+        context = "\n".join(parts)
         logger.info(f"Kontext z paměti: {len(context)} znaků")
         return context
+
+
+# ══════════════════════════════════════════════════════
+#  DAILY SUMMARIZER
+# ══════════════════════════════════════════════════════
+
+class DailySummarizer:
+    """
+    Každou půlnoc (nebo on-demand) vezme dnešní konverzace,
+    pošle je do Ollama, extrahuje fakta o uživateli a uloží do UserProfile.
+    Výsledek shrnutí se uloží do memory s tag "daily_summary".
+    """
+
+    def __init__(self, config: dict, memory: JarvisMemory):
+        self.config = config
+        self.memory = memory
+        self._state_file = Path.home() / ".jarvis_daily_summary.json"
+        self._lock = threading.Lock()
+
+    def _last_summary_date(self) -> Optional[date]:
+        try:
+            if self._state_file.exists():
+                data = json.loads(self._state_file.read_text())
+                return date.fromisoformat(data.get("last_date", ""))
+        except Exception:
+            pass
+        return None
+
+    def _save_last_date(self, d: date) -> None:
+        try:
+            self._state_file.write_text(
+                json.dumps({"last_date": d.isoformat()}), encoding="utf-8")
+        except Exception:
+            pass
+
+    def should_run(self) -> bool:
+        """True pokud dnes ještě neproběhlo shrnutí."""
+        last = self._last_summary_date()
+        return last is None or last < date.today()
+
+    def run(self, force: bool = False) -> str:
+        """Spustí denní shrnutí. Vrátí text shrnutí nebo '' pokud nespuštěno."""
+        if not force and not self.should_run():
+            return ""
+
+        with self._lock:
+            try:
+                return self._do_summarize()
+            except Exception as e:
+                logger.error(f"DailySummarizer chyba: {e}")
+                return ""
+
+    def _do_summarize(self) -> str:
+        from user_profile import get_user_profile
+        import requests as _req
+
+        # Získej dnešní konverzace z memory (query = "dnešní konverzace")
+        today_mems = self.memory.recall(
+            "dnešní konverzace rozhovor",
+            top_k=20,
+            min_importance=0.0,
+        )
+        if not today_mems:
+            logger.info("DailySummarizer: žádné konverzace ke shrnutí")
+            self._save_last_date(date.today())
+            return ""
+
+        # Sestav konverzační blok
+        conv_text = "\n".join(m["content"] for m in today_mems[:15])[:3000]
+
+        prompt = f"""Analyzuj níže uvedené konverzace s AI asistentem a extrahuj:
+1. Fakta o uživateli (jméno, město, profese, zájmy, preference)
+2. Témata, o která se zajímá
+3. Problémy které řeší
+
+Odpověz ve formátu JSON:
+{{
+  "fakta": {{"jméno": "...", "město": "...", "zájmy": [...]}},
+  "témata": ["...", "..."],
+  "shrnutí": "Krátké shrnutí dne v 1-2 větách."
+}}
+
+Konverzace:
+{conv_text}"""
+
+        try:
+            r = _req.post(
+                self.config.get("ollama_url", "http://localhost:11434/api/chat"),
+                json={
+                    "model": self.config.get("ollama_model", "qwen2.5:3b"),
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                    "options": {"temperature": 0.1, "num_predict": 600},
+                },
+                timeout=60,
+            )
+            r.raise_for_status()
+            content = r.json().get("message", {}).get("content", "").strip()
+
+            # Parsuj JSON z odpovědi
+            import re
+            json_match = re.search(r"\{.*\}", content, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+                profile = get_user_profile()
+
+                # Ulož fakta do UserProfile
+                for key, value in data.get("fakta", {}).items():
+                    if value:
+                        profile.set(key, value, confidence=0.7, source="daily_summary")
+
+                # Extrahuj zájmy z témat
+                for tema in data.get("témata", []):
+                    existing = profile.get("zájmy") or []
+                    if isinstance(existing, list) and tema not in existing:
+                        existing.append(tema)
+                        profile.set("zájmy", existing, confidence=0.5, source="inferred")
+
+                summary_text = data.get("shrnutí", "")
+            else:
+                summary_text = content[:200]
+
+            # Ulož shrnutí do memory s vysokou důležitostí
+            if summary_text:
+                self.memory.store(
+                    content=f"Denní shrnutí {date.today()}: {summary_text}",
+                    importance=0.9,
+                    tags=["daily_summary", str(date.today())],
+                )
+
+            self._save_last_date(date.today())
+            logger.info(f"DailySummarizer: hotovo — {summary_text[:80]}")
+            return summary_text
+
+        except Exception as e:
+            logger.error(f"DailySummarizer LLM chyba: {e}")
+            self._save_last_date(date.today())
+            return ""
+
+    def schedule_midnight(self, scheduler) -> None:
+        """Naplánuje spuštění denního shrnutí každou půlnoc."""
+        scheduler.every_day_at(0, 5, lambda: self.run())
+        logger.info("DailySummarizer naplánován na 00:05")

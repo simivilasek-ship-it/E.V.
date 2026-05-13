@@ -1,0 +1,8 @@
+{
+  "name": "timer",
+  "version": "1.0.0",
+  "description": "Nastavení časovačů a odpočtu hlasem — 'timer 5 minut', 'alarm za 30 sekund'.",
+  "author": "JARVIS",
+  "permissions": ["set_timer"],
+  "triggers": ["timer", "casovac", "alarm", "odpocet", "za X minut"]
+}

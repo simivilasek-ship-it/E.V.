@@ -527,10 +527,34 @@ class LLMEngine:
         self.config  = config
         self.url     = config["ollama_url"]
         self.model   = config["ollama_model"]
-        self.history: deque = deque(maxlen=config.get("history_size", 20))  # fallback
-        self.memory  = memory or JarvisMemory(config)  # neural memory
+        self.history: deque = deque(maxlen=config.get("history_size", 20))
+        self.memory  = memory or JarvisMemory(config)
         self._stream_resp = None
+        self._profile_context = ""   # injektovaný souhrn UserProfile
         logger.info(f"LLM: {self.model} @ {self.url} + Neural Memory")
+
+    def _extract_user_facts(self, text: str) -> None:
+        """Zkusí extrahovat fakta o uživateli z jeho zprávy do UserProfile."""
+        try:
+            from user_profile import get_user_profile
+            found = get_user_profile().extract_from_text(text)
+            if found:
+                # Aktualizuj inject po extrakci
+                self.inject_profile(get_user_profile().summary())
+        except Exception:
+            pass
+
+    def inject_profile(self, profile_summary: str) -> None:
+        """Vloží souhrn UserProfile do systémového promptu pro každý dotaz."""
+        self._profile_context = profile_summary
+        logger.info(f"UserProfile injektován do LLM ({len(profile_summary)} znaků)")
+
+    def _build_system_prompt(self) -> str:
+        """Sestaví systémový prompt včetně user profilu."""
+        prompt = SYSTEM_PROMPT
+        if self._profile_context:
+            prompt += f"\n\n{self._profile_context}"
+        return prompt
 
     # ── QUICK MATCH (lokální router) ─────────────────
 
@@ -552,15 +576,18 @@ class LLMEngine:
 
         self.history.append({"role": "user", "content": user_text})
 
-        # Získaj kontext z neural memory
+        # Extrahuj fakta o uživateli z textu
+        self._extract_user_facts(user_text)
+
+        # Sestaví systémový prompt (SYSTEM_PROMPT + UserProfile + memory kontext)
         context = self.memory.recall_context(user_text, top_k=3)
-        enhanced_prompt = SYSTEM_PROMPT
+        system = self._build_system_prompt()
         if context:
-            enhanced_prompt += f"\n\nRelevantní kontext z paměti:\n{context}"
+            system += f"\n\nRelevantní kontext z paměti:\n{context}"
 
         payload = {
             "model":    self.model,
-            "messages": [{"role": "system", "content": enhanced_prompt},
+            "messages": [{"role": "system", "content": system},
                          *list(self.history)],
             "stream":   False,
             "options":  {"temperature": 0.3, "num_predict": 800},
@@ -570,10 +597,7 @@ class LLMEngine:
             resp.raise_for_status()
             raw  = resp.json().get("message", {}).get("content", "").strip()
             self.history.append({"role": "assistant", "content": raw})
-
-            # Ulož konverzaci do neural memory s vyšší důležitostí pro AI odpovědi
             self.memory.store_conversation(user_text, raw, importance=0.6)
-
             return raw, {"action": "answer", "params": {}}
         except requests.Timeout:
             self.history.pop()
@@ -600,15 +624,17 @@ class LLMEngine:
         self.history.append({"role": "user", "content": user_text})
         self._stream_resp = None
 
-        # Získaj kontext z neural memory
+        # Extrahuj fakta o uživateli z textu
+        self._extract_user_facts(user_text)
+
         context = self.memory.recall_context(user_text, top_k=3)
-        enhanced_prompt = SYSTEM_PROMPT
+        system = self._build_system_prompt()
         if context:
-            enhanced_prompt += f"\n\nRelevantní kontext z paměti:\n{context}"
+            system += f"\n\nRelevantní kontext z paměti:\n{context}"
 
         payload = {
             "model":    self.model,
-            "messages": [{"role": "system", "content": enhanced_prompt},
+            "messages": [{"role": "system", "content": system},
                          *list(self.history)],
             "stream":   True,
             "options":  {"temperature": 0.3, "num_predict": 800},

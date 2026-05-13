@@ -1,0 +1,8 @@
+{
+  "name": "clipboard",
+  "version": "1.0.0",
+  "description": "Operace se schránkou — 'zkopíruj', 'vlož', 'co je ve schránce'.",
+  "author": "JARVIS",
+  "permissions": ["clipboard_set"],
+  "triggers": ["zkopiruj", "vloz", "schranky", "clipboard"]
+}

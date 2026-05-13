@@ -27,6 +27,7 @@ from scheduler import get_scheduler
 from security_v2 import get_security_manager, confirm_action
 from llm_router import LLMRouter
 from wake_word_detector import WakeWordDetector
+from user_profile import get_user_profile
 
 logger = logging.getLogger(__name__)
 
@@ -463,15 +464,29 @@ class JarvisApp:
             _t.Thread(target=self.tts.speak, args=(text,), daemon=True).start()
 
     def _schedule_memory_maintenance(self):
-        """Naplánuje automatické čištění paměti každých 6 hodin."""
+        """Naplánuje auto-maintenance paměti a denní shrnutí."""
         try:
-            from memory import JarvisMemory
+            from memory import JarvisMemory, DailySummarizer
             mem = JarvisMemory(CONFIG)
             self.scheduler.every(6 * 3600, mem.run_maintenance,
                                  name="memory_maintenance")
-            logger.info("Auto-maintenance paměti naplánována (každých 6h)")
+
+            # UserProfile — načti a vlož souhrn do LLM systémového promptu
+            self.user_profile = get_user_profile()
+            profile_summary = self.user_profile.summary()
+            if profile_summary:
+                self.llm.inject_profile(profile_summary)
+
+            # DailySummarizer — spusť dnes pokud ještě neproběhl, naplánuj půlnoc
+            summarizer = DailySummarizer(CONFIG, mem)
+            if summarizer.should_run():
+                import threading as _t
+                _t.Thread(target=summarizer.run, daemon=True).start()
+            summarizer.schedule_midnight(self.scheduler)
+
+            logger.info("Memory maintenance + DailySummarizer naplánováno")
         except Exception as e:
-            logger.debug(f"Memory maintenance skip: {e}")
+            logger.debug(f"Memory setup skip: {e}")
 
     def _check_ollama(self):
         def _chk():
