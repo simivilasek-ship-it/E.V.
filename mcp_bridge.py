@@ -157,12 +157,36 @@ class MCPBridge:
     # ── Pomocné ───────────────────────────────────────
 
     def _run(self, server_name: str, coro) -> Any:
-        """Spustí korutinu synchronně v izolované smyčce."""
-        try:
-            return asyncio.run(coro)
-        except Exception as e:
-            logger.error(f"MCP asyncio chyba ({server_name}): {e}")
+        """
+        Spustí korutinu synchronně.
+        Používá dedikované vlákno s vlastní event loop — vyhne se
+        TaskGroup konfliktu při opakovaném volání asyncio.run().
+        """
+        import concurrent.futures
+        result_container = [None]
+        exc_container = [None]
+
+        def _thread_target():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result_container[0] = loop.run_until_complete(coro)
+            except Exception as e:
+                exc_container[0] = e
+            finally:
+                loop.close()
+
+        t = threading.Thread(target=_thread_target, daemon=True)
+        t.start()
+        t.join(timeout=60)   # max 60s na odpověď serveru
+
+        if exc_container[0]:
+            logger.error(f"MCP chyba ({server_name}): {exc_container[0]}")
             return None
+        if t.is_alive():
+            logger.error(f"MCP timeout ({server_name}): server neodpověděl do 60s")
+            return None
+        return result_container[0]
 
     def list_tools(self) -> List[MCPTool]:
         with self._lock:
@@ -206,7 +230,26 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
         enabled=config.get("mcp_filesystem_enabled", True),
     ))
 
-    # ── Brave Search MCP ─────────────────────────────
+    # ── Git MCP (bez API klíče) ───────────────────────
+    bridge.register(MCPServerConfig(
+        name="git",
+        command="uvx",
+        args=["mcp-server-git"],
+        enabled=config.get("mcp_git_enabled", True),
+    ))
+
+    # ── Memory MCP — knowledge graph (bez API klíče) ──
+    mem_dir = os.path.join(os.path.expanduser("~"), ".jarvis_mcp_memory")
+    os.makedirs(mem_dir, exist_ok=True)
+    bridge.register(MCPServerConfig(
+        name="mcp-memory",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-memory"],
+        env={"MEMORY_FILE_PATH": os.path.join(mem_dir, "graph.json")},
+        enabled=config.get("mcp_memory_enabled", True),
+    ))
+
+    # ── Brave Search MCP (vyžaduje API klíč) ─────────
     brave_key = (
         config.get("brave_api_key")
         or os.environ.get("BRAVE_API_KEY")
@@ -221,7 +264,7 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
     ))
 
     if not brave_key:
-        logger.info("Brave Search MCP: BRAVE_API_KEY není nastavena → zakázáno")
+        logger.info("Brave Search MCP: BRAVE_API_KEY není nastavena → zakázáno (použij mcp_fetch)")
 
     return bridge
 

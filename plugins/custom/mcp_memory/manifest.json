@@ -1,0 +1,8 @@
+{
+  "name": "mcp_memory",
+  "version": "1.0.0",
+  "description": "Persistentní knowledge graph přes MCP Memory server — entity, vztahy, fakta. Bez API klíče.",
+  "author": "JARVIS",
+  "permissions": ["memory_store", "memory_recall"],
+  "triggers": ["zapamatuj si", "pamatuj", "co víš o", "zapomeň", "přidej do paměti"]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "mcp_fetch",
+  "version": "1.0.0",
+  "description": "Načte obsah webové stránky nebo vyhledá na DuckDuckGo — bez API klíče.",
+  "author": "JARVIS",
+  "permissions": ["search_web", "open_url"],
+  "triggers": ["načti stránku", "obsah webu", "duckduckgo", "hledej online", "fetch url"]
+}
