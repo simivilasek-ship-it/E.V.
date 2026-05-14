@@ -80,7 +80,10 @@ safety>=2.3.0
 # NEURAL AI MEMORY — pokročilá paměť
 # ═════════════════════════════════════════════════════
 
-neural-ai-memory[local]>=0.1.0
+# neural-ai-memory[local]>=0.1.0  # volitelné — JARVIS má vlastní JSON fallback
+
+# MCP — Model Context Protocol
+mcp>=1.0.0
 
 # ═════════════════════════════════════════════════════
 # VOLITELNĚ — Windows hlasitost

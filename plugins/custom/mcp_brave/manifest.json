@@ -1,0 +1,8 @@
+{
+  "name": "mcp_brave",
+  "version": "1.0.0",
+  "description": "Brave Search přes MCP — vrací skutečné výsledky do chatu (ne jen otevření prohlížeče). Vyžaduje BRAVE_API_KEY v .env.",
+  "author": "JARVIS",
+  "permissions": ["search_web"],
+  "triggers": ["brave", "vyhledej", "najdi na internetu", "co je", "kdo je", "novinky"]
+}

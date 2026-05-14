@@ -27,6 +27,7 @@ from scheduler import get_scheduler
 from security_v2 import get_security_manager, confirm_action
 from wake_word_detector import WakeWordDetector
 from user_profile import get_user_profile
+from mcp_bridge import get_mcp_bridge, HAS_MCP
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,7 @@ class JarvisApp:
         # Načti pluginy a navař callbacks
         self._load_plugins()
         self._wire_skill_callbacks()
+        self._init_mcp()
 
         # GUI
         self.gui = JarvisGUI()
@@ -132,6 +134,23 @@ class JarvisApp:
         except Exception as e:
             logger.warning(f"Plugin systém selhal: {e}")
             self.plugin_manager = None
+
+    def _init_mcp(self):
+        """Inicializuje MCP bridge a předá ho skill modulům."""
+        if not HAS_MCP:
+            logger.info("MCP bridge: mcp balíček není nainstalován, přeskočeno")
+            return
+        try:
+            self.mcp = get_mcp_bridge(CONFIG)
+            # Předej bridge skill modulům přes sys.modules (jsou již načteny)
+            import sys as _sys
+            for mod_name in ("jarvis_skill_mcp_filesystem", "jarvis_skill_mcp_brave"):
+                mod = _sys.modules.get(mod_name)
+                if mod and hasattr(mod, "_bridge"):
+                    mod._bridge = self.mcp
+            logger.info(f"MCP bridge inicializován: {self.mcp.get_server_names()}")
+        except Exception as e:
+            logger.warning(f"MCP bridge init selhal: {e}")
 
     def _wire_skill_callbacks(self):
         """Naváže callbacks do skill modulů po jejich načtení."""
@@ -338,6 +357,14 @@ class JarvisApp:
                 return
 
             # 3. Pokud nic nesedí, použij LLM
+            if not self._ollama_reachable():
+                offline_msg = (
+                    "Ollama není dostupná. Lokální příkazy fungují normálně — "
+                    "zkus např. 'kolik je hodin', 'otevři chrome' nebo 'hlasitost na 50'."
+                )
+                self._execute_result(offline_msg, {"action": "answer", "params": {}})
+                return
+
             full_response = ""
             sentence_buf  = ""
             is_command    = False
@@ -368,7 +395,6 @@ class JarvisApp:
 
             full_text = full_response.strip()
             if full_text:
-                # speak=False — věty byly già mluveny po jedné při streamování
                 self._execute_result(full_text, {"action": "answer", "params": {}}, speak=False)
 
         except Exception as e:
@@ -476,6 +502,24 @@ class JarvisApp:
         if not has_code and len(text) < 400:
             self._gui(lambda: self.gui.set_state("speaking"))
             self.tts.speak(text)  # neblokující — přidá do fronty workeru
+
+    def _ollama_reachable(self) -> bool:
+        """Rychlá kontrola dostupnosti Ollama (cachováno na 15s)."""
+        import time as _time
+        now = _time.time()
+        if now - getattr(self, "_ollama_check_ts", 0) < 15:
+            return getattr(self, "_ollama_ok", True)
+        try:
+            import requests as _req
+            r = _req.get(
+                self.llm.url.replace("/api/chat", "/api/tags"),
+                timeout=2,
+            )
+            self._ollama_ok = r.status_code == 200
+        except Exception:
+            self._ollama_ok = False
+        self._ollama_check_ts = now
+        return self._ollama_ok
 
     def _schedule_memory_maintenance(self):
         """Naplánuje auto-maintenance paměti a denní shrnutí."""

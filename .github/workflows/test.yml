@@ -20,12 +20,13 @@ jobs:
           cache: "pip"
 
       - name: Install system deps
-        run: sudo apt-get install -y portaudio19-dev ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y portaudio19-dev ffmpeg python3-tk
 
       - name: Install Python deps
         run: |
           pip install --upgrade pip
-          # Nainstaluj jen to co testy potřebují (bez GUI, audio HW)
           pip install \
             requests psutil edge-tts \
             customtkinter \
@@ -36,4 +37,12 @@ jobs:
       - name: Run tests
         run: python -m pytest test_jarvis.py -q --timeout=30
         env:
-          DISPLAY: ""          # headless — žádné GUI okno
+          DISPLAY: ":99"
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: jarvis.log
+          if-no-files-found: ignore
