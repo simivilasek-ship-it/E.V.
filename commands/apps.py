@@ -3,12 +3,14 @@
 import logging
 import platform
 import shutil
-import subprocess
 import webbrowser
+from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
 import psutil
+
+from .utils import safe_run
 
 logger = logging.getLogger(__name__)
 
@@ -47,24 +49,19 @@ def cmd_open_app(app: str, args: Optional[List[str]] = None) -> str:
     app_cmd = find_app(app)
     if app_cmd == "spotify":
         return _launch_spotify(args)
-    try:
-        subprocess.Popen([app_cmd] + (args or []))
-        return "ok"
-    except FileNotFoundError:
+    result = safe_run([app_cmd] + (args or []), bg=True)
+    if result["rc"] != 0:
         return f"Aplikace '{app}' nenalezena"
-    except Exception as e:
-        return f"Chyba: {e}"
+    return "ok"
 
 
 def _launch_spotify(args: Optional[List[str]] = None) -> str:
     if args:
-        try:
-            subprocess.Popen(["xdg-open", f"spotify:search:{quote(' '.join(args))}"])
+        r = safe_run(["xdg-open", f"spotify:search:{quote(' '.join(args))}"], bg=True)
+        if r["rc"] == 0:
             return "ok"
-        except Exception:
-            pass
     if shutil.which("spotify"):
-        subprocess.Popen(["spotify"])
+        safe_run(["spotify"], bg=True)
     else:
         webbrowser.open("https://open.spotify.com/")
     return "ok"
@@ -83,23 +80,22 @@ def cmd_kill_process(name: str) -> str:
 
 
 def cmd_install_app(name: str = "") -> str:
-    subprocess.Popen(["pkexec", "apt", "install", "-y", name])
+    safe_run(["pkexec", "apt", "install", "-y", name], bg=True)
     return f"Instaluji: {name}"
 
 
 def cmd_uninstall_app(name: str = "") -> str:
-    subprocess.Popen(["pkexec", "apt", "remove", "-y", name])
+    safe_run(["pkexec", "apt", "remove", "-y", name], bg=True)
     return f"Odinstaluji: {name}"
 
 
 def cmd_run_script(path: str = "") -> str:
-    from pathlib import Path
-    subprocess.Popen(["bash", str(Path(path).expanduser())])
+    safe_run(["bash", str(Path(path).expanduser())], bg=True)
     return f"Spouštím: {path}"
 
 
 def cmd_vscode_open(path: str = "") -> str:
     import os
     p = os.path.expanduser(path)
-    subprocess.Popen(["code", p])
+    safe_run(["code", p], bg=True)
     return f"Otevřeno ve VSCode: {p}"

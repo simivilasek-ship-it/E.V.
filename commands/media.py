@@ -1,13 +1,14 @@
 """Mediální příkazy: YouTube, přehrávání, screenshot, klávesnice."""
 
 import logging
-import subprocess
 import threading
 import time
 import webbrowser
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
+
+from .utils import safe_run
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,7 @@ def cmd_youtube_play(query: str, index: int = 1, audio_only: bool = False) -> st
             logger.info(f"Přehrávám: {title}")
             player_cmd = (["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", url]
                           if audio_only else ["ffplay", "-loglevel", "quiet", url])
-            subprocess.Popen(player_cmd)
+            safe_run(player_cmd, bg=True)
         except ImportError:
             webbrowser.open(f"https://www.youtube.com/results?search_query={quote(query)}")
         except Exception as e:
@@ -128,10 +129,10 @@ def cmd_youtube_download(query: str, path: str = "", audio_only: bool = False,
     def _download():
         try:
             fmt_map = {
-                "best": "bestvideo+bestaudio",
-                "720p": "bestvideo[height<=720]+bestaudio",
+                "best":  "bestvideo+bestaudio",
+                "720p":  "bestvideo[height<=720]+bestaudio",
                 "1080p": "bestvideo[height<=1080]+bestaudio",
-                "480p": "bestvideo[height<=480]+bestaudio",
+                "480p":  "bestvideo[height<=480]+bestaudio",
             }
             if audio_only:
                 ydl_opts = {
