@@ -47,3 +47,10 @@ def blend(color: str, bg: str, alpha: float) -> str:
 
 def lerp(a: str, b: str, t: float) -> str:
     return blend(b, a, t)
+
+STATE_ICON = {
+    "idle":      "○",
+    "listening": "◉",
+    "thinking":  "◎",
+    "speaking":  "●",
+}

@@ -146,3 +146,26 @@ class OrbCanvas(tk.Canvas):
         for (ox,oy),(hx,hy),(vx,vy) in corners:
             self.create_line(ox, oy, ox+hx*L, oy+hy*L, fill=c, width=1)
             self.create_line(ox, oy, ox+vx*L, oy+vy*L, fill=c, width=1)
+
+
+class MiniOrbCanvas(OrbCanvas):
+    """Malý orb pro top bar — 48×48 px, méně částic."""
+
+    SIZE = 48
+
+    def __init__(self, parent, **kw):
+        # Přeskočí OrbCanvas.__init__ a zavolá Canvas přímo
+        tk.Canvas.__init__(self, parent, width=self.SIZE, height=self.SIZE,
+                           bg=BG, highlightthickness=0, bd=0, **kw)
+        self.cx = self.cy = self.SIZE / 2
+        self._state     = "idle"
+        self._color     = ORB_COLORS["idle"]
+        self._tgt       = self._color
+        self._lerp_t    = 1.0
+        self._frame     = 0
+        self._pulse     = 0.0
+        self._ring_a    = 0.0
+        self._ring2_a   = 0.0
+        self._running   = True
+        self._particles = [Particle(self.cx, self.cy) for _ in range(12)]
+        self._animate()
