@@ -261,8 +261,11 @@ class JarvisGUI:
         self.root.update_idletasks()
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         self.root.geometry(f"{self.W}x{self.H}+{(sw-self.W)//2}+{(sh-self.H)//2}")
-        self.root.bind("<Return>", self._on_enter)
-        self.root.bind("<space>", self._on_space)
+        self.root.bind("<Return>",    self._on_enter)
+        self.root.bind("<space>",     self._on_space)
+        self.root.bind("<Control-l>", lambda e: self._clear_chat())
+        self.root.bind("<Control-e>", lambda e: self._export_chat())
+        self.root.bind("<Escape>",    lambda e: self._input.focus())
 
     # ── LAYOUT ───────────────────────────────────────
 
@@ -423,12 +426,17 @@ class JarvisGUI:
         btn_row = ctk.CTkFrame(area, fg_color=BG2, corner_radius=0)
         btn_row.place(relx=0.5, rely=0.72, anchor="center")
 
-        for txt, cmd in [("🗑", self._clear_chat), ("🧠", self._clear_mem)]:
-            ctk.CTkButton(btn_row, text=txt,
-                          font=("DM Sans", 14), fg_color=BG3,
-                          hover_color=BORDER, text_color=FG2,
-                          corner_radius=8, width=36, height=36,
-                          command=cmd).pack(side="left", padx=4)
+        for txt, cmd, tip in [
+            ("🗑", self._clear_chat, "Vymazat chat (Ctrl+L)"),
+            ("💾", self._export_chat, "Exportovat chat (Ctrl+E)"),
+            ("🧠", self._clear_mem,  "Vymazat paměť LLM"),
+        ]:
+            b = ctk.CTkButton(btn_row, text=txt,
+                              font=("DM Sans", 14), fg_color=BG3,
+                              hover_color=BORDER, text_color=FG2,
+                              corner_radius=8, width=36, height=36,
+                              command=cmd)
+            b.pack(side="left", padx=4)
 
     # ── PRAVÝ PANEL (CHAT) ────────────────────────────
 
@@ -765,6 +773,35 @@ class JarvisGUI:
         for w in self._chat.winfo_children():
             w.destroy()
         self._add_sys("Log vymazán.")
+
+    def _export_chat(self):
+        """Exportuje konverzaci do .md souboru na plochu."""
+        from pathlib import Path
+        import re as _re
+
+        lines = []
+        for w in self._chat.winfo_children():
+            for lbl in w.winfo_children():
+                for sub in lbl.winfo_children():
+                    try:
+                        t = sub.cget("text")
+                        if t:
+                            lines.append(t)
+                    except Exception:
+                        pass
+
+        if not lines:
+            self._add_sys("Nic k exportu.")
+            return
+
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out = Path.home() / "Plocha" / f"jarvis_chat_{ts}.md"
+        if not out.parent.exists():
+            out = Path.home() / f"jarvis_chat_{ts}.md"
+
+        out.write_text("# JARVIS chat export\n\n" + "\n\n".join(lines),
+                       encoding="utf-8")
+        self._add_sys(f"Exportováno: {out.name}")
 
     def _clear_mem(self):
         self._add_sys("Paměť vymazána.")

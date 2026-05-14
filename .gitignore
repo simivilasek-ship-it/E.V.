@@ -1,6 +1,25 @@
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+
+# Secrets & local config
 .env
+config.json
+audit.log
 *.log
+
+# Runtime data
 memory_data/
+jarvis.db
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~

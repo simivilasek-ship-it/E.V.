@@ -28,119 +28,165 @@ logger = logging.getLogger(__name__)
 #  VESTAVĚNÁ JSON PAMĚŤ (fallback — bez závislostí)
 # ══════════════════════════════════════════════════════
 
+import sqlite3
 import uuid
 import math as _math
 
 
-class _JSONMemoryStore:
+class _SQLiteMemoryStore:
     """
-    Jednoduchá persistentní paměť v JSON.
-    Funguje vždy — bez externích závislostí.
-    Keyword-based recall (TF-IDF aproximace přes word overlap).
+    Persistentní paměť v SQLite.
+    Drop-in náhrada za původní JSON store — stejné API.
+    SQLite je výrazně rychlejší pro velké paměti a nepotřebuje
+    načítat vše do RAM při každém spuštění.
+    """
+
+    _SCHEMA = """
+    CREATE TABLE IF NOT EXISTS memories (
+        id           TEXT PRIMARY KEY,
+        content      TEXT NOT NULL,
+        importance   REAL NOT NULL DEFAULT 0.5,
+        tags         TEXT NOT NULL DEFAULT '[]',
+        metadata     TEXT NOT NULL DEFAULT '{}',
+        created_at   REAL NOT NULL,
+        last_access  REAL NOT NULL,
+        access_count INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_importance ON memories(importance);
+    CREATE INDEX IF NOT EXISTS idx_created_at ON memories(created_at);
     """
 
     def __init__(self, path: Path):
-        self._path = path
-        self._path.mkdir(parents=True, exist_ok=True)
-        self._file = self._path / "memories.json"
+        path.mkdir(parents=True, exist_ok=True)
+        self._db_path = path / "memories.db"
         self._lock = threading.Lock()
-        self._data: List[dict] = []
-        self._load()
+        self._migrate_json(path)
+        with self._connect() as con:
+            con.executescript(self._SCHEMA)
 
-    def _load(self) -> None:
-        try:
-            if self._file.exists():
-                self._data = json.loads(self._file.read_text(encoding="utf-8"))
-        except Exception:
-            self._data = []
+    def _connect(self) -> sqlite3.Connection:
+        con = sqlite3.connect(self._db_path, check_same_thread=False)
+        con.row_factory = sqlite3.Row
+        return con
 
-    def _save(self) -> None:
+    def _migrate_json(self, path: Path) -> None:
+        """Přenese data ze starého memories.json do SQLite (jednorázově)."""
+        json_file = path / "memories.json"
+        if not json_file.exists():
+            return
         try:
-            self._file.write_text(
-                json.dumps(self._data, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
+            data = json.loads(json_file.read_text(encoding="utf-8"))
+            if not data:
+                json_file.rename(path / "memories.json.migrated")
+                return
+            with self._connect() as con:
+                con.executescript(self._SCHEMA)
+                for e in data:
+                    con.execute(
+                        "INSERT OR IGNORE INTO memories VALUES (?,?,?,?,?,?,?,?)",
+                        (e["id"], e["content"], e["importance"],
+                         json.dumps(e.get("tags", []), ensure_ascii=False),
+                         json.dumps(e.get("metadata", {}), ensure_ascii=False),
+                         e["created_at"], e["last_access"], e["access_count"]),
+                    )
+            json_file.rename(path / "memories.json.migrated")
+            logger.info(f"Migrováno {len(data)} vzpomínek z JSON do SQLite")
         except Exception as e:
-            logger.warning(f"JSON memory save chyba: {e}")
+            logger.warning(f"JSON→SQLite migrace selhala: {e}")
 
     def store(self, content: str, importance: float, tags: List[str],
               metadata: dict) -> str:
         mid = str(uuid.uuid4())[:8]
-        entry = {
-            "id": mid,
-            "content": content,
-            "importance": importance,
-            "tags": tags,
-            "metadata": metadata,
-            "created_at": time.time(),
-            "last_access": time.time(),
-            "access_count": 0,
-        }
-        with self._lock:
-            self._data.append(entry)
-            self._save()
+        now = time.time()
+        with self._lock, self._connect() as con:
+            con.execute(
+                "INSERT INTO memories VALUES (?,?,?,?,?,?,?,?)",
+                (mid, content, importance,
+                 json.dumps(tags, ensure_ascii=False),
+                 json.dumps(metadata, ensure_ascii=False),
+                 now, now, 0),
+            )
         return mid
 
     def recall(self, query: str, top_k: int, min_importance: float) -> List[dict]:
         q_words = set(query.lower().split())
+        now = time.time()
+        with self._lock, self._connect() as con:
+            rows = con.execute(
+                "SELECT * FROM memories WHERE importance >= ?",
+                (min_importance,),
+            ).fetchall()
+
         results = []
-        with self._lock:
-            for entry in self._data:
-                if entry["importance"] < min_importance:
-                    continue
-                c_words = set(entry["content"].lower().split())
-                overlap = len(q_words & c_words)
-                if overlap == 0:
-                    continue
-                # Recency bonus: půlnoc 14 dní
-                age_days = (time.time() - entry["created_at"]) / 86400
-                recency = _math.exp(-age_days / 14)
-                score = 0.5 * (overlap / max(len(q_words), 1)) + \
-                        0.3 * entry["importance"] + \
-                        0.2 * recency
-                results.append({**entry, "_score": score})
-        results.sort(key=lambda x: x["_score"], reverse=True)
-        # Aktualizuj last_access
-        ids = {r["id"] for r in results[:top_k]}
-        with self._lock:
-            for e in self._data:
-                if e["id"] in ids:
-                    e["last_access"] = time.time()
-                    e["access_count"] += 1
-            if ids:
-                self._save()
-        return results[:top_k]
+        for row in rows:
+            c_words = set(row["content"].lower().split())
+            overlap = len(q_words & c_words)
+            if overlap == 0:
+                continue
+            age_days = (now - row["created_at"]) / 86400
+            recency  = _math.exp(-age_days / 14)
+            score    = (0.5 * overlap / max(len(q_words), 1)
+                        + 0.3 * row["importance"]
+                        + 0.2 * recency)
+            results.append({
+                "id": row["id"], "content": row["content"],
+                "importance": row["importance"],
+                "tags": json.loads(row["tags"]),
+                "metadata": json.loads(row["metadata"]),
+                "created_at": row["created_at"],
+                "score": score,
+            })
+
+        results.sort(key=lambda x: x["score"], reverse=True)
+        top = results[:top_k]
+
+        if top:
+            ids = tuple(r["id"] for r in top)
+            placeholders = ",".join("?" * len(ids))
+            with self._lock, self._connect() as con:
+                con.execute(
+                    f"UPDATE memories SET last_access=?, access_count=access_count+1 "
+                    f"WHERE id IN ({placeholders})",
+                    (now, *ids),
+                )
+        return top
 
     def forget(self, mid: str) -> bool:
-        with self._lock:
-            before = len(self._data)
-            self._data = [e for e in self._data if e["id"] != mid]
-            changed = len(self._data) < before
-            if changed:
-                self._save()
-        return changed
+        with self._lock, self._connect() as con:
+            cur = con.execute("DELETE FROM memories WHERE id=?", (mid,))
+        return cur.rowcount > 0
 
     def maintenance(self, decay_rate: float = 0.01,
                     min_importance: float = 0.05) -> dict:
-        """Sníží importance starých vzpomínek, odstraní pod prahem."""
-        removed = 0
-        with self._lock:
-            for entry in self._data:
-                age_days = (time.time() - entry["created_at"]) / 86400
-                entry["importance"] *= _math.exp(-decay_rate * age_days)
-            before = len(self._data)
-            self._data = [e for e in self._data
-                          if e["importance"] >= min_importance]
-            removed = before - len(self._data)
-            self._save()
+        now = time.time()
+        with self._lock, self._connect() as con:
+            rows = con.execute("SELECT id, importance, created_at FROM memories").fetchall()
+            for row in rows:
+                age_days    = (now - row["created_at"]) / 86400
+                new_imp     = row["importance"] * _math.exp(-decay_rate * age_days)
+                if new_imp < min_importance:
+                    con.execute("DELETE FROM memories WHERE id=?", (row["id"],))
+                else:
+                    con.execute("UPDATE memories SET importance=? WHERE id=?",
+                                (new_imp, row["id"]))
+            remaining = con.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+        removed = len(rows) - remaining
         logger.info(f"Memory maintenance: odstraněno {removed} vzpomínek")
-        return {"removed": removed, "remaining": len(self._data)}
+        return {"removed": removed, "remaining": remaining}
 
     def stats(self) -> dict:
-        with self._lock:
-            total = len(self._data)
-            avg_imp = sum(e["importance"] for e in self._data) / total if total else 0.0
-        return {"total_memories": total, "avg_importance": round(avg_imp, 3)}
+        with self._lock, self._connect() as con:
+            row = con.execute(
+                "SELECT COUNT(*) as total, AVG(importance) as avg_imp FROM memories"
+            ).fetchone()
+        return {
+            "total_memories": row["total"] or 0,
+            "avg_importance": round(row["avg_imp"] or 0.0, 3),
+        }
+
+
+# Alias pro zpětnou kompatibilitu
+_JSONMemoryStore = _SQLiteMemoryStore
 
 
 # ══════════════════════════════════════════════════════
@@ -180,8 +226,8 @@ class JarvisMemory:
                 logger.warning(f"Neural memory init selhal: {e}, používám JSON fallback")
 
         self.system = None
-        self._store = _JSONMemoryStore(mem_dir)
-        logger.info(f"JSON memory inicializován v: {mem_dir}")
+        self._store = _SQLiteMemoryStore(mem_dir)
+        logger.info(f"SQLite memory inicializován v: {mem_dir}")
 
     # ── Store ──────────────────────────────────────────
 

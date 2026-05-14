@@ -1,4 +1,4 @@
-# JARVIS v3.1 — Lokální AI asistent
+# JARVIS v3.2 — Lokální AI asistent
 
 Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český hlas, ovládání celého PC, dlouhodobá paměť, MCP integrace a rozšiřitelný skill systém.
 
@@ -101,6 +101,15 @@ cp jarvis.desktop ~/Plocha/
 ### Wake Word
 Řekni **„Jarvis"** — asistent se probudí a začne poslouchat bez kliknutí. Mikrofon je uvolněn pro STT (žádná kolize).
 
+### GUI klávesové zkratky
+| Zkratka | Akce |
+|---|---|
+| `Enter` | Odeslat příkaz |
+| `Mezerník` | Aktivovat mikrofon (pokud focus není v inputu) |
+| `Ctrl+L` | Vymazat chat log |
+| `Ctrl+E` | Exportovat konverzaci do `.md` na plochu |
+| `Esc` | Přesunout focus do input pole |
+
 ---
 
 ## MCP integrace
@@ -184,11 +193,12 @@ Fakta se extrahují automaticky z každé konverzace:
 
 Profil se vkládá do každého LLM dotazu — JARVIS ví kdo jsi.
 
-### Neural Memory / JSON Memory (`memory_data/`)
+### Neural Memory / SQLite Memory (`memory_data/memories.db`)
 - Ukládá konverzace s důležitostí a tagy
 - Keyword recall s recency scoring
 - Automatický decay + maintenance každých 6 hodin
-- Funguje bez externích závislostí (vestavěný JSON fallback)
+- **SQLite backend** — rychlý i pro tisíce vzpomínek, bez RAM overhead
+- Automatická migrace z původního JSON při prvním spuštění
 
 ### Daily Summarizer
 Každou půlnoc Ollama zpracuje dnešní konverzace a extrahuje fakta do UserProfile.
@@ -202,13 +212,18 @@ Persistentní knowledge graph přes `@modelcontextprotocol/server-memory` — en
 
 ```
 jarvis.py               — bootstrap (10 řádků)
-app_core.py             — orchestrátor, event loop, security, wake word, MCP init
-gui.py                  — sci-fi HUD GUI (customtkinter + animovaný orb + volume display)
+app_core.py             — orchestrátor, event loop, lazy init (rychlý start)
+gui.py                  — sci-fi HUD GUI (Ctrl+L vymazat, Ctrl+E export do .md)
 llm.py                  — lokální router + Ollama streaming + user profil inject
-commands.py             — implementace 60+ příkazů (YouTube, soubory, systém…)
+commands/               — balíček příkazů (system, apps, media, files, utils)
+  ├── system.py         — shutdown, restart, hlasitost, jas, systém info
+  ├── apps.py           — open/kill/install aplikace
+  ├── media.py          — YouTube, screenshot, klávesnice, timer
+  ├── files.py          — soubory, složky, clipboard, web
+  └── utils.py          — kalkulačka, překlad, poznámky, počasí, wiki, měna
 tts.py                  — edge-tts / pyttsx3, queue worker (sériové přehrávání)
 stt.py                  — Google STT + offline Sphinx fallback
-memory.py               — JSON memory + DailySummarizer
+memory.py               — SQLite memory + DailySummarizer (migrace z JSON)
 user_profile.py         — permanentní fakta o uživateli
 security_v2.py          — audit log, 3 úrovně oprávnění, dangerous patterns
 event_bus.py            — pub/sub event systém

@@ -16,18 +16,19 @@ from commands import CommandExecutor
 from gui import JarvisGUI
 from logging_setup import setup_logging
 
-# Nové moduly
+# Core moduly — nutné ihned
 from async_utils import get_async_engine, shutdown_async_engine, TaskPriority
 from error_handling import get_error_handler, ErrorSeverity, ErrorCategory
-from plugin_system import create_plugin_manager
-# v2.0 moduly
 from event_bus import EventType, Event, get_event_bus
-from agents import AgentManager
-from scheduler import get_scheduler
-from security_v2 import get_security_manager, confirm_action
-from wake_word_detector import WakeWordDetector
-from user_profile import get_user_profile
-from mcp_bridge import get_mcp_bridge, HAS_MCP
+
+# Těžké moduly — importují se lazy (zrychlení startu o ~2-4s)
+# from plugin_system import create_plugin_manager   → lazy v _load_plugins
+# from agents import AgentManager                   → lazy v _init_new_systems
+# from scheduler import get_scheduler               → lazy v _init_new_systems
+# from security_v2 import get_security_manager, confirm_action → lazy v _init_new_systems
+# from wake_word_detector import WakeWordDetector   → lazy v _init_new_systems
+# from user_profile import get_user_profile         → lazy v _schedule_memory_maintenance
+# from mcp_bridge import get_mcp_bridge, HAS_MCP   → lazy v _init_mcp
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,11 @@ class JarvisApp:
 
     def _init_new_systems(self):
         """Inicializuje všechny systémy v2.0."""
+        from agents import AgentManager
+        from scheduler import get_scheduler
+        from security_v2 import get_security_manager
+        from wake_word_detector import WakeWordDetector
+
         # Error handler
         self.error_handler = get_error_handler()
         self.error_handler.on_error    = self._on_error
@@ -128,6 +134,7 @@ class JarvisApp:
     def _load_plugins(self):
         """Načte plugin systém a pluginy"""
         try:
+            from plugin_system import create_plugin_manager
             self.plugin_manager = create_plugin_manager(CONFIG)
             loaded = self.plugin_manager.load_all_plugins()
             logger.info(f"Načteno {len(loaded)} pluginů")
@@ -137,6 +144,7 @@ class JarvisApp:
 
     def _init_mcp(self):
         """Inicializuje MCP bridge a předá ho skill modulům."""
+        from mcp_bridge import get_mcp_bridge, HAS_MCP
         if not HAS_MCP:
             logger.info("MCP bridge: mcp balíček není nainstalován, přeskočeno")
             return
@@ -445,6 +453,7 @@ class JarvisApp:
 
         # Potvrzení pro nebezpečné akce
         if self.security.needs_confirmation(action):
+            from security_v2 import confirm_action
             confirmed = confirm_action(action, params, parent=self.gui.root)
             if not confirmed:
                 self._gui(lambda: self.gui.add_message("Akce zrušena.", "jarvis"))
@@ -530,6 +539,7 @@ class JarvisApp:
                                  name="memory_maintenance")
 
             # UserProfile — načti a vlož souhrn do LLM systémového promptu
+            from user_profile import get_user_profile
             self.user_profile = get_user_profile()
             profile_summary = self.user_profile.summary()
             if profile_summary:
