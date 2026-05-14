@@ -271,3 +271,43 @@ def get_security_manager() -> SecurityManager:
     if _security is None:
         _security = SecurityManager()
     return _security
+
+
+# ── Kompatibilní aliasy (nahrazují starý security.py) ──
+
+@dataclass
+class AuditLogEntry:
+    """Jednoduchá datová třída pro testy a kompatibilitu."""
+    action: str
+    user: str = ""
+    status: str = "success"
+    details: Dict[str, Any] = field(default_factory=dict)
+    timestamp: Any = field(default_factory=lambda: __import__("datetime").datetime.now())
+
+
+def requires_confirmation(action: str, params: Dict[str, Any] = None) -> bool:
+    """Vrátí True pokud akce vyžaduje potvrzení."""
+    level = ACTION_PERMISSIONS.get(action, PermissionLevel.RESTRICTED)
+    return level in (PermissionLevel.ELEVATED, PermissionLevel.RESTRICTED)
+
+
+def contains_dangerous_pattern(text: str) -> bool:
+    """Vrátí True pokud text obsahuje nebezpečný vzor."""
+    return any(p.search(text) for p in _DANGEROUS_RE)
+
+
+def is_action_allowed(action: str) -> bool:
+    """Modul-level alias — zkontroluje zda je akce povolena."""
+    allowed, _ = get_security_manager().check(action, {})
+    return allowed
+
+
+# Aliasy na SecurityManager metodách
+SecurityManager.is_action_allowed = lambda self, action: self.check(action, {})[0]
+SecurityManager.log_action = lambda self, action, user="", status="success", details=None: \
+    self._audit.log(action, details or {}, status == "success", status, user)
+
+try:
+    from error_handling import ErrorCategory  # re-export pro zpětnou kompatibilitu testů
+except ImportError:
+    pass
