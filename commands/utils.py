@@ -1,16 +1,71 @@
 """Utility příkazy: kalkulačka, překlad, poznámky, počasí, Wikipedia, měna."""
 
+from __future__ import annotations
+
 import logging
 import math
 import os
+import subprocess
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
+
+
+# ── Bezpečný subprocess helper ────────────────────────
+
+
+def safe_run(
+    cmd: List[str],
+    timeout: float = 30.0,
+    cwd: Optional[str] = None,
+    bg: bool = False,
+) -> Dict[str, Any]:
+    """Spustí příkaz bezpečně — vždy bez shell=True.
+
+    Args:
+        cmd:     příkaz jako list (nikdy string se shell=True)
+        timeout: maximální doba čekání v sekundách
+        cwd:     pracovní adresář (None = aktuální)
+        bg:      True = spusť na pozadí a ihned vrať
+
+    Returns:
+        {"rc": int, "stdout": str, "stderr": str, "timeout": bool}
+    """
+    if not isinstance(cmd, list) or not cmd:
+        raise ValueError(f"safe_run: cmd musí být neprázdný list, dostal: {cmd!r}")
+
+    if bg:
+        try:
+            subprocess.Popen(cmd, cwd=cwd,
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            logger.warning(f"safe_run bg: příkaz nenalezen: {cmd[0]}")
+            return {"rc": -1, "stdout": "", "stderr": f"nenalezen: {cmd[0]}", "timeout": False}
+        return {"rc": 0, "stdout": "", "stderr": "", "timeout": False}
+
+    try:
+        r = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=cwd,
+        )
+        return {"rc": r.returncode, "stdout": r.stdout, "stderr": r.stderr, "timeout": False}
+    except subprocess.TimeoutExpired:
+        logger.warning(f"safe_run timeout ({timeout}s): {cmd}")
+        return {"rc": -1, "stdout": "", "stderr": "timeout", "timeout": True}
+    except FileNotFoundError:
+        return {"rc": -1, "stdout": "", "stderr": f"nenalezen: {cmd[0]}", "timeout": False}
+    except Exception as e:
+        logger.error(f"safe_run chyba {cmd}: {e}")
+        return {"rc": -1, "stdout": "", "stderr": str(e), "timeout": False}
 
 _HOME = str(Path.home())
 

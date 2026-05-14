@@ -154,8 +154,10 @@ class TTSEngine:
             await communicate.save(temp_path)
             try:
                 if os.name == "nt":
-                    proc = subprocess.Popen(["start", "/wait", "", temp_path],
-                                            shell=True)
+                    # cmd /c start — bez shell=True
+                    proc = subprocess.Popen(
+                        ["cmd", "/c", "start", "/wait", "", temp_path]
+                    )
                 elif self._player == "ffplay":
                     proc = subprocess.Popen(
                         ["ffplay", "-nodisp", "-autoexit",

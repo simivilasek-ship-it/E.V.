@@ -61,7 +61,9 @@ def cmd_sleep_pc() -> str:
 
 def cmd_update_system() -> str:
     if _IS_LINUX:
-        subprocess.Popen(["pkexec", "bash", "-c", "apt update && apt upgrade -y"])
+        # Dva oddělené příkazy bez shell stringu — apt update pak upgrade
+        subprocess.Popen(["pkexec", "apt", "update"])
+        subprocess.Popen(["pkexec", "apt", "upgrade", "-y"])
     return "Spouštím aktualizaci..."
 
 
@@ -104,14 +106,18 @@ def cmd_set_brightness(level: int = 50) -> str:
             subprocess.run(["brightnessctl", "set", f"{level}%"], capture_output=True)
         else:
             try:
-                displays = subprocess.check_output(
-                    "xrandr | grep ' connected' | awk '{print $1}'",
-                    shell=True, text=True,
-                ).strip().split("\n")
+                # xrandr bez shell=True — parsujeme výstup v Pythonu
+                r = subprocess.run(["xrandr"], capture_output=True, text=True, timeout=5)
+                displays = [
+                    line.split()[0]
+                    for line in r.stdout.splitlines()
+                    if " connected" in line
+                ]
                 for d in displays:
                     if d:
                         subprocess.run(["xrandr", "--output", d,
-                                        "--brightness", str(level / 100)])
+                                        "--brightness", str(level / 100)],
+                                       capture_output=True, timeout=5)
             except Exception as e:
                 return f"Chyba jasu: {e}"
     return f"Jas: {level}%"
