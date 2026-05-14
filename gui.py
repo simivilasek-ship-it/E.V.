@@ -320,12 +320,22 @@ class JarvisGUI:
             font=("DM Sans", 10), text_color=FG2)
         self._info_lbl.pack(pady=(0, 8))
 
-        # Hodiny
+        # Hodiny + hlasitost v jednom řádku
+        bottom_row = ctk.CTkFrame(orb_frame, fg_color=BG2, corner_radius=0)
+        bottom_row.pack(fill="x", padx=8)
+
         self._clock = ctk.CTkLabel(
-            orb_frame, text="",
+            bottom_row, text="",
             font=("Courier New", 9), text_color=BORDER)
-        self._clock.pack()
+        self._clock.pack(side="left", padx=(4, 0))
+
+        self._vol_lbl = ctk.CTkLabel(
+            bottom_row, text="🔊 —",
+            font=("Courier New", 9), text_color=BORDER)
+        self._vol_lbl.pack(side="right", padx=(0, 4))
+
         self._tick_clock()
+        self._refresh_vol()
 
         ctk.CTkFrame(parent, fg_color=BORDER, height=1, corner_radius=0).pack(fill="x", pady=(12, 0))
 
@@ -567,6 +577,26 @@ class JarvisGUI:
     def _tick_clock(self):
         self._clock.configure(text=datetime.now().strftime("%H:%M:%S"))
         self.root.after(1000, self._tick_clock)
+
+    def _refresh_vol(self):
+        """Přečte aktuální hlasitost a zobrazí v GUI. Opakuje se každých 3s."""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["pactl", "get-sink-volume", "@DEFAULT_SINK@"],
+                capture_output=True, text=True, timeout=1,
+            )
+            if result.returncode == 0:
+                import re
+                m = re.search(r"(\d+)%", result.stdout)
+                if m:
+                    pct = int(m.group(1))
+                    icon = "🔊" if pct > 50 else ("🔉" if pct > 0 else "🔇")
+                    self._vol_lbl.configure(text=f"{icon} {pct}%",
+                                            text_color=CYAN if pct > 80 else BORDER)
+        except Exception:
+            pass  # pactl nedostupný → zůstane "🔊 —"
+        self.root.after(3000, self._refresh_vol)
 
     # ── VEŘEJNÉ API ──────────────────────────────────
 

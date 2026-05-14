@@ -15,20 +15,16 @@ import math
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import quote
-from typing import Dict, Any, Optional, Callable, List, Tuple, Union
+from typing import Dict, Any, Optional, Callable, List
 
 try:
     import pyautogui
     HAS_PYAUTOGUI = True
-except ImportError:
+except Exception:
     pyautogui = None  # type: ignore
     HAS_PYAUTOGUI = False
 
 logger = logging.getLogger(__name__)
-
-# ══════════════════════════════════════════════════════
-#  MAPA APLIKACÍ
-# ══════════════════════════════════════════════════════
 
 APP_MAP: Dict[str, List[str]] = {
     "chrome":     ["chrome", "google chrome"],
@@ -50,76 +46,70 @@ APP_MAP: Dict[str, List[str]] = {
     "steam":      ["steam"],
     "vlc":        ["vlc"],
     "telegram":   ["telegram"],
+    "gimp":       ["gimp"],
+    "libreoffice":["libreoffice"],
+    "nautilus":   ["nautilus", "správce souborů", "files"],
+    "gedit":      ["gedit", "textový editor"],
+    "tilix":      ["tilix", "terminál", "terminal"],
 }
+
+_HOME = str(Path.home())
 
 class CommandExecutor:
     """Vykonává příkazy JARVIS"""
 
     def __init__(self, config: Dict[str, Any]) -> None:
-        self.config: Dict[str, Any] = config
-        self.is_windows: bool = platform.system() == "Windows"
-        self.is_linux: bool = platform.system() == "Linux"
+        self.config = config
+        self.is_windows = platform.system() == "Windows"
+        self.is_linux = platform.system() == "Linux"
 
     def execute(self, action: str, params: Dict[str, Any]) -> str:
-        """Vykoná příkaz a vrátí výsledek"""
         try:
-            method_name: str = f"_cmd_{action}"
-            if hasattr(self, method_name):
-                method: Callable = getattr(self, method_name)
-                return method(**params)
-            else:
-                logger.warning(f"Neznámá akce: {action}")
-                return f"Neznámá akce: {action}"
+            method = getattr(self, f"_cmd_{action}")
+            return method(**params)
+        except AttributeError:
+            logger.warning(f"Neznámá akce: {action}")
+            return f"Neznámá akce: {action}"
         except Exception as e:
-            logger.error(f"Chyba při vykonávání {action}: {e}")
+            logger.exception(f"Chyba při vykonávání {action}")
             return f"Chyba: {e}"
 
     def _find_app(self, app: str) -> Optional[str]:
-        """Najde aplikaci v APP_MAP (vrátí command nebo None)"""
-        app_lower: str = app.lower()
-        
-        # Přímý match
-        if app_lower in APP_MAP:
-            return APP_MAP[app_lower][0]
-        
-        # Match v aliasech
-        for app_cmd, aliases in APP_MAP.items():
-            if app_lower in [alias.lower() for alias in aliases]:
-                return app_cmd
-        
-        return None
+        if not app:
+            return None
+        nl = app.lower().strip()
+        if nl in APP_MAP:
+            return APP_MAP[nl][0]
+        for cmd, aliases in APP_MAP.items():
+            if nl in [a.lower() for a in aliases]:
+                return cmd
+        return nl
 
     def _cmd_open_app(self, app: str, args: Optional[List[str]] = None) -> str:
-        """Otevře aplikaci"""
-        app_cmd: Optional[str] = self._find_app(app)
+        app_cmd = self._find_app(app)
         if not app_cmd:
             return f"Aplikace '{app}' nenalezena"
-
         if app_cmd == "spotify":
             if args:
-                query: str = " ".join(str(a) for a in args)
-                return self._cmd_spotify_play(query)
+                return self._cmd_spotify_play(" ".join(args))
             return self._launch_spotify()
-
-        cmd: str = f"{app_cmd} {' '.join(str(a) for a in (args or []))}"
+        cmd = [app_cmd] + (args or [])
         try:
-            subprocess.Popen(cmd, shell=True)
+            subprocess.Popen([str(c) for c in cmd])
             return "ok"
         except Exception as e:
             logger.error(f"Chyba při otevírání aplikace: {e}")
             return f"Chyba: {e}"
 
     def _launch_spotify(self) -> str:
-        """Otevře Spotify aplikaci nebo web"""
-        uri: str = "spotify:"
         try:
             if shutil.which("spotify"):
                 subprocess.Popen(["spotify"])
             else:
-                subprocess.Popen(["xdg-open", uri])
+                subprocess.Popen(["xdg-open", "spotify:"])
             return "ok"
         except Exception as e:
-            logger.warning(f"Spotify launch fallback selhal: {e}")
+            logger.warning(f"Spotify launch selhal: {e}")
             try:
                 webbrowser.open("https://open.spotify.com/")
                 return "ok"
@@ -127,15 +117,10 @@ class CommandExecutor:
                 return f"Chyba: {exc}"
 
     def _cmd_spotify_play(self, query: str, index: int = 1, audio_only: bool = False) -> str:
-        """Přehrát skladbu na Spotify"""
         if not query:
             return self._launch_spotify()
-
-        uri: str = f"spotify:search:{quote(query)}"
         try:
-            if shutil.which("spotify"):
-                subprocess.Popen(["xdg-open", uri])
-                return "ok"
+            uri = f"spotify:search:{quote(query)}"
             subprocess.Popen(["xdg-open", uri])
             return "ok"
         except Exception as e:
@@ -147,232 +132,623 @@ class CommandExecutor:
                 return f"Chyba: {exc}"
 
     def _cmd_get_time(self) -> str:
-        """Vrátí aktuální čas"""
         return datetime.now().strftime("%H:%M:%S")
 
     def _cmd_get_date(self) -> str:
-        """Vrátí aktuální datum"""
         return datetime.now().strftime("%d.%m.%Y")
 
     def _cmd_calculate(self, expr: str) -> str:
-        """Vypočítá matematický výraz — bezpečný sandbox, bez eval()."""
-        import math as _math
         import ast as _ast
+        import operator as _op
 
-        _SAFE = {
-            "sqrt": _math.sqrt, "pow": _math.pow, "abs": abs,
-            "sin": _math.sin, "cos": _math.cos, "tan": _math.tan,
-            "log": _math.log, "log10": _math.log10,
-            "ceil": _math.ceil, "floor": _math.floor,
-            "round": round, "pi": _math.pi, "e": _math.e,
+        ALLOWED_NAMES = {
+            'sqrt': math.sqrt, 'pow': math.pow, 'abs': abs,
+            'sin': math.sin, 'cos': math.cos, 'tan': math.tan,
+            'log': math.log, 'log10': math.log10,
+            'ceil': math.ceil, 'floor': math.floor,
+            'round': round, 'pi': math.pi, 'e': math.e,
         }
-        _ALLOWED_NODES = (
-            _ast.Expression, _ast.BinOp, _ast.UnaryOp, _ast.Constant,
-            _ast.Add, _ast.Sub, _ast.Mult, _ast.Div, _ast.Pow,
-            _ast.Mod, _ast.FloorDiv, _ast.USub, _ast.UAdd,
-            _ast.Call, _ast.Name, _ast.Load,
-        )
 
-        def _safe_eval(node):
-            if not isinstance(node, _ALLOWED_NODES):
-                raise ValueError(f"Zakázaný výraz: {type(node).__name__}")
+        OPERATORS = {
+            _ast.Add: _op.add, _ast.Sub: _op.sub, _ast.Mult: _op.mul,
+            _ast.Div: _op.truediv, _ast.Pow: _op.pow, _ast.Mod: _op.mod,
+            _ast.FloorDiv: _op.floordiv,
+        }
+
+        def _eval(node):
+            if isinstance(node, _ast.Expression):
+                return _eval(node.body)
             if isinstance(node, _ast.Constant):
-                if not isinstance(node.value, (int, float)):
-                    raise ValueError("Pouze čísla jsou povolena")
-                return node.value
+                if isinstance(node.value, (int, float)):
+                    return node.value
+                raise ValueError('Pouze čísla jsou povolena')
             if isinstance(node, _ast.BinOp):
-                return _safe_eval(node.left).__class__(0) or 0  # type check
-            if isinstance(node, _ast.Name):
-                if node.id not in _SAFE:
-                    raise ValueError(f"Neznámá funkce: {node.id}")
-                return _SAFE[node.id]
-            if isinstance(node, _ast.Call):
-                fn = _safe_eval(node.func)
-                args = [_safe_eval(a) for a in node.args]
-                return fn(*args)
+                left = _eval(node.left)
+                right = _eval(node.right)
+                op = type(node.op)
+                if op in OPERATORS:
+                    return OPERATORS[op](left, right)
+                raise ValueError('Nepodporovaný operator')
             if isinstance(node, _ast.UnaryOp):
+                val = _eval(node.operand)
                 if isinstance(node.op, _ast.USub):
-                    return -_safe_eval(node.operand)
-                return _safe_eval(node.operand)
-            raise ValueError(f"Nepodporovaný uzel: {type(node).__name__}")
+                    return -val
+                return val
+            if isinstance(node, _ast.Call):
+                if isinstance(node.func, _ast.Name) and node.func.id in ALLOWED_NAMES:
+                    fn = ALLOWED_NAMES[node.func.id]
+                    args = [_eval(a) for a in node.args]
+                    return fn(*args)
+                raise ValueError('Neznámá funkce')
+            if isinstance(node, _ast.Name):
+                if node.id in ALLOWED_NAMES:
+                    return ALLOWED_NAMES[node.id]
+                raise ValueError('Neznámé jméno')
+            raise ValueError(f'Nepodporovaný uzel: {type(node).__name__}')
 
         try:
-            expr_clean = expr.strip().replace(",", ".").replace("^", "**")
-            tree = _ast.parse(expr_clean, mode="eval")
-            # Ověř všechny uzly před spuštěním
-            for node in _ast.walk(tree):
-                if not isinstance(node, _ALLOWED_NODES):
-                    return f"Chyba: zakázaný výraz ({type(node).__name__})"
-            result = eval(  # noqa: S307 — bezpečné, whitelist + AST check
-                compile(tree, "<calc>", "eval"),
-                {"__builtins__": {}},
-                _SAFE,
-            )
-            if isinstance(result, float) and result == int(result):
+            expr_clean = expr.strip().replace(',', '.').replace('^', '**')
+            tree = _ast.parse(expr_clean, mode='eval')
+            for n in _ast.walk(tree):
+                if not isinstance(n, (_ast.Expression, _ast.BinOp, _ast.UnaryOp, _ast.Constant,
+                                      _ast.Add, _ast.Sub, _ast.Mult, _ast.Div, _ast.Pow,
+                                      _ast.Mod, _ast.FloorDiv, _ast.USub, _ast.UAdd,
+                                      _ast.Call, _ast.Name, _ast.Load)):
+                    return f"Chyba: zakázaný výraz ({type(n).__name__})"
+            result = _eval(tree)
+            if isinstance(result, float) and result.is_integer():
                 return str(int(result))
-            return f"{result:.10g}"
+            return f"{result:.10g}" if isinstance(result, float) else str(result)
         except Exception as e:
             return f"Chyba výpočtu: {e}"
 
     def _cmd_system_info(self) -> str:
-        """Vrátí informace o systému"""
         try:
-            cpu_percent: float = psutil.cpu_percent(interval=1)
-            mem: Any = psutil.virtual_memory()
-            disk: Any = psutil.disk_usage('/')
-            
-            info: str = (
-                f"CPU: {cpu_percent}% | "
-                f"RAM: {mem.percent}% ({mem.available // (1024**3)} GB) | "
-                f"Disk: {disk.percent}% ({disk.free // (1024**3)} GB volného)"
-            )
-            return info
+            cpu = psutil.cpu_percent(interval=1)
+            ram = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            return f"CPU: {cpu}% | RAM: {ram.percent}% ({ram.available // (1024**3)} GB) | Disk: {disk.percent}% ({disk.free // (1024**3)} GB)"
         except Exception as e:
             logger.error(f"Chyba při zjišťování systému: {e}")
             return f"Chyba: {e}"
 
     def _cmd_open_url(self, url: str) -> str:
-        """Otevře URL v prohlížeči"""
         try:
+            if not url.startswith('http'):
+                url = 'https://' + url
             webbrowser.open(url)
-            return "ok"
+            return 'ok'
         except Exception as e:
             logger.error(f"Chyba při otevírání URL: {e}")
             return f"Chyba: {e}"
 
     def _cmd_search_web(self, query: str) -> str:
-        """Vyhledá na Googlu"""
         try:
-            url: str = f"https://www.google.com/search?q={quote(query)}"
-            webbrowser.open(url)
-            return "ok"
+            webbrowser.open(f"https://www.google.com/search?q={quote(query)}")
+            return 'ok'
         except Exception as e:
             logger.error(f"Chyba při vyhledávání: {e}")
             return f"Chyba: {e}"
 
     def _cmd_screenshot(self) -> str:
-        """Vytvoří screenshot"""
         if not HAS_PYAUTOGUI:
-            return "pyautogui není nainstalován"
-        
+            return 'pyautogui není nainstalován'
         try:
-            timestamp: str = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename: str = f"screenshot_{timestamp}.png"
-            desktop_path: str = os.path.expanduser("~/Plocha")
-            if not os.path.exists(desktop_path):
-                desktop_path = os.path.expanduser("~/Desktop")
-            
-            filepath: str = os.path.join(desktop_path, filename)
-            img: Any = pyautogui.screenshot()
+            ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+            desktop = os.path.expanduser('~/Plocha')
+            if not os.path.exists(desktop):
+                desktop = os.path.expanduser('~/Desktop')
+            filepath = os.path.join(desktop, f'screenshot_{ts}.png')
+            img = pyautogui.screenshot()
             img.save(filepath)
-            return f"Uloženo: {filepath}"
+            return f'Uloženo: {filepath}'
         except Exception as e:
             logger.error(f"Chyba při screenshotu: {e}")
             return f"Chyba: {e}"
 
     def _cmd_type_key(self, key: str) -> str:
-        """Stiskne klávesu"""
         if not HAS_PYAUTOGUI:
-            return "pyautogui není nainstalován"
-        
+            return 'pyautogui není nainstalován'
         try:
-            pyautogui.press(key)
-            return "ok"
+            if '+' in key:
+                pyautogui.hotkey(*key.split('+'))
+            else:
+                pyautogui.press(key)
+            return 'ok'
         except Exception as e:
             logger.error(f"Chyba při stisku klávesy: {e}")
             return f"Chyba: {e}"
 
     def _cmd_write_text(self, text: str) -> str:
-        """Napíše text"""
         if not HAS_PYAUTOGUI:
-            return "pyautogui není nainstalován"
-        
+            return 'pyautogui není nainstalován'
         try:
-            pyautogui.typewrite(text, interval=0.05)
-            return "ok"
+            time.sleep(0.5)
+            pyautogui.write(text, interval=0.03)
+            return 'ok'
         except Exception as e:
             logger.error(f"Chyba při psaní textu: {e}")
             return f"Chyba: {e}"
 
     def _cmd_clipboard_set(self, text: str) -> str:
-        """Zkopíruje text do schránky"""
         try:
             import pyperclip
             pyperclip.copy(text)
-            return "ok"
+            return 'ok'
+        except ImportError:
+            return 'pyperclip není nainstalován'
         except Exception as e:
             logger.error(f"Chyba při kopírování do schránky: {e}")
             return f"Chyba: {e}"
 
-    def _cmd_create_file(self, path: str) -> str:
-        """Vytvoří soubor"""
+    def _cmd_create_file(self, path: str = '') -> str:
         try:
-            Path(path).touch()
-            return "ok"
+            p = Path(path).expanduser()
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.touch()
+            return f"Soubor vytvořen: {p}"
         except Exception as e:
             logger.error(f"Chyba při vytváření souboru: {e}")
             return f"Chyba: {e}"
 
-    def _cmd_move_file(self, src: str, dst: str) -> str:
-        """Přesune soubor"""
+    def _cmd_move_file(self, src: str = '', dst: str = '') -> str:
         try:
-            shutil.move(src, dst)
-            return "ok"
+            shutil.move(str(Path(src).expanduser()), str(Path(dst).expanduser()))
+            return f"Přesunuto: {src} → {dst}"
         except Exception as e:
-            logger.error(f"Chyba při přesunování souboru: {e}")
-            return f"Chyba: {e}"
-            return f"Aplikace '{app}' nenalezena"
-
-        if app_cmd == "spotify":
-            if args:
-                query = " ".join(str(a) for a in args)
-                return self._cmd_spotify_play(query)
-            return self._launch_spotify()
-
-        cmd = f"{app_cmd} {' '.join(str(a) for a in (args or []))}"
-        try:
-            subprocess.Popen(cmd, shell=True)
-            return "ok"
-        except Exception as e:
-            logger.error(f"Chyba při otevírání aplikace: {e}")
+            logger.error(f"Chyba při přesunu: {e}")
             return f"Chyba: {e}"
 
-    def _launch_spotify(self) -> str:
-        """Otevře Spotify aplikaci nebo web"""
-        uri = "spotify:"
+    def _cmd_delete_file(self, path: str = '') -> str:
         try:
-            if shutil.which("spotify"):
-                subprocess.Popen(["spotify"])
+            p = Path(path).expanduser()
+            try:
+                res = subprocess.run(["gio", "trash", str(p)], capture_output=True)
+                if res.returncode == 0:
+                    return f"Přesunuto do koše: {p}"
+            except Exception:
+                pass
+            if p.is_file():
+                p.unlink()
+            elif p.is_dir():
+                shutil.rmtree(p)
+            return f"Smazáno: {p}"
+        except Exception as e:
+            logger.error(f"Chyba při mazání: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_find_files(self, name: str = '', path: str = '~') -> str:
+        try:
+            search_path = Path(path).expanduser()
+            result = subprocess.run(['find', str(search_path), '-iname', f'*{name}*', '-maxdepth', '6'], capture_output=True, text=True, timeout=10)
+            files = [f for f in result.stdout.strip().split('\n') if f][:10]
+            return '\n'.join(files) if files else 'Nic nenalezeno.'
+        except Exception as e:
+            logger.error(f"Chyba při hledání: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_install_app(self, name: str = '') -> str:
+        try:
+            subprocess.Popen(['pkexec', 'apt', 'install', '-y', name])
+            return f"Instaluji: {name}"
+        except Exception as e:
+            logger.error(f"Chyba instalace: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_uninstall_app(self, name: str = '') -> str:
+        try:
+            subprocess.Popen(['pkexec', 'apt', 'remove', '-y', name])
+            return f"Odinstaluji: {name}"
+        except Exception as e:
+            logger.error(f"Chyba odinstalace: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_run_script(self, path: str = '') -> str:
+        try:
+            subprocess.Popen(['bash', str(Path(path).expanduser())])
+            return f"Spouštím: {path}"
+        except Exception as e:
+            logger.error(f"Chyba spuštění skriptu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_memory_recall(self, query: str = '', top_k: int = 5) -> str:
+        try:
+            from memory import JarvisMemory
+            mem = JarvisMemory(self.config)
+            results = mem.recall(query, top_k=top_k)
+            if not results:
+                return 'Nic nenalezeno v paměti.'
+            resp = f'Nalezeno {len(results)} vzpomínek:\n'
+            for i, r in enumerate(results, 1):
+                resp += f"{i}. [{r['score']:.2f}] {r['content'][:100]}...\n"
+            return resp
+        except Exception as e:
+            logger.error(f"Chyba paměti: {e}")
+            return f"Chyba paměti: {e}"
+
+    def _cmd_memory_store(self, content: str = '', importance: float = 0.5) -> str:
+        try:
+            from memory import JarvisMemory
+            mem = JarvisMemory(self.config)
+            mem_id = mem.store(content, importance=importance)
+            return f"Uloženo do paměti (ID: {mem_id})."
+        except Exception as e:
+            logger.error(f"Chyba paměti: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_memory_stats(self) -> str:
+        try:
+            from memory import JarvisMemory
+            mem = JarvisMemory(self.config)
+            stats = mem.stats()
+            return f"Paměť: {stats.get('total_memories', 0)} položek, průměrná důležitost: {stats.get('avg_importance', 0):.2f}"
+        except Exception as e:
+            logger.error(f"Chyba paměti: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_memory_maintenance(self) -> str:
+        try:
+            from memory import JarvisMemory
+            mem = JarvisMemory(self.config)
+            result = mem.run_maintenance()
+            return f"Údržba dokončena: {result}"
+        except Exception as e:
+            logger.error(f"Chyba paměti: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_translate(self, text: str, from_lang: str = 'auto', to_lang: str = 'cs') -> str:
+        try:
+            import requests as _req
+            lang_map = {'cs': 'češtiny', 'en': 'angličtiny', 'de': 'němčiny', 'fr': 'francouzštiny', 'es': 'španělštiny', 'sk': 'slovenštiny'}
+            to_name = lang_map.get(to_lang, to_lang)
+            prompt = f"Přelož přesně do {to_name}, vrať pouze překlad bez vysvětlení:\n{text}"
+            model = self.config.get('ollama_model', 'qwen2.5:3b')
+            payload = {'model': model, 'messages': [{'role': 'user', 'content': prompt}], 'stream': False, 'options': {'temperature': 0.1, 'num_predict': 500}}
+            r = _req.post('http://localhost:11434/api/chat', json=payload, timeout=30)
+            r.raise_for_status()
+            translated = r.json().get('message', {}).get('content', '').strip()
+            return f"Překlad: {translated}"
+        except Exception as e:
+            logger.error(f"Chyba překladu: {e}")
+            return f"Chyba překladu: {e}"
+
+    def _cmd_note_add(self, note: str) -> str:
+        try:
+            notes_file = os.path.join(_HOME, 'jarvis_notes.txt')
+            with open(notes_file, 'a', encoding='utf-8') as f:
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                f.write(f"[{timestamp}] {note}\n")
+            return 'Poznámka uložena.'
+        except Exception as e:
+            logger.error(f"Chyba při zapisování poznámky: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_note_list(self) -> str:
+        try:
+            notes_file = os.path.join(_HOME, 'jarvis_notes.txt')
+            if os.path.exists(notes_file):
+                with open(notes_file, 'r', encoding='utf-8') as f:
+                    notes = f.read().strip()
+                return notes if notes else 'Žádné poznámky.'
+            return 'Žádné poznámky.'
+        except Exception as e:
+            logger.error(f"Chyba při čtení poznámek: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_reminder_set(self, text: str, time_str: str) -> str:
+        try:
+            import threading
+            def remind():
+                time.sleep(60)
+                logger.info(f"Připomínka: {text}")
+            thread = threading.Thread(target=remind, daemon=True)
+            thread.start()
+            return f"Připomínka nastavena: {text}"
+        except Exception as e:
+            logger.error(f"Chyba při nastavování připomínky: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_wiki_search(self, query: str) -> str:
+        try:
+            import requests
+            url = f"https://cs.wikipedia.org/api/rest_v1/page/summary/{quote(query)}"
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get('extract', 'Nenalezeno.').split('.')[0] + '.'
+            return 'Nenalezeno na Wikipedii.'
+        except Exception as e:
+            logger.error(f"Chyba wiki: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_currency_convert(self, amount: float, from_curr: str, to_curr: str) -> str:
+        try:
+            rates = {'USD': 1.0, 'EUR': 0.85, 'CZK': 25.0}
+            if from_curr.upper() in rates and to_curr.upper() in rates:
+                result = amount * rates[to_curr.upper()] / rates[from_curr.upper()]
+                return f"{amount} {from_curr.upper()} = {result:.2f} {to_curr.upper()}"
+            return 'Nepodporované měny.'
+        except Exception as e:
+            logger.error(f"Chyba při převodu měny: {e}")
+            return f"Chyba: {e}"
+
+    # Jednoduché no-op akce
+    def _cmd_clear_history(self) -> str:
+        return 'ok'
+
+    def _cmd_answer(self) -> str:
+        return 'ok'
+
+    def _cmd_vscode_open(self, path: str = '') -> str:
+        try:
+            p = str(Path(path).expanduser())
+            subprocess.Popen(['code', p])
+            return f"Otevřeno ve VSCode: {p}"
+        except Exception as e:
+            logger.error(f"Chyba při otevírání VSCode: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_vscode_new_file(self) -> str:
+        try:
+            if HAS_PYAUTOGUI:
+                time.sleep(0.5)
+                pyautogui.hotkey('ctrl', 'n')
+                return 'ok'
+            return 'pyautogui není nainstalován'
+        except Exception as e:
+            logger.error(f"Chyba při vytváření nového souboru: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_set_timer(self, seconds: int, label: str = 'Timer') -> str:
+        import threading
+        def fire():
+            time.sleep(seconds)
+            logger.info(f"Timer {label} vypršel")
+        threading.Thread(target=fire, daemon=True).start()
+        m, s = divmod(seconds, 60)
+        h, m = divmod(m, 60)
+        dur = f"{h}h {m}m {s}s" if h else (f"{m}m {s}s" if m else f"{s}s")
+        return f"Timer nastaven na {dur}"
+
+    def _cmd_kill_process(self, name: str) -> str:
+        try:
+            killed = 0
+            for proc in psutil.process_iter(['name']):
+                if proc.info['name'] and name.lower() in proc.info['name'].lower():
+                    try:
+                        proc.kill()
+                        killed += 1
+                    except Exception:
+                        pass
+            return f"Ukončeno: {killed} procesů" if killed else f"Proces '{name}' nenalezen"
+        except Exception as e:
+            logger.error(f"Chyba při ukončování procesu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_write_email(self, to: str = '', subject: str = '', body: str = '') -> str:
+        try:
+            mailto = f"mailto:{to}?subject={quote(subject)}&body={quote(body)}"
+            webbrowser.open(mailto)
+            return 'ok'
+        except Exception as e:
+            logger.error(f"Chyba při otevírání emailu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_shutdown(self, delay: int = 0) -> str:
+        try:
+            if self.is_windows:
+                subprocess.run(['shutdown', '/s', '/t', str(delay)], check=False)
             else:
-                subprocess.Popen(["xdg-open", uri])
-            return "ok"
+                cmd = ['shutdown', '-h', f'+{delay // 60}'] if delay else ['shutdown', '-h', 'now']
+                subprocess.run(cmd, check=False)
+            return 'ok'
         except Exception as e:
-            logger.warning(f"Spotify launch fallback selhal: {e}")
-            try:
-                webbrowser.open("https://open.spotify.com/")
-                return "ok"
-            except Exception as exc:
-                return f"Chyba: {exc}"
+            logger.error(f"Chyba při vypínání: {e}")
+            return f"Chyba: {e}"
 
-    def _cmd_spotify_play(self, query: str, index: int = 1, audio_only: bool = False) -> str:
-        """Přehrát skladbu na Spotify"""
-        if not query:
-            return self._launch_spotify()
-
-        uri = f"spotify:search:{quote(query)}"
+    def _cmd_restart(self, delay: int = 0) -> str:
         try:
-            if shutil.which("spotify"):
-                subprocess.Popen(["xdg-open", uri])
-                return "ok"
-            subprocess.Popen(["xdg-open", uri])
-            return "ok"
+            if self.is_windows:
+                subprocess.run(['shutdown', '/r', '/t', str(delay)], check=False)
+            else:
+                subprocess.run(['reboot'], check=False)
+            return 'ok'
         except Exception as e:
-            logger.warning(f"Spotify search selhalo: {e}")
-            try:
-                webbrowser.open(f"https://open.spotify.com/search/{quote(query)}")
-                return "ok"
-            except Exception as exc:
-                return f"Chyba: {exc}"
+            logger.error(f"Chyba při restartu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_weather(self, city: str = '') -> str:
+        try:
+            from urllib.parse import quote as _q
+            url = f"https://wttr.in/{_q(city)}?format=3" if city else "https://wttr.in/?format=3"
+            resp = __import__('requests').get(url, timeout=8, headers={'User-Agent': 'curl/7.0'})
+            return resp.text.strip()
+        except Exception as e:
+            logger.error(f"Chyba počasí: {e}")
+            return f"Chyba počasí: {e}"
+
+    def _cmd_set_brightness(self, level: int = 50) -> str:
+        try:
+            level = max(1, min(100, int(level)))
+            if self.is_linux:
+                if subprocess.run(['which', 'brightnessctl'], capture_output=True).returncode == 0:
+                    subprocess.run(['brightnessctl', 'set', f'{level}%'], capture_output=True)
+                else:
+                    displays = subprocess.check_output("xrandr | grep ' connected' | awk '{print $1}'", shell=True, text=True).strip().split('\n')
+                    for d in displays:
+                        subprocess.run(['xrandr', '--output', d, '--brightness', str(level / 100)])
+            return f"Jas: {level}%"
+        except Exception as e:
+            logger.error(f"Chyba při nastavování jasu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_sleep_pc(self) -> str:
+        try:
+            if self.is_windows:
+                subprocess.run(['rundll32.exe', 'powrprof.dll,SetSuspendState', '0,1,0'], check=False)
+            else:
+                subprocess.run(['systemctl', 'suspend'], check=False)
+            return 'ok'
+        except Exception as e:
+            logger.error(f"Chyba při uspání: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_update_system(self) -> str:
+        try:
+            if self.is_linux:
+                subprocess.Popen(['pkexec', 'bash', '-c', 'apt update && apt upgrade -y'])
+            return 'Spouštím aktualizaci...'
+        except Exception as e:
+            logger.error(f"Chyba při aktualizaci: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_create_folder(self, path: str = '') -> str:
+        try:
+            p = Path(path).expanduser()
+            p.mkdir(parents=True, exist_ok=True)
+            return f"Složka vytvořena: {p}"
+        except Exception as e:
+            logger.error(f"Chyba při vytváření složky: {e}")
+            return f"Chyba: {e}"
+
+    # Jednoduché no-op akce
+    def _cmd_clear_history(self) -> str:
+        return 'ok'
+
+    def _cmd_answer(self) -> str:
+        return 'ok'
+
+    def _cmd_vscode_open(self, path: str = '') -> str:
+        try:
+            p = str(Path(path).expanduser())
+            subprocess.Popen(['code', p])
+            return f"Otevřeno ve VSCode: {p}"
+        except Exception as e:
+            logger.error(f"Chyba při otevírání VSCode: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_vscode_new_file(self) -> str:
+        try:
+            if HAS_PYAUTOGUI:
+                time.sleep(0.5)
+                pyautogui.hotkey('ctrl', 'n')
+                return 'ok'
+            return 'pyautogui není nainstalován'
+        except Exception as e:
+            logger.error(f"Chyba při vytváření nového souboru: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_set_timer(self, seconds: int, label: str = 'Timer') -> str:
+        import threading
+        def fire():
+            time.sleep(seconds)
+            logger.info(f"Timer {label} vypršel")
+        threading.Thread(target=fire, daemon=True).start()
+        m, s = divmod(seconds, 60)
+        h, m = divmod(m, 60)
+        dur = f"{h}h {m}m {s}s" if h else (f"{m}m {s}s" if m else f"{s}s")
+        return f"Timer nastaven na {dur}"
+
+    def _cmd_kill_process(self, name: str) -> str:
+        try:
+            killed = 0
+            for proc in psutil.process_iter(['name']):
+                if proc.info['name'] and name.lower() in proc.info['name'].lower():
+                    try:
+                        proc.kill()
+                        killed += 1
+                    except Exception:
+                        pass
+            return f"Ukončeno: {killed} procesů" if killed else f"Proces '{name}' nenalezen"
+        except Exception as e:
+            logger.error(f"Chyba při ukončování procesu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_write_email(self, to: str = '', subject: str = '', body: str = '') -> str:
+        try:
+            mailto = f"mailto:{to}?subject={quote(subject)}&body={quote(body)}"
+            webbrowser.open(mailto)
+            return 'ok'
+        except Exception as e:
+            logger.error(f"Chyba při otevírání emailu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_shutdown(self, delay: int = 0) -> str:
+        try:
+            if self.is_windows:
+                subprocess.run(['shutdown', '/s', '/t', str(delay)], check=False)
+            else:
+                cmd = ['shutdown', '-h', f'+{delay // 60}'] if delay else ['shutdown', '-h', 'now']
+                subprocess.run(cmd, check=False)
+            return 'ok'
+        except Exception as e:
+            logger.error(f"Chyba při vypínání: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_restart(self, delay: int = 0) -> str:
+        try:
+            if self.is_windows:
+                subprocess.run(['shutdown', '/r', '/t', str(delay)], check=False)
+            else:
+                subprocess.run(['reboot'], check=False)
+            return 'ok'
+        except Exception as e:
+            logger.error(f"Chyba při restartu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_weather(self, city: str = '') -> str:
+        try:
+            from urllib.parse import quote as _q
+            url = f"https://wttr.in/{_q(city)}?format=3" if city else "https://wttr.in/?format=3"
+            resp = __import__('requests').get(url, timeout=8, headers={'User-Agent': 'curl/7.0'})
+            return resp.text.strip()
+        except Exception as e:
+            logger.error(f"Chyba počasí: {e}")
+            return f"Chyba počasí: {e}"
+
+    def _cmd_set_brightness(self, level: int = 50) -> str:
+        try:
+            level = max(1, min(100, int(level)))
+            if self.is_linux:
+                if subprocess.run(['which', 'brightnessctl'], capture_output=True).returncode == 0:
+                    subprocess.run(['brightnessctl', 'set', f'{level}%'], capture_output=True)
+                else:
+                    displays = subprocess.check_output("xrandr | grep ' connected' | awk '{print $1}'", shell=True, text=True).strip().split('\n')
+                    for d in displays:
+                        subprocess.run(['xrandr', '--output', d, '--brightness', str(level / 100)])
+            return f"Jas: {level}%"
+        except Exception as e:
+            logger.error(f"Chyba při nastavování jasu: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_sleep_pc(self) -> str:
+        try:
+            if self.is_windows:
+                subprocess.run(['rundll32.exe', 'powrprof.dll,SetSuspendState', '0,1,0'], check=False)
+            else:
+                subprocess.run(['systemctl', 'suspend'], check=False)
+            return 'ok'
+        except Exception as e:
+            logger.error(f"Chyba při uspání: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_update_system(self) -> str:
+        try:
+            if self.is_linux:
+                subprocess.Popen(['pkexec', 'bash', '-c', 'apt update && apt upgrade -y'])
+            return 'Spouštím aktualizaci...'
+        except Exception as e:
+            logger.error(f"Chyba při aktualizaci: {e}")
+            return f"Chyba: {e}"
+
+    def _cmd_create_folder(self, path: str = '') -> str:
+        try:
+            p = Path(path).expanduser()
+            p.mkdir(parents=True, exist_ok=True)
+            return f"Složka vytvořena: {p}"
+        except Exception as e:
+            logger.error(f"Chyba při vytváření složky: {e}")
+            return f"Chyba: {e}"
 
     def _cmd_youtube_play(self, query: str, index: int = 1, audio_only: bool = False) -> str:
         """Přehraje video/audio pomocí yt-dlp + ffplay (bez prohlížeče)."""

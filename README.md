@@ -1,13 +1,16 @@
 # JARVIS v3.1 — Lokální AI asistent
 
-Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český hlas, ovládání celého PC, dlouhodobá paměť a rozšiřitelný skill systém.
+Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český hlas, ovládání celého PC, dlouhodobá paměť, MCP integrace a rozšiřitelný skill systém.
+
+[![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
 
 ## Obsah
 - [Rychlý start](#rychlý-start)
 - [Co umí](#co-umí)
-- [Architektura](#architektura)
+- [MCP integrace](#mcp-integrace)
 - [Skills — přidání vlastního](#skills--přidání-vlastního)
 - [Smart Memory](#smart-memory)
+- [Architektura](#architektura)
 - [Konfigurace](#konfigurace)
 - [Troubleshooting](#troubleshooting)
 - [Vývoj a testy](#vývoj-a-testy)
@@ -46,7 +49,7 @@ cp jarvis.desktop ~/Plocha/
 
 ## Co umí
 
-### Hlasové a textové ovládání PC
+### Ovládání PC
 | Příkaz | Akce |
 |---|---|
 | „Otevři Chrome / Discord / Spotify" | Spustí aplikaci |
@@ -70,7 +73,7 @@ cp jarvis.desktop ~/Plocha/
 ### YouTube & média
 | Příkaz | Akce |
 |---|---|
-| „Zahraj Bohemian Rhapsody" | yt-dlp + ffplay |
+| „Zahraj Bohemian Rhapsody" | yt-dlp + ffplay (bez prohlížeče) |
 | „Stáhni video X" | yt-dlp download |
 | „Info o videu X" | Metadata bez stažení |
 | „Titulky k videu X" | yt-dlp subtitles |
@@ -83,7 +86,7 @@ cp jarvis.desktop ~/Plocha/
 | „Počasí Praha" | wttr.in |
 | „Co je Python?" | Wikipedia |
 | „Přelož hello world" | Ollama překlad |
-| „Vypočítej 15% z 200" | Lokální kalkulačka |
+| „Vypočítej 15% z 200" | Sandbox kalkulačka |
 | „Zapamatuj si X" | Neural memory |
 | „Co si pamatuješ o X?" | Recall z memory |
 | Obecná otázka / kód / matematika | Ollama LLM |
@@ -91,67 +94,45 @@ cp jarvis.desktop ~/Plocha/
 ### Produktivita
 | Příkaz | Akce |
 |---|---|
-| „Timer 5 minut" | Odpočet + notifikace |
-| „Zkopíruj tento text" | Schránka |
+| „Timer 5 minut" | Odpočet + hlasová notifikace |
+| „Zkopíruj tento text" | Schránka (xclip/pyperclip) |
 | „Přidej poznámku nakoupit chleba" | `~/jarvis_notes.txt` |
-| „Zobraz poznámky" | Výpis poznámek |
 
 ### Wake Word
-Řekni **„Jarvis"** — asistent se probudí a začne poslouchat bez kliknutí.
+Řekni **„Jarvis"** — asistent se probudí a začne poslouchat bez kliknutí. Mikrofon je uvolněn pro STT (žádná kolize).
 
 ---
 
-## Architektura
+## MCP integrace
 
-```
-jarvis.py           — bootstrap (11 řádků)
-app_core.py         — orchestrátor, event loop, security, wake word
-gui.py              — sci-fi HUD GUI (customtkinter + animovaný orb)
-llm.py              — lokální router + Ollama streaming + user profil inject
-commands.py         — implementace všech akcí (~60 příkazů)
-tts.py              — edge-tts / pyttsx3, threading.Lock (bez dvojího hlasu)
-stt.py              — Google STT + offline Sphinx fallback
-memory.py           — neural memory + DailySummarizer
-user_profile.py     — permanentní fakta o uživateli (nikdy nedecay)
-security_v2.py      — audit log, permission levels, dangerous pattern detection
-event_bus.py        — pub/sub event systém
-agents.py           — background agents (CPU/RAM monitor, idle detector)
-scheduler.py        — plánování úloh (at/after/every/every_day_at)
-plugin_system.py    — skill loader (manifest.json + lazy loading)
-llm_router.py       — LLM router 2.0 (task detection, model fallback)
-dashboard.py        — web dashboard FastAPI (port 8002)
-wake_word_detector.py — wake word detekce (porpoise / SR fallback)
-```
+JARVIS integruje [Model Context Protocol](https://modelcontextprotocol.io) pro pokročilé schopnosti. Servery běží přes `npx` jako subprocesy.
 
-### Datový tok
+### Dostupné MCP skills
 
-```
-Uživatel (hlas/text)
-  │
-  ▼
-JarvisApp._process_command()
-  ├─ 1. Plugin/Skill routes   (greeting, calculator, timer, clipboard…)
-  ├─ 2. Lokální router        (95% příkazů bez LLM — otevři, hlasitost…)
-  └─ 3. Ollama LLM stream     (AI konverzace, kód, překlad, vysvětlení)
-           │
-           ├─ UserProfile kontext (jméno, město, zájmy…)
-           └─ Neural memory kontext (relevantní vzpomínky)
-  │
-  ▼
-Security check → CommandExecutor → TTS (fronta, bez double-speak)
+| Skill | Příkaz | API klíč |
+|---|---|---|
+| **Filesystem** | „přečti soubor notes.txt", „strom ~/Projekty", „hledej v souborech TODO" | ❌ není potřeba |
+| **Web Fetch** | „hledej online Python asyncio", „načti stránku github.com" | ❌ není potřeba |
+| **Git** | „git log", „git status", „git diff", „větve" | ❌ není potřeba |
+| **Memory Graph** | „zapamatuj si X", „co víš o X", „zapomeň X" | ❌ není potřeba |
+| **Brave Search** | „vyhledej X", „novinky o X" | ✅ BRAVE_API_KEY |
+
+### Konfigurace Brave Search
+```bash
+# Nastav do .env (nikdy do gitu!)
+echo "BRAVE_API_KEY=tvůj_klíč" >> .env
+# Klíč zdarma: https://api.search.brave.com/
 ```
 
-### Skills pipeline
-
+### Přidání vlastního MCP serveru
+```python
+# mcp_bridge.py → create_mcp_bridge()
+bridge.register(MCPServerConfig(
+    name="muj-server",
+    command="npx",
+    args=["-y", "@muj/mcp-server"],
+))
 ```
-plugins/custom/
-├── greeting/         ← manifest.json + skill.py
-├── calculator/       ← výpočty, procenta
-├── timer/            ← timer/alarm hlasem
-└── clipboard/        ← schránka (xclip/pyperclip)
-```
-
-Každý skill je **izolovaná složka** — stačí přidat novou a JARVIS ji načte automaticky při startu.
 
 ---
 
@@ -167,7 +148,7 @@ Vytvoř složku v `plugins/custom/muj_skill/`:
   "description": "Co skill dělá",
   "author": "Tvoje jméno",
   "permissions": ["answer"],
-  "triggers": ["klíčové", "slovo"]
+  "triggers": ["klíčové slovo"]
 }
 ```
 
@@ -187,90 +168,136 @@ def get_actions():
     return {}
 ```
 
-Žádný restart není potřeba pokud zavoláš `plugin_manager.reload_plugin("muj_skill")`. Při příštím startu se načte automaticky.
+Při příštím startu se načte automaticky. Žádný restart kódu není potřeba.
 
 ---
 
 ## Smart Memory
 
-JARVIS si pamatuje informace o tobě **permanentně** (přes restarty):
+JARVIS si pamatuje informace o tobě **permanentně** (přes restarty).
 
 ### User Profile (`~/.jarvis_user_profile.json`)
-Při každé konverzaci JARVIS automaticky extrahuje fakta:
+Fakta se extrahují automaticky z každé konverzace:
 - „jmenuji se Petr" → `jméno: Petr`
 - „bydlím v Brně" → `město: Brno`
 - „baví mě python" → `zájmy: [python]`
 
 Profil se vkládá do každého LLM dotazu — JARVIS ví kdo jsi.
 
-### Daily Summarizer
-Každou půlnoc Ollama zpracuje dnešní konverzace, extrahuje fakta a uloží je do profilu. Výsledné shrnutí je dostupné v neural memory s tagy `daily_summary`.
-
-### Neural Memory (`memory_data/`)
+### Neural Memory / JSON Memory (`memory_data/`)
 - Ukládá konverzace s důležitostí a tagy
-- Sémantické vyhledávání pro LLM kontext
-- Automatický decay neaktivních vzpomínek (konverzace decayují, user fakta nikdy)
-- Auto-maintenance každých 6 hodin
+- Keyword recall s recency scoring
+- Automatický decay + maintenance každých 6 hodin
+- Funguje bez externích závislostí (vestavěný JSON fallback)
 
-### Příkazy pro paměť
+### Daily Summarizer
+Každou půlnoc Ollama zpracuje dnešní konverzace a extrahuje fakta do UserProfile.
+
+### MCP Knowledge Graph (`~/.jarvis_mcp_memory/`)
+Persistentní knowledge graph přes `@modelcontextprotocol/server-memory` — entity a vztahy.
+
+---
+
+## Architektura
+
 ```
-„Zapamatuj si [informace]"    → uloží do neural memory
-„Co si pamatuješ o [téma]?"   → recall z memory
-„Statistiky paměti"           → počet vzpomínek, avg importance
-„Údržba paměti"               → spustí decay + merge
+jarvis.py               — bootstrap (10 řádků)
+app_core.py             — orchestrátor, event loop, security, wake word, MCP init
+gui.py                  — sci-fi HUD GUI (customtkinter + animovaný orb + volume display)
+llm.py                  — lokální router + Ollama streaming + user profil inject
+commands.py             — implementace 60+ příkazů (YouTube, soubory, systém…)
+tts.py                  — edge-tts / pyttsx3, queue worker (sériové přehrávání)
+stt.py                  — Google STT + offline Sphinx fallback
+memory.py               — JSON memory + DailySummarizer
+user_profile.py         — permanentní fakta o uživateli
+security_v2.py          — audit log, 3 úrovně oprávnění, dangerous patterns
+event_bus.py            — pub/sub event systém
+agents.py               — background agents (CPU/RAM monitor, idle detector)
+scheduler.py            — plánování úloh (at/after/every/every_day_at)
+plugin_system.py        — skill loader (manifest.json + lazy loading)
+mcp_bridge.py           — MCP klient (filesystem, brave-search, git, memory)
+dashboard.py            — web dashboard FastAPI (port 8002)
+wake_word_detector.py   — wake word detekce (pause/resume při STT)
+
+plugins/custom/
+├── greeting/           — pozdravy dle denní doby
+├── calculator/         — výpočty, procenta, sqrt
+├── timer/              — timer/alarm hlasem + callback
+├── clipboard/          — schránka (xclip/pyperclip)
+├── mcp_filesystem/     — čtení souborů, strom, full-text hledání
+├── mcp_fetch/          — DuckDuckGo search + URL fetch
+├── mcp_git/            — git log/status/diff/blame
+├── mcp_brave/          — Brave Search (vyžaduje API klíč)
+└── mcp_memory/         — knowledge graph přes MCP
+```
+
+### Datový tok
+
+```
+Uživatel (hlas/text)
+  │
+  ▼
+JarvisApp._process_command()
+  ├─ 1. Skill routes     (greeting, calculator, timer, MCP skills…)
+  ├─ 2. Lokální router   (95% příkazů bez LLM — otevři, hlasitost…)
+  └─ 3. Ollama stream    (AI konverzace, kód, překlad, vysvětlení)
+           │
+           ├─ UserProfile kontext (jméno, město, zájmy…)
+           └─ Memory kontext (relevantní vzpomínky)
+  │
+  ▼
+Security check → CommandExecutor / MCP → TTS worker queue
 ```
 
 ---
 
 ## Konfigurace
 
-### config.json (hlavní)
+### config.json
 ```json
 {
-  "ollama_url":   "http://localhost:11434/api/chat",
-  "ollama_model": "qwen2.5:3b",
-  "tts_enabled":  true,
-  "tts_voice":    "cs-CZ-AntoninNeural",
-  "tts_rate":     170,
-  "history_size": 20,
-  "stt_language": "cs-CZ",
-  "wake_word":    "jarvis",
+  "ollama_url":        "http://localhost:11434/api/chat",
+  "ollama_model":      "qwen2.5:3b",
+  "tts_enabled":       true,
+  "tts_voice":         "cs-CZ-AntoninNeural",
+  "tts_rate":          170,
+  "stt_language":      "cs-CZ",
+  "wake_word":         "jarvis",
   "wake_word_enabled": true
 }
 ```
 
-Model lze měnit přímo v GUI — uloží se automaticky.
-
-### Dostupné hlasy (edge-tts)
-- `cs-CZ-AntoninNeural` — muž (výchozí)
-- `cs-CZ-VlastaNeural` — žena
+### .env (secrets — není v gitu)
+```bash
+cp .env.example .env
+# Vyplň:
+BRAVE_API_KEY=tvůj_klíč   # pro Brave Search MCP
+```
 
 ### Doporučené modely Ollama
-| Model | Rychlost | Kvalita | RAM |
+| Model | RAM | Rychlost | Kvalita |
 |---|---|---|---|
-| `qwen2.5:3b` | ⚡⚡⚡ | ★★★ | ~3 GB |
-| `llama3.2:3b` | ⚡⚡ | ★★★ | ~3 GB |
-| `llama3.1:8b` | ⚡ | ★★★★★ | ~8 GB |
+| `qwen2.5:3b` | ~3 GB | ⚡⚡⚡ | ★★★ |
+| `llama3.2:3b` | ~3 GB | ⚡⚡⚡ | ★★★ |
+| `llama3.1:8b` | ~8 GB | ⚡ | ★★★★★ |
 
-### Security (`security_v2.py`)
-Tříúrovňový systém oprávnění:
+### Security
 - **SAFE** — vždy povoleno (čas, počasí, otevřít URL…)
 - **STANDARD** — bez potvrzení (vytvořit soubor, poznámka…)
-- **ELEVATED** — vyžaduje potvrzení dialogem (smazat soubor, kill process, shutdown…)
+- **ELEVATED** — dialog potvrzení (smazat soubor, shutdown…)
 
-Audit log se ukládá do `~/.jarvis_audit.jsonl`.
+Audit log: `~/.jarvis_audit.jsonl`
 
 ---
 
 ## Web Dashboard
 
-Dostupný na **http://localhost:8002** — spouští se automaticky se JARVIS.
+**http://localhost:8002** — spouští se automaticky se JARVIS.
 
-Zobrazuje:
 - CPU / RAM / Disk v reálném čase
 - Status Ollama + aktuální model
 - Stav background agentů
-- Naplánované úlohy (scheduler)
+- Naplánované úlohy
 - Audit log (posledních 20 akcí)
 - Live logy přes WebSocket
 
@@ -280,16 +307,15 @@ Zobrazuje:
 
 ### Ollama se nespustí
 ```bash
-curl http://localhost:11434/api/tags   # test připojení
-ollama serve                           # manuální start
-ollama pull qwen2.5:3b                 # stáhni model
+curl http://localhost:11434/api/tags
+ollama serve
+ollama pull qwen2.5:3b
 ```
 
-### TTS nefunguje / není slyšet
+### TTS nefunguje
 ```bash
-sudo apt install ffmpeg mpg123         # audio přehrávač
-pip install edge-tts                   # TTS engine
-python -c "import edge_tts; print('OK')"
+sudo apt install ffmpeg mpg123
+pip install edge-tts
 ```
 
 ### Mikrofon nefunguje
@@ -298,16 +324,18 @@ sudo usermod -a -G audio $USER
 python -c "import speech_recognition as sr; print(sr.Microphone.list_microphone_names())"
 ```
 
-### Wake word nefunguje
+### MCP filesystem nefunguje
 ```bash
-pip install porpoise                   # nejlehčí detektor
-# nebo — funguje i bez porpoise (SR fallback)
+node --version        # potřeba Node.js 18+
+npx --version
+npx -y @modelcontextprotocol/server-filesystem ~
 ```
 
-### Dashboard nedostupný (port 8002)
+### Brave Search nefunguje
 ```bash
-python dashboard.py                    # manuální start
-curl http://localhost:8002/            # test
+# Zkontroluj .env
+cat .env | grep BRAVE
+# Klíč zdarma: https://api.search.brave.com/
 ```
 
 ---
@@ -317,12 +345,13 @@ curl http://localhost:8002/            # test
 ### Spuštění testů
 ```bash
 source ~/Stažené/jarvis-env/bin/activate
-cd "/home/simi/Stažené/nepojmenovaná složka"
 python -m pytest test_jarvis.py -v
 ```
 
-54 testů pokrývá: config, STT, TTS (lock/stop), LLM router, CommandExecutor,
-AsyncEngine, ErrorHandler, PluginManager, Security (audit log, dangerous patterns, confirm_action).
+**82 testů** pokrývají: config, STT, TTS (worker queue), LocalRouter, CommandExecutor (sandbox kalkulačka), AsyncEngine, ErrorHandler, PluginManager, Security (audit, dangerous patterns), WakeWord (pause/resume), UserProfile (normalizace diakritiky), GUI (headless).
+
+### CI/CD
+GitHub Actions běží automaticky na každý push — Python 3.11 + 3.12, ubuntu-latest.
 
 ### Závislosti
 ```bash
@@ -332,29 +361,29 @@ pip install -r requirements.txt
 | Balíček | Účel |
 |---|---|
 | `customtkinter` | Sci-fi HUD GUI |
-| `requests` | Ollama API, počasí |
+| `requests` | Ollama API, počasí, web fetch |
 | `edge-tts` | Kvalitní český hlas |
-| `yt-dlp` | YouTube přehrávání a stahování |
-| `ffplay` (ffmpeg) | Audio přehrávač |
-| `pyautogui` | Klávesnice/myš simulace |
-| `psutil` | Systémové info a procesy |
+| `yt-dlp` | YouTube bez prohlížeče |
+| `ffplay` (ffmpeg) | Audio/video přehrávač |
+| `mcp` | Model Context Protocol klient |
 | `fastapi` + `uvicorn` | Web dashboard |
+| `psutil` | Systémové metriky |
 | `SpeechRecognition` + `PyAudio` | Mikrofon (volitelné) |
 
-### Přidání nové akce (bez skill systému)
-1. Přidej pattern do `LocalRouter.route()` v `llm.py`
-2. Implementuj `_cmd_nazev_akce()` v `commands.py`
-3. Přidej akci do `ACTION_PERMISSIONS` v `security_v2.py`
-4. Přidej unit test do `test_jarvis.py`
+### Přidání nové akce
+1. Pattern do `LocalRouter.route()` v `llm.py`
+2. Implementace `_cmd_nazev()` v `commands.py`
+3. Oprávnění do `ACTION_PERMISSIONS` v `security_v2.py`
+4. Test do `test_jarvis.py`
 
 ---
 
 ## Požadavky
 
 - Python 3.11+
-- [Ollama](https://ollama.com) — `ollama serve` + `ollama pull qwen2.5:3b`
-- ffmpeg — `sudo apt install ffmpeg` (TTS + YouTube)
-- brightnessctl — `sudo apt install brightnessctl` (jas, volitelné)
+- Node.js 18+ (pro MCP servery)
+- [Ollama](https://ollama.com) — `ollama pull qwen2.5:3b`
+- ffmpeg — `sudo apt install ffmpeg`
 
 ---
 
