@@ -248,7 +248,12 @@ class JarvisGUI:
         )
         self._input.pack(side="left", fill="x", expand=True, pady=11)
         self._input.bind("<Return>", self._on_enter)
+        self._input.bind("<Up>",     self._history_prev)
+        self._input.bind("<Down>",   self._history_next)
         self._input.focus()
+        self._history: list[str] = []
+        self._history_idx: int = -1
+        self._history_draft: str = ""
 
     # ── CHAT HELPERS ────────────────────────────────────
 
@@ -346,11 +351,40 @@ class JarvisGUI:
     def _on_enter(self, event=None):
         self._send()
 
+    def _history_prev(self, event=None):
+        if not self._history:
+            return "break"
+        if self._history_idx == -1:
+            self._history_draft = self._input.get()
+            self._history_idx = len(self._history) - 1
+        elif self._history_idx > 0:
+            self._history_idx -= 1
+        self._input.delete(0, "end")
+        self._input.insert(0, self._history[self._history_idx])
+        return "break"
+
+    def _history_next(self, event=None):
+        if self._history_idx == -1:
+            return "break"
+        if self._history_idx < len(self._history) - 1:
+            self._history_idx += 1
+            self._input.delete(0, "end")
+            self._input.insert(0, self._history[self._history_idx])
+        else:
+            self._history_idx = -1
+            self._input.delete(0, "end")
+            self._input.insert(0, self._history_draft)
+        return "break"
+
     def _send(self):
         text = self._input.get().strip()
         if not text:
             return
         self._input.delete(0, "end")
+        if not self._history or self._history[-1] != text:
+            self._history.append(text)
+        self._history_idx = -1
+        self._history_draft = ""
         if self.on_send:
             self.on_send(text)
         else:

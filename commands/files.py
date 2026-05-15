@@ -8,7 +8,7 @@ import webbrowser
 from pathlib import Path
 from urllib.parse import quote
 
-from .utils import safe_run
+from .utils import safe_run, validate_path
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +50,13 @@ def cmd_create_file(path: str = "") -> str:
 
 
 def cmd_delete_file(path: str = "") -> str:
-    p = Path(path).expanduser()
+    try:
+        p = validate_path(path, must_exist=True)
+    except ValueError as e:
+        return f"Chyba: {e}"
     result = safe_run(["gio", "trash", str(p)], timeout=5.0)
     if result["rc"] == 0:
         return f"Přesunuto do koše: {p}"
-    # gio není k dispozici nebo selhalo — smaž přímo
     try:
         if p.is_file():
             p.unlink()
@@ -67,8 +69,13 @@ def cmd_delete_file(path: str = "") -> str:
 
 def cmd_move_file(src: str = "", dst: str = "") -> str:
     try:
-        shutil.move(str(Path(src).expanduser()), str(Path(dst).expanduser()))
-        return f"Přesunuto: {src} → {dst}"
+        src_p = validate_path(src, must_exist=True)
+        dst_p = validate_path(dst)
+    except ValueError as e:
+        return f"Chyba: {e}"
+    try:
+        shutil.move(str(src_p), str(dst_p))
+        return f"Přesunuto: {src_p} → {dst_p}"
     except Exception as e:
         return f"Chyba přesunu: {e}"
 

@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 import psutil
 
-from .utils import safe_run
+from .utils import safe_run, validate_package_name
 
 logger = logging.getLogger(__name__)
 
@@ -80,11 +80,19 @@ def cmd_kill_process(name: str) -> str:
 
 
 def cmd_install_app(name: str = "") -> str:
+    try:
+        name = validate_package_name(name)
+    except ValueError as e:
+        return f"Chyba: {e}"
     safe_run(["pkexec", "apt", "install", "-y", name], bg=True)
     return f"Instaluji: {name}"
 
 
 def cmd_uninstall_app(name: str = "") -> str:
+    try:
+        name = validate_package_name(name)
+    except ValueError as e:
+        return f"Chyba: {e}"
     safe_run(["pkexec", "apt", "remove", "-y", name], bg=True)
     return f"Odinstaluji: {name}"
 

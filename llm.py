@@ -58,6 +58,9 @@ Mám brain-inspired paměť, která:
 - Automaticky zapomíná nepodstatné věci
 - Poskytuje kontext pro lepší odpovědi
 
+Pokud nevíš co uživatel chce (nejasný příkaz), VŽDY se zeptej upřesňující otázkou místo hádání.
+Příklad: "Chceš otevřít web, spustit aplikaci, nebo něco jiného?"
+
 Neodpovídej žádným COMMAND formátem — to zpracovává lokální systém automaticky."""
 
 
@@ -344,6 +347,15 @@ class LocalRouter:
                 return f"Zjišťuji info: {query}", {
                     "action": "youtube_info", "params": {"query": query}}
 
+        # ── URL v textu → vždy otevři prohlížeč (před hudbou!) ──────
+        url_early = re.search(r"(https?://\S+|\b\w[\w.-]+\.\w{2,}\S*)", text)
+        if url_early and re.search(r"\b(spust|otevri|naviguj|jdi\s+na|web|stranku|prohlizec|browser|chromium|firefox|chrome)\b", t):
+            url = url_early.group(1)
+            if not url.startswith("http"):
+                url = "https://" + url
+            return f"Otevírám {url}.", {
+                "action": "open_url", "params": {"url": url}}
+
         # ── HUDBA ─────────────────────────────────────
         if re.search(r"\b(pust|zahraj|prehraj|spust|play)\b", t):
             audio_only = bool(re.search(r"\b(jen\s+zvuk|audio|mp3|poslouchat)\b", t))
@@ -514,6 +526,15 @@ class LocalRouter:
         if re.search(r"\b(údržba\s+paměti|memory\s+maintenance)\b", t):
             return "Spouštím údržbu paměti.", {
                 "action": "memory_maintenance", "params": {}}
+
+        # ── FALLBACK: jakákoliv URL v textu → otevři ─────────
+        url_fb = re.search(r"(https?://\S+|\b\w[\w.-]+\.(cz|com|org|net|io|sk|de|eu)\S*)", text)
+        if url_fb:
+            url = url_fb.group(1)
+            if not url.startswith("http"):
+                url = "https://" + url
+            return f"Otevírám {url}.", {
+                "action": "open_url", "params": {"url": url}}
 
         # Nerozpoznáno → LLM
         return None, None

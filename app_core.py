@@ -428,8 +428,10 @@ class JarvisApp:
             try:
                 pattern = route.get("pattern")
                 handler = route.get("handler")
+                plugin_name = route.get("plugin", "?")
                 if pattern and handler and pattern.search(text):
-                    result = handler(text)
+                    result = self.plugin_manager.call_route(
+                        handler, text, plugin_name=plugin_name)
                     if result and result[0] is not None:
                         return result
             except Exception as e:
@@ -478,8 +480,11 @@ class JarvisApp:
                 if self.plugin_manager:
                     plugin_action = self.plugin_manager.get_action(action)
                     if plugin_action:
-                        result = plugin_action(**params)
-                        if result and result != "ok":
+                        result, err = self.plugin_manager.call_action(
+                            plugin_action, plugin_name=action, **params)
+                        if err:
+                            logger.warning(f"Plugin akce '{action}' selhala: {err}")
+                        elif result and result != "ok":
                             self._gui(lambda r=result: self.gui.set_status(f"↳ {r}"))
                             logger.info(f"Plugin výsledek: {result}")
                         return

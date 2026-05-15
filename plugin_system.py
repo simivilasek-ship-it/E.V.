@@ -14,10 +14,14 @@ import importlib
 import importlib.util
 import inspect
 import logging
+import concurrent.futures
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
+
+_PLUGIN_ROUTE_TIMEOUT = 3.0   # max sekundy na jedno routování
+_PLUGIN_ACTION_TIMEOUT = 10.0  # max sekundy na jedno vykonání akce
 
 logger = logging.getLogger(__name__)
 
@@ -340,6 +344,47 @@ class PluginManager:
         return None
 
     # ── Getters ───────────────────────────────────────
+
+    # ── Timeout-safe volání ───────────────────────────
+
+    @staticmethod
+    def _call_with_timeout(fn: Callable, args: tuple, kwargs: dict,
+                           timeout: float, plugin_name: str = "?"):
+        """Spustí callable s časovým limitem. Vrátí (result, error_str).
+
+        Executor se uzavírá s wait=False aby hlavní vlákno neblokoval,
+        pokud plugin přesáhl timeout a stále běží v pozadí.
+        """
+        ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
+            fut = ex.submit(fn, *args, **kwargs)
+            try:
+                return fut.result(timeout=timeout), None
+            except concurrent.futures.TimeoutError:
+                msg = f"Plugin '{plugin_name}' timeout ({timeout}s)"
+                logger.warning(msg)
+                fut.cancel()
+                return None, msg
+            except Exception as e:
+                logger.error(f"Plugin '{plugin_name}' výjimka: {e}")
+                return None, str(e)
+        finally:
+            ex.shutdown(wait=False)
+
+    def call_route(self, handler: Callable, text: str,
+                   plugin_name: str = "?") -> Optional[Tuple]:
+        """Zavolá plugin route handler s timeoutem."""
+        result, err = self._call_with_timeout(
+            handler, (text,), {}, _PLUGIN_ROUTE_TIMEOUT, plugin_name)
+        if err:
+            return None
+        return result
+
+    def call_action(self, action_fn: Callable, plugin_name: str = "?",
+                    **kwargs) -> Tuple[Optional[Any], Optional[str]]:
+        """Zavolá plugin action s timeoutem. Vrátí (result, error)."""
+        return self._call_with_timeout(
+            action_fn, (), kwargs, _PLUGIN_ACTION_TIMEOUT, plugin_name)
 
     def get_routes(self) -> List[Dict[str, Any]]:
         return list(self._routes)

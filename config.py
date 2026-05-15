@@ -65,6 +65,13 @@ DEFAULT_CONFIG = {
     "audit_enabled": True,
     # Memory
     "memory_dir": "memory_data",
+    # MCP defaults
+    "mcp_filesystem_enabled": True,
+    "mcp_git_enabled": True,
+    "mcp_memory_enabled": True,
+    "mcp_brave_enabled": False,
+    "mcp_fetch_enabled": True,
+    "mcp_playwright_enabled": False,
 }
 
 
@@ -81,7 +88,7 @@ def _load_env() -> Dict[str, Any]:
     if not os.path.exists(env_path):
         return {}
     
-    load_dotenv(env_path)
+    load_dotenv(env_path, override=True)
     
     # Mapování env proměnných → config klíče
     env_mapping = {
@@ -109,6 +116,13 @@ def _load_env() -> Dict[str, Any]:
         "AUDIT_LOG_FILE": "audit_log_file",
         "AUDIT_ENABLED": ("audit_enabled", lambda x: x.lower() == "true"),
         "MEMORY_DIR": "memory_dir",
+        "BRAVE_API_KEY": "brave_api_key",
+        "MCP_FILESYSTEM_ENABLED": ("mcp_filesystem_enabled", lambda x: x.lower() == "true"),
+        "MCP_GIT_ENABLED":        ("mcp_git_enabled",        lambda x: x.lower() == "true"),
+        "MCP_MEMORY_ENABLED":     ("mcp_memory_enabled",     lambda x: x.lower() == "true"),
+        "MCP_BRAVE_ENABLED":      ("mcp_brave_enabled",      lambda x: x.lower() == "true"),
+        "MCP_FETCH_ENABLED":      ("mcp_fetch_enabled",      lambda x: x.lower() == "true"),
+        "MCP_PLAYWRIGHT_ENABLED": ("mcp_playwright_enabled", lambda x: x.lower() == "true"),
     }
     
     config = {}
