@@ -147,12 +147,18 @@ class MCPBridge:
                                 parts.append(item.text)
                             elif hasattr(item, "data"):
                                 parts.append(str(item.data))
-                        return "\n".join(parts) if parts else "(prázdný výsledek)"
+                        text = "\n".join(parts) if parts else "(prázdný výsledek)"
+                        # Ochrana LLM před obřím výstupem (HTML stránky apod.)
+                        if len(text) > 32_000:
+                            text = text[:32_000] + "\n…[výstup zkrácen]"
+                        return text
             except Exception as e:
                 logger.error(f"MCP call '{server_name}/{tool_name}': {e}")
-                return f"Chyba MCP: {e}"
+                return f"Chyba MCP ({server_name}/{tool_name}): {e}"
 
-        return self._run(server_name, _call())
+        result = self._run(server_name, _call())
+        # _run vrací string při chybě/timeoutu — propaguj ho
+        return result if result is not None else f"Chyba MCP ({server_name}): žádný výsledek"
 
     # ── Pomocné ───────────────────────────────────────
 
@@ -178,14 +184,15 @@ class MCPBridge:
 
         t = threading.Thread(target=_thread_target, daemon=True)
         t.start()
-        t.join(timeout=60)   # max 60s na odpověď serveru
+        t.join(timeout=30)   # max 30s na odpověď serveru
 
         if exc_container[0]:
-            logger.error(f"MCP chyba ({server_name}): {exc_container[0]}")
-            return None
+            err = str(exc_container[0])
+            logger.error(f"MCP chyba ({server_name}): {err}")
+            return f"Chyba MCP ({server_name}): {err}"
         if t.is_alive():
-            logger.error(f"MCP timeout ({server_name}): server neodpověděl do 60s")
-            return None
+            logger.error(f"MCP timeout ({server_name}): server neodpověděl do 30s")
+            return f"Chyba MCP ({server_name}): timeout (server neodpověděl do 30 s)"
         return result_container[0]
 
     def list_tools(self) -> List[MCPTool]:
@@ -305,6 +312,15 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
         command="uvx",
         args=["mcp-server-time", "--local-timezone=Europe/Prague"],
         enabled=config.get("mcp_time_enabled", True),
+    ))
+
+    # ── Computer Control MCP (pyautogui + OCR + okna) ─
+    # Vyžaduje DISPLAY proměnnou (X11). Na Linuxu funguje nativně.
+    bridge.register(MCPServerConfig(
+        name="computer-control",
+        command="uvx",
+        args=["computer-control-mcp", "server"],
+        enabled=config.get("mcp_computer_control_enabled", True),
     ))
 
     return bridge

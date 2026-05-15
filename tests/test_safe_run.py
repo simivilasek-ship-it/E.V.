@@ -53,3 +53,26 @@ class TestSafeRun:
         r = safe_run(["_neexistuje_bg_"], bg=True)
         assert r["rc"] == -1
         assert "nenalezen" in r["stderr"]
+
+    def test_stdout_a_stderr_oddelene(self):
+        r = safe_run(["python3", "-c",
+                      "import sys; print('out'); sys.stderr.write('err')"])
+        assert "out" in r["stdout"]
+        assert "err" in r["stderr"]
+
+    def test_cwd_parametr(self):
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as d:
+            r = safe_run(["pwd"], cwd=d)
+            assert r["rc"] == 0
+            assert os.path.realpath(d) in os.path.realpath(r["stdout"].strip())
+
+    def test_cmd_string_misto_listu(self):
+        with pytest.raises(ValueError, match="list"):
+            safe_run("ls -la")
+
+    def test_velky_vystup(self):
+        # safe_run musí zvládnout velký stdout bez OOM
+        r = safe_run(["python3", "-c", "print('x' * 100_000)"])
+        assert r["rc"] == 0
+        assert len(r["stdout"]) > 90_000
