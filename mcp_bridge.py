@@ -238,11 +238,11 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
         enabled=config.get("mcp_git_enabled", True),
     ))
 
-    # ── Fetch MCP (web fetching / simple scraping) ─────
+    # ── Fetch MCP — správný balíček je mcp-server-fetch přes uvx ─────
     bridge.register(MCPServerConfig(
         name="fetch",
-        command="npx",
-        args=["-y", "@modelcontextprotocol/server-fetch", "--transport", "stdio"],
+        command="uvx",
+        args=["mcp-server-fetch"],
         enabled=config.get("mcp_fetch_enabled", True),
     ))
 
