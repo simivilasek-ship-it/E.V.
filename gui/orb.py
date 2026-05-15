@@ -149,23 +149,49 @@ class OrbCanvas(tk.Canvas):
 
 
 class MiniOrbCanvas(OrbCanvas):
-    """Malý orb pro top bar — 48×48 px, méně částic."""
+    """Malý orb pro top bar — 48×48 px, méně částic, pomalejší refresh."""
 
     SIZE = 48
+    _N_PARTICLES = 10
+    _REFRESH_MS  = 80
 
     def __init__(self, parent, **kw):
-        # Přeskočí OrbCanvas.__init__ a zavolá Canvas přímo
-        tk.Canvas.__init__(self, parent, width=self.SIZE, height=self.SIZE,
-                           bg=BG, highlightthickness=0, bd=0, **kw)
-        self.cx = self.cy = self.SIZE / 2
-        self._state     = "idle"
-        self._color     = ORB_COLORS["idle"]
-        self._tgt       = self._color
-        self._lerp_t    = 1.0
-        self._frame     = 0
-        self._pulse     = 0.0
-        self._ring_a    = 0.0
-        self._ring2_a   = 0.0
-        self._running   = True
-        self._particles = [Particle(self.cx, self.cy) for _ in range(12)]
-        self._animate()
+        super().__init__(parent, **kw)
+        # Zmenš počet částic z 55 na 10 (super() už vytvořil 55)
+        self._particles = [Particle(self.cx, self.cy) for _ in range(self._N_PARTICLES)]
+
+    def _animate(self):
+        if not self._running:
+            return
+        self._frame += 1
+        sm = self._speed_mult
+        self._pulse   += 0.06 * sm
+        self._ring_a   = (self._ring_a  + 1.1 * sm) % 360
+        self._ring2_a  = (self._ring2_a - 0.7 * sm) % 360
+        if self._lerp_t < 1.0:
+            self._lerp_t = min(1.0, self._lerp_t + 0.06 * sm)
+            self._color  = lerp(self._color, self._tgt, self._lerp_t)
+        self._draw()
+        self.after(self._REFRESH_MS, self._animate)
+
+    def _draw(self):
+        self.delete("all")
+        cx, cy = self.cx, self.cy
+        r = 14
+        # Glow
+        pulse = math.sin(self._pulse) * 3
+        for base_r, alpha in [(r + 4, 0.4), (r + 8, 0.2), (r + 12, 0.08)]:
+            gr = base_r + pulse * (base_r / 26)
+            c  = blend(self._color, BG, alpha)
+            self.create_oval(cx - gr, cy - gr, cx + gr, cy + gr, fill=c, outline="")
+        # Core
+        self.create_oval(cx - r, cy - r, cx + r, cy + r,
+                         fill=blend(self._color, BG, 0.25),
+                         outline=self._color, width=1)
+        # Particles (orbit_r scaled to fit 48px)
+        sm = self._speed_mult
+        for p in self._particles:
+            x, y, _ = p.pos(self._frame, sm, 0.18)
+            if 1 < x < self.SIZE - 1 and 1 < y < self.SIZE - 1:
+                self.create_oval(x - 1, y - 1, x + 1, y + 1,
+                                 fill=blend(self._color, BG, 0.7), outline="")

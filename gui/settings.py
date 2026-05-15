@@ -61,9 +61,10 @@ def open_settings(self):
     )
     energy_slider.pack(anchor="w", padx=12, pady=(0, 6), fill="x")
 
-    self._energy_lbl = ctk.CTkLabel(scroll, text="300",
-                                     font=("Courier New", 10), text_color=FG2)
-    self._energy_lbl.pack(anchor="w", padx=12, pady=(0, 12))
+    energy_lbl = ctk.CTkLabel(scroll, text=str(self._energy_var.get()),
+                               font=("Courier New", 10), text_color=FG2)
+    energy_lbl.pack(anchor="w", padx=12, pady=(0, 12))
+    self._energy_lbl = energy_lbl  # slider callback používá self._energy_lbl
 
     ctk.CTkLabel(scroll, text="Nižší = citlivější",
                  font=("Courier New", 8), text_color=BORDER).pack(anchor="w", padx=12)
@@ -87,9 +88,10 @@ def open_settings(self):
     )
     tts_slider.pack(anchor="w", padx=12, pady=(0, 6), fill="x")
 
-    self._tts_lbl = ctk.CTkLabel(scroll, text="170",
-                                  font=("Courier New", 10), text_color=FG2)
-    self._tts_lbl.pack(anchor="w", padx=12, pady=(0, 12))
+    tts_lbl = ctk.CTkLabel(scroll, text=str(self._tts_var.get()),
+                            font=("Courier New", 10), text_color=FG2)
+    tts_lbl.pack(anchor="w", padx=12, pady=(0, 12))
+    self._tts_lbl = tts_lbl  # slider callback používá self._tts_lbl
 
     ctk.CTkLabel(scroll, text="Vyšší = rychleji",
                  font=("Courier New", 8), text_color=BORDER).pack(anchor="w", padx=12)

@@ -16,10 +16,9 @@ import customtkinter as ctk
 from gui.constants import (
     BG, BG2, BG3, FG, FG2, BORDER,
     CYAN, CYAN2, GREEN, RED, PURPLE,
-    ORB_COLORS, STATE_LABELS,
-    blend, lerp,
+    ORB_COLORS, STATE_ICON,
 )
-from gui.orb import OrbCanvas, MiniOrbCanvas
+from gui.orb import MiniOrbCanvas
 
 FONT_MONO   = ("Courier New", 11)
 FONT_MONO_S = ("Courier New", 9)
@@ -31,12 +30,6 @@ STATE_COLOR = {
     "listening": GREEN,
     "thinking":  PURPLE,
     "speaking":  CYAN,
-}
-STATE_ICON = {
-    "idle":      "○",
-    "listening": "◉",
-    "thinking":  "◎",
-    "speaking":  "●",
 }
 
 
@@ -217,10 +210,10 @@ class JarvisGUI:
         ctk.CTkFrame(bar, fg_color=BORDER, width=1, height=28,
                      corner_radius=0).pack(side="left", padx=10, pady=14)
 
-        # Akční ikony před send
-        for txt, cmd in [("🗑", self._clear_chat),
-                         ("💾", self._export_chat),
-                         ("🧠", self._clear_mem)]:
+        # Akční ikony — reversed() zachová vizuální pořadí 🗑 💾 🧠 při pack(side=right)
+        for txt, cmd in reversed([("🗑", self._clear_chat),
+                                   ("💾", self._export_chat),
+                                   ("🧠", self._clear_mem)]):
             ctk.CTkButton(
                 bar, text=txt,
                 font=("DM Sans", 13),
@@ -292,9 +285,11 @@ class JarvisGUI:
                 m = re.search(r"(\d+)%", result.stdout)
                 if m:
                     pct = int(m.group(1))
-                    icon = "🔊" if pct > 50 else ("🔉" if pct > 0 else "🔇")
-                    col  = RED if pct > 90 else (CYAN if pct > 50 else FG2)
-                    self._vol_lbl.configure(text=f"{icon} {pct}%", text_color=col)
+                    if pct != getattr(self, "_last_vol_pct", None):
+                        self._last_vol_pct = pct
+                        icon = "🔊" if pct > 50 else ("🔉" if pct > 0 else "🔇")
+                        col  = RED if pct > 90 else (CYAN if pct > 50 else FG2)
+                        self._vol_lbl.configure(text=f"{icon} {pct}%", text_color=col)
         except Exception:
             pass
         self.root.after(3000, self._refresh_vol)

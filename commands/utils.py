@@ -29,9 +29,9 @@ def safe_run(
 
     Args:
         cmd:     příkaz jako list (nikdy string se shell=True)
-        timeout: maximální doba čekání v sekundách
+        timeout: maximální doba čekání v sekundách (ignorováno pokud bg=True)
         cwd:     pracovní adresář (None = aktuální)
-        bg:      True = spusť na pozadí a ihned vrať
+        bg:      True = spusť na pozadí a ihned vrať (Popen, timeout se neaplikuje)
 
     Returns:
         {"rc": int, "stdout": str, "stderr": str, "timeout": bool}
@@ -68,6 +68,55 @@ def safe_run(
         return {"rc": -1, "stdout": "", "stderr": str(e), "timeout": False}
 
 _HOME = str(Path.home())
+
+
+# ── Vstupní validace ─────────────────────────────────
+
+_PKG_RE = __import__("re").compile(r"^[a-zA-Z0-9][a-zA-Z0-9\-\_\.+]*$")
+
+
+def validate_package_name(name: str) -> str:
+    """Ověří název apt balíčku — povoleny jen bezpečné znaky.
+
+    Returns:
+        Oříznutý název pokud je validní.
+    Raises:
+        ValueError: pokud název obsahuje nebezpečné znaky.
+    """
+    name = name.strip()
+    if not name:
+        raise ValueError("Název balíčku nesmí být prázdný")
+    if len(name) > 128:
+        raise ValueError("Název balíčku je příliš dlouhý")
+    if not _PKG_RE.match(name):
+        raise ValueError(f"Neplatný název balíčku: {name!r} "
+                         "(povoleno: a-z A-Z 0-9 - _ . +)")
+    return name
+
+
+def validate_path(path: str, must_exist: bool = False) -> Path:
+    """Canonicalizuje cestu a zabrání path traversal útokům.
+
+    Pravidla:
+    - Expanduje ~ a proměnné prostředí
+    - Zabrání ../../../etc/passwd stylu přes resolve()
+    - Odmítne prázdné cesty
+
+    Returns:
+        Absolutní Path objekt.
+    Raises:
+        ValueError: pokud je cesta prázdná nebo nebezpečná.
+    """
+    if not path or not path.strip():
+        raise ValueError("Cesta nesmí být prázdná")
+    p = Path(path.strip()).expanduser()
+    try:
+        resolved = p.resolve()
+    except Exception as e:
+        raise ValueError(f"Nelze zpracovat cestu: {e}") from e
+    if must_exist and not resolved.exists():
+        raise ValueError(f"Cesta neexistuje: {resolved}")
+    return resolved
 
 
 def cmd_calculate(expr: str) -> str:
