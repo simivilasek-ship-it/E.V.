@@ -1,0 +1,8 @@
+{
+  "name": "mcp_sequential_thinking",
+  "version": "1.0.0",
+  "description": "Krok-za-krokem přemýšlení pro složité úkoly",
+  "author": "JARVIS",
+  "permissions": ["answer"],
+  "triggers": ["premysli", "rozmysli", "krok za krokem", "analyze step by step"]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "mcp_puppeteer",
+  "version": "1.0.0",
+  "description": "Browser automation — screenshot, navigace, klikání přes Puppeteer MCP",
+  "author": "JARVIS",
+  "permissions": ["answer"],
+  "triggers": ["screenshot", "otevri v prohlizeci", "klikni na", "puppeteer"]
+}

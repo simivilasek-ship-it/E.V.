@@ -238,7 +238,24 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
         enabled=config.get("mcp_git_enabled", True),
     ))
 
+    # ── Fetch MCP (web fetching / simple scraping) ─────
+    bridge.register(MCPServerConfig(
+        name="fetch",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-fetch", "--transport", "stdio"],
+        enabled=config.get("mcp_fetch_enabled", True),
+    ))
+
+    # ── Playwright MCP (headless browsing / JS rendering)
+    bridge.register(MCPServerConfig(
+        name="playwright",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-playwright", "--transport", "stdio"],
+        enabled=config.get("mcp_playwright_enabled", False),
+    ))
+
     # ── Memory MCP — knowledge graph (bez API klíče) ──
+    mem_dir = os.path.join(os.path.expanduser("~"), ".jarvis_mcp_memory")
     mem_dir = os.path.join(os.path.expanduser("~"), ".jarvis_mcp_memory")
     os.makedirs(mem_dir, exist_ok=True)
     bridge.register(MCPServerConfig(
@@ -265,6 +282,30 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
 
     if not brave_key:
         logger.info("Brave Search MCP: BRAVE_API_KEY není nastavena → zakázáno (použij mcp_fetch)")
+
+    # ── Sequential Thinking MCP ───────────────────────
+    bridge.register(MCPServerConfig(
+        name="sequential-thinking",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-sequential-thinking"],
+        enabled=config.get("mcp_sequential_thinking_enabled", True),
+    ))
+
+    # ── Puppeteer MCP (browser automation) ───────────
+    bridge.register(MCPServerConfig(
+        name="puppeteer",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-puppeteer"],
+        enabled=config.get("mcp_puppeteer_enabled", True),
+    ))
+
+    # ── Time MCP ─────────────────────────────────────
+    bridge.register(MCPServerConfig(
+        name="time",
+        command="uvx",
+        args=["mcp-server-time", "--local-timezone=Europe/Prague"],
+        enabled=config.get("mcp_time_enabled", True),
+    ))
 
     return bridge
 
