@@ -159,22 +159,33 @@ class JarvisApp:
             logger.info(f"MCP bridge inicializován: {self.mcp.get_server_names()}")
         except Exception as e:
             logger.warning(f"MCP bridge init selhal: {e}")
-        self._init_react_agent()
+        self._init_agents()
 
-    def _init_react_agent(self):
-        """Inicializuje ReAct agenta (lazy — až po MCP a commands)."""
+    def _init_agents(self):
+        """Inicializuje ReAct agenta a grafového agenta."""
+        url   = CONFIG.get("ollama_url",   "http://localhost:11434/api/chat")
+        model = CONFIG.get("ollama_model", "qwen2.5:3b")
+        mcp   = getattr(self, "mcp", None)
+
         try:
             from agent_react import get_react_agent
             self.react_agent = get_react_agent(
-                executor=self.cmd,
-                mcp_bridge=getattr(self, "mcp", None),
-                ollama_url=CONFIG.get("ollama_url", "http://localhost:11434/api/chat"),
-                model=CONFIG.get("ollama_model", "qwen2.5:3b"),
-            )
+                executor=self.cmd, mcp_bridge=mcp,
+                ollama_url=url, model=model)
             logger.info("ReactAgent připraven")
         except Exception as e:
             self.react_agent = None
             logger.warning(f"ReactAgent init selhal: {e}")
+
+        try:
+            from agent_graph import get_graph_agent
+            self.graph_agent = get_graph_agent(
+                executor=self.cmd, mcp_bridge=mcp,
+                ollama_url=url, model=model)
+            logger.info("GraphAgent připraven")
+        except Exception as e:
+            self.graph_agent = None
+            logger.warning(f"GraphAgent init selhal: {e}")
 
     def _wire_skill_callbacks(self):
         """Naváže callbacks do skill modulů po jejich načtení."""
@@ -380,13 +391,25 @@ class JarvisApp:
                 self._execute_result(msg, action_data)
                 return
 
-            # 3. Vícesvůlový úkol → ReAct agent
+            # 3. Složitý úkol → Grafový agent (Planner+Router+Executor+Critic)
+            from agent_graph import should_handle as _graph_should
+            if getattr(self, "graph_agent", None) and _graph_should(text):
+                self._gui(lambda: self.gui.set_status("Plánovač přemýšlí…"))
+
+                def _on_graph_step(s: str):
+                    self._gui(lambda m=s: self.gui.set_status(m))
+
+                answer = self.graph_agent.run(text, on_step=_on_graph_step)
+                self._execute_result(answer, {"action": "answer", "params": {}})
+                return
+
+            # 3b. Vícesvůlový úkol → ReAct agent (fallback)
             from agent_react import should_handle as _react_should
             if getattr(self, "react_agent", None) and _react_should(text):
                 self._gui(lambda: self.gui.set_status("Agent přemýšlí…"))
 
-                def _on_step(step_text: str):
-                    self._gui(lambda s=step_text: self.gui.set_status(s))
+                def _on_step(s: str):
+                    self._gui(lambda m=s: self.gui.set_status(m))
 
                 answer = self.react_agent.run(text, on_step=_on_step)
                 self._execute_result(answer, {"action": "answer", "params": {}})
