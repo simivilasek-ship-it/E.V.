@@ -1,4 +1,4 @@
-# JARVIS v3.2 — Lokální AI asistent
+# JARVIS v3.3 — Lokální AI asistent
 
 Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český hlas, ovládání celého PC, dlouhodobá paměť, MCP integrace a rozšiřitelný skill systém.
 
@@ -14,6 +14,22 @@ Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český 
 - [Konfigurace](#konfigurace)
 - [Troubleshooting](#troubleshooting)
 - [Vývoj a testy](#vývoj-a-testy)
+
+---
+
+## Co je nového v v3.3
+
+| Změna | Detail |
+|---|---|
+| **GUI package** | `gui.py` → `gui/` balíček (orb, chat, settings, constants, app_window) |
+| **OpenCode styl** | Nový design — top bar, fullwidth chat, bottom input |
+| **safe_run helper** | Všechny subprocess volání bez `shell=True` — ochrana před shell injection |
+| **Router fix** | „spust/pust chrome" správně otevírá aplikaci místo YouTube |
+| **Security cleanup** | `security.py` smazán, vše v `security_v2.py` + zpětně kompatibilní aliasy |
+| **commands package** | `commands.py` (1323 ř.) → `commands/` balíček (system, apps, media, files, utils) |
+| **SQLite memory** | `memory.py` přešel z JSON na SQLite — rychlejší recall, automatická migrace |
+| **Lazy init** | `app_core.py` načítá těžké moduly až na vyžádání → rychlejší start |
+| **CI: Xvfb** | GUI testy v CI/CD přes virtual framebuffer, coverage upload |
 
 ---
 
@@ -213,14 +229,19 @@ Persistentní knowledge graph přes `@modelcontextprotocol/server-memory` — en
 ```
 jarvis.py               — bootstrap (10 řádků)
 app_core.py             — orchestrátor, event loop, lazy init (rychlý start)
-gui.py                  — sci-fi HUD GUI (Ctrl+L vymazat, Ctrl+E export do .md)
+gui/                    — GUI package (OpenCode styl — top bar, fullwidth chat)
+  ├── app_window.py     — JarvisGUI hlavní okno + všechny callbacks
+  ├── orb.py            — animovaný orb + částice
+  ├── chat.py           — chat panel, render zpráv, export do .md
+  ├── settings.py       — SettingsDialog
+  └── constants.py      — barvy, ORB_COLORS, blend/lerp
 llm.py                  — lokální router + Ollama streaming + user profil inject
 commands/               — balíček příkazů (system, apps, media, files, utils)
   ├── system.py         — shutdown, restart, hlasitost, jas, systém info
-  ├── apps.py           — open/kill/install aplikace
-  ├── media.py          — YouTube, screenshot, klávesnice, timer
-  ├── files.py          — soubory, složky, clipboard, web
-  └── utils.py          — kalkulačka, překlad, poznámky, počasí, wiki, měna
+  ├── apps.py           — open/kill/install aplikace (safe_run)
+  ├── media.py          — YouTube, screenshot, klávesnice, timer (safe_run)
+  ├── files.py          — soubory, složky, clipboard, web (safe_run)
+  └── utils.py          — kalkulačka, překlad, poznámky, počasí, wiki, měna + safe_run helper
 tts.py                  — edge-tts / pyttsx3, queue worker (sériové přehrávání)
 stt.py                  — Google STT + offline Sphinx fallback
 memory.py               — SQLite memory + DailySummarizer (migrace z JSON)
@@ -363,7 +384,7 @@ source ~/Stažené/jarvis-env/bin/activate
 python -m pytest test_jarvis.py -v
 ```
 
-**82 testů** pokrývají: config, STT, TTS (worker queue), LocalRouter, CommandExecutor (sandbox kalkulačka), AsyncEngine, ErrorHandler, PluginManager, Security (audit, dangerous patterns), WakeWord (pause/resume), UserProfile (normalizace diakritiky), GUI (headless).
+**177+ testů** pokrývají: config, STT, TTS (worker queue), LocalRouter, CommandExecutor (sandbox kalkulačka), AsyncEngine, ErrorHandler, PluginManager, Security (audit, dangerous patterns), WakeWord (pause/resume), UserProfile (normalizace diakritiky), GUI (headless), safe_run helper.
 
 ### CI/CD
 GitHub Actions běží automaticky na každý push — Python 3.11 + 3.12, ubuntu-latest.
@@ -387,9 +408,10 @@ pip install -r requirements.txt
 
 ### Přidání nové akce
 1. Pattern do `LocalRouter.route()` v `llm.py`
-2. Implementace `_cmd_nazev()` v `commands.py`
-3. Oprávnění do `ACTION_PERMISSIONS` v `security_v2.py`
-4. Test do `test_jarvis.py`
+2. Implementace `cmd_nazev()` v příslušném modulu `commands/` (system/apps/media/files/utils)
+3. Export z `commands/__init__.py` do `CommandExecutor.execute()`
+4. Oprávnění do `ACTION_PERMISSIONS` v `security_v2.py`
+5. Test do `test_jarvis.py` nebo `tests/`
 
 ---
 
