@@ -82,6 +82,12 @@ safety>=2.3.0
 
 # neural-ai-memory[local]>=0.1.0  # volitelné — JARVIS má vlastní JSON fallback
 
+# ═════════════════════════════════════════════════════
+# EMBEDDINGY — lokální sémantické vyhledávání
+# ═════════════════════════════════════════════════════
+
+sentence-transformers
+
 # MCP — Model Context Protocol
 mcp>=1.0.0
 

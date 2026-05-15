@@ -24,6 +24,58 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
+# ══════════════════════════════════════════════════════
+#  EMBEDDING ENGINE (opt-in — sentence-transformers)
+# ══════════════════════════════════════════════════════
+
+class EmbeddingEngine:
+    """Lokální embeddingy přes sentence-transformers. Fallback: TF-IDF keyword overlap."""
+
+    MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
+    def __init__(self):
+        self._model = None
+        self._available = False
+        try:
+            from sentence_transformers import SentenceTransformer
+            self._model = SentenceTransformer(self.MODEL)
+            self._available = True
+            logger.info("EmbeddingEngine: sentence-transformers OK")
+        except ImportError:
+            logger.info("EmbeddingEngine: sentence-transformers není — používám keyword fallback")
+
+    def encode(self, text: str) -> list:
+        if self._available and self._model:
+            return self._model.encode(text).tolist()
+        return []  # prázdné = fallback na keyword search
+
+    def similarity(self, a: str, b: str) -> float:
+        """Kosinová podobnost. Pokud embeddingy nejsou, vrátí keyword overlap score."""
+        if self._available and self._model:
+            import numpy as np
+            va = self._model.encode(a)
+            vb = self._model.encode(b)
+            return float(np.dot(va, vb) / (np.linalg.norm(va) * np.linalg.norm(vb) + 1e-9))
+        # Fallback: keyword overlap
+        sa, sb = set(a.lower().split()), set(b.lower().split())
+        return len(sa & sb) / (len(sa | sb) + 1e-9)
+
+    @property
+    def available(self) -> bool:
+        return self._available
+
+
+_embedding_engine: "EmbeddingEngine | None" = None
+
+
+def get_embedding_engine() -> EmbeddingEngine:
+    global _embedding_engine
+    if _embedding_engine is None:
+        _embedding_engine = EmbeddingEngine()
+    return _embedding_engine
+
+
 # ══════════════════════════════════════════════════════
 #  VESTAVĚNÁ JSON PAMĚŤ (fallback — bez závislostí)
 # ══════════════════════════════════════════════════════
@@ -111,6 +163,7 @@ class _SQLiteMemoryStore:
     def recall(self, query: str, top_k: int, min_importance: float) -> List[dict]:
         q_words = set(query.lower().split())
         now = time.time()
+        engine = get_embedding_engine()
         with self._lock, self._connect() as con:
             rows = con.execute(
                 "SELECT * FROM memories WHERE importance >= ?",
@@ -119,15 +172,23 @@ class _SQLiteMemoryStore:
 
         results = []
         for row in rows:
-            c_words = set(row["content"].lower().split())
-            overlap = len(q_words & c_words)
-            if overlap == 0:
-                continue
             age_days = (now - row["created_at"]) / 86400
             recency  = _math.exp(-age_days / 14)
-            score    = (0.5 * overlap / max(len(q_words), 1)
-                        + 0.3 * row["importance"]
-                        + 0.2 * recency)
+            if engine.available:
+                sem_score = engine.similarity(query, row["content"])
+                score = (0.5 * sem_score
+                         + 0.3 * row["importance"]
+                         + 0.2 * recency)
+                if sem_score == 0.0:
+                    continue
+            else:
+                c_words = set(row["content"].lower().split())
+                overlap = len(q_words & c_words)
+                if overlap == 0:
+                    continue
+                score = (0.5 * overlap / max(len(q_words), 1)
+                         + 0.3 * row["importance"]
+                         + 0.2 * recency)
             results.append({
                 "id": row["id"], "content": row["content"],
                 "importance": row["importance"],
