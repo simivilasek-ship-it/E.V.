@@ -159,6 +159,22 @@ class JarvisApp:
             logger.info(f"MCP bridge inicializován: {self.mcp.get_server_names()}")
         except Exception as e:
             logger.warning(f"MCP bridge init selhal: {e}")
+        self._init_react_agent()
+
+    def _init_react_agent(self):
+        """Inicializuje ReAct agenta (lazy — až po MCP a commands)."""
+        try:
+            from agent_react import get_react_agent
+            self.react_agent = get_react_agent(
+                executor=self.cmd,
+                mcp_bridge=getattr(self, "mcp", None),
+                ollama_url=CONFIG.get("ollama_url", "http://localhost:11434/api/chat"),
+                model=CONFIG.get("ollama_model", "qwen2.5:3b"),
+            )
+            logger.info("ReactAgent připraven")
+        except Exception as e:
+            self.react_agent = None
+            logger.warning(f"ReactAgent init selhal: {e}")
 
     def _wire_skill_callbacks(self):
         """Naváže callbacks do skill modulů po jejich načtení."""
@@ -364,7 +380,19 @@ class JarvisApp:
                 self._execute_result(msg, action_data)
                 return
 
-            # 3. Pokud nic nesedí, použij LLM
+            # 3. Vícesvůlový úkol → ReAct agent
+            from agent_react import should_handle as _react_should
+            if getattr(self, "react_agent", None) and _react_should(text):
+                self._gui(lambda: self.gui.set_status("Agent přemýšlí…"))
+
+                def _on_step(step_text: str):
+                    self._gui(lambda s=step_text: self.gui.set_status(s))
+
+                answer = self.react_agent.run(text, on_step=_on_step)
+                self._execute_result(answer, {"action": "answer", "params": {}})
+                return
+
+            # 4. Pokud nic nesedí, použij LLM
             if not self._ollama_reachable():
                 offline_msg = (
                     "Ollama není dostupná. Lokální příkazy fungují normálně — "
