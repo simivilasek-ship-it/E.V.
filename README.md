@@ -1,12 +1,15 @@
-# JARVIS v3.3 — Lokální AI asistent
+# JARVIS v4.0 — Lokální AI asistent
 
-Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český hlas, ovládání celého PC, dlouhodobá paměť, MCP integrace a rozšiřitelný skill systém.
+Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český hlas, ovládání celého PC, dlouhodobá paměť, MCP integrace, ReAct agentní plánování a multi-modalita (OCR, kamera, popis obrazovky).
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
 
 ## Obsah
 - [Rychlý start](#rychlý-start)
+- [Co je nového ve v4.0](#co-je-nového-ve-v40)
 - [Co umí](#co-umí)
+- [ReAct agent](#react-agent)
+- [Multi-modalita](#multi-modalita)
 - [MCP integrace](#mcp-integrace)
 - [Skills — přidání vlastního](#skills--přidání-vlastního)
 - [Smart Memory](#smart-memory)
@@ -17,19 +20,19 @@ Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český 
 
 ---
 
-## Co je nového v v3.3
+## Co je nového ve v4.0
 
 | Změna | Detail |
 |---|---|
-| **GUI package** | `gui.py` → `gui/` balíček (orb, chat, settings, constants, app_window) |
-| **OpenCode styl** | Nový design — top bar, fullwidth chat, bottom input |
-| **safe_run helper** | Všechny subprocess volání bez `shell=True` — ochrana před shell injection |
-| **Router fix** | „spust/pust chrome" správně otevírá aplikaci místo YouTube |
-| **Security cleanup** | `security.py` smazán, vše v `security_v2.py` + zpětně kompatibilní aliasy |
-| **commands package** | `commands.py` (1323 ř.) → `commands/` balíček (system, apps, media, files, utils) |
-| **SQLite memory** | `memory.py` přešel z JSON na SQLite — rychlejší recall, automatická migrace |
-| **Lazy init** | `app_core.py` načítá těžké moduly až na vyžádání → rychlejší start |
-| **CI: Xvfb** | GUI testy v CI/CD přes virtual framebuffer, coverage upload |
+| **ReAct agent** | Vícesvůlové úkoly — JARVIS plánuje kroky sám (Thought→Action→Observation→Answer) |
+| **Multi-modalita** | OCR textu z obrazovky, popis obrazovky přes LLaVA, webcam vstup |
+| **Computer Control MCP** | Klikání, psaní, pohyb myší, správa oken přes AI |
+| **Brave Search MCP** | Opravena inicializace — BRAVE_API_KEY načítán z `.env` přes `python-dotenv` |
+| **Nastavení GUI** | Plné nastavení (STT, TTS, MCP přepínače, logy) přes ⚙ tlačítko |
+| **Šipky v chatu** | ↑/↓ procházení historie zpráv jako v terminálu |
+| **URL router fix** | „spust web/chromium + URL" vždy otevře prohlížeč (ne YouTube) |
+| **MCP výstup** | Truncace na 32 000 znaků + timeout 30 s + chybové stringy místo None |
+| **Unit testy** | +50 testů: safe_run edge-cases, MCP bridge (mock), ReAct smyčka, Vision |
 
 ---
 
@@ -53,12 +56,11 @@ ollama serve &
 python jarvis.py
 ```
 
-### Jako ikona na ploše (Linux)
+### Pro multi-modalitu (nepovinné)
 ```bash
-cp start_jarvis.sh ~/.local/bin/start-jarvis.sh
-chmod +x ~/.local/bin/start-jarvis.sh
-cp jarvis.desktop ~/.local/share/applications/
-cp jarvis.desktop ~/Plocha/
+ollama pull llava:7b                          # popis obrazovky + webcam
+sudo apt install tesseract-ocr tesseract-ocr-ces   # OCR
+pip install pytesseract opencv-python
 ```
 
 ---
@@ -76,6 +78,9 @@ cp jarvis.desktop ~/Plocha/
 | „Najdi soubor readme" | `find` |
 | „Otevři složku X ve vscode" | VS Code |
 | „Vypni / Restartuj počítač" | Shutdown / Restart |
+| „Klikni na 500 300" | Klik na souřadnice (Computer Control MCP) |
+| „Seznam oken" | Všechna otevřená okna |
+| „Přepni na okno Chrome" | Aktivace okna |
 
 ### Zvuk, obraz, klávesnice
 | Příkaz | Akce |
@@ -86,13 +91,19 @@ cp jarvis.desktop ~/Plocha/
 | „Napíš Hello World" | Simulace klávesnice |
 | „Stiskni Ctrl+C" | pyautogui |
 
+### Multi-modalita (Vision)
+| Příkaz | Akce |
+|---|---|
+| „Co vidíš / Popiš obrazovku" | Screenshot + LLaVA popis |
+| „Přečti text z obrazovky / OCR" | pytesseract OCR |
+| „Zapni kameru / Webcam" | cv2 záběr + LLaVA popis |
+
 ### YouTube & média
 | Příkaz | Akce |
 |---|---|
 | „Zahraj Bohemian Rhapsody" | yt-dlp + ffplay (bez prohlížeče) |
 | „Stáhni video X" | yt-dlp download |
 | „Info o videu X" | Metadata bez stažení |
-| „Titulky k videu X" | yt-dlp subtitles |
 
 ### Informace a AI
 | Příkaz | Akce |
@@ -114,13 +125,11 @@ cp jarvis.desktop ~/Plocha/
 | „Zkopíruj tento text" | Schránka (xclip/pyperclip) |
 | „Přidej poznámku nakoupit chleba" | `~/jarvis_notes.txt` |
 
-### Wake Word
-Řekni **„Jarvis"** — asistent se probudí a začne poslouchat bez kliknutí. Mikrofon je uvolněn pro STT (žádná kolize).
-
 ### GUI klávesové zkratky
 | Zkratka | Akce |
 |---|---|
 | `Enter` | Odeslat příkaz |
+| `↑ / ↓` | Procházet historii zpráv (jako v terminálu) |
 | `Mezerník` | Aktivovat mikrofon (pokud focus není v inputu) |
 | `Ctrl+L` | Vymazat chat log |
 | `Ctrl+E` | Exportovat konverzaci do `.md` na plochu |
@@ -128,23 +137,106 @@ cp jarvis.desktop ~/Plocha/
 
 ---
 
+## ReAct agent
+
+JARVIS v4.0 automaticky rozpozná **vícesvůlové úkoly** a plánuje kroky sám — bez nutnosti explicitních příkazů.
+
+### Jak to funguje
+
+```
+Uživatel: "Najdi cenu RTX 4090 a ulož ji do poznámky"
+
+Thought: Musím vyhledat cenu na webu
+Action: web_search(query="RTX 4090 cena 2025")
+Observation: RTX 4090 stojí ~35 000 Kč
+
+Thought: Mám výsledek, uložím do poznámky
+Action: note_add(note="RTX 4090: ~35 000 Kč")
+Observation: Poznámka uložena.
+
+Answer: Cena RTX 4090 (~35 000 Kč) uložena do poznámek.
+```
+
+### Příklady vícesvůlových úkolů
+- „Najdi cenu GPU a ulož do poznámky"
+- „Zjisti počasí v Praze a zapiš ho"
+- „Porovnej ceny modelů RTX 4080 vs 4090"
+- „Zkontroluj web a pak otevři stránku"
+- „Ulož si co jsem dnes dělal"
+
+### Dostupné nástroje agenta
+
+| Nástroj | Popis |
+|---|---|
+| `web_search` | Brave Search nebo Google (dle konfigurace) |
+| `fetch_url` | Stáhne obsah webové stránky (MCP fetch) |
+| `note_add` / `note_list` | Poznámky |
+| `memory_store` / `memory_recall` | Dlouhodobá paměť |
+| `calculate` | Sandbox kalkulačka |
+| `get_weather` | Počasí |
+| `get_time` | Čas |
+| `open_url` / `open_app` | Prohlížeč / aplikace |
+| `screenshot` | Screenshot |
+| `wiki_search` | Wikipedia |
+| `read_file` / `list_files` | Filesystem (pokud MCP aktivní) |
+
+Jednoduchý příkaz („otevři chrome") jde přes rychlý lokální router — beze změny výkonu.
+
+---
+
+## Multi-modalita
+
+### Popis obrazovky (LLaVA)
+```
+„Co vidíš na obrazovce?"
+„Popiš mi co je otevřené"
+```
+Pořídí screenshot a pošle ho do LLaVA (`ollama pull llava:7b`).
+
+### OCR textu
+```
+„Přečti text z obrazovky"
+„OCR"
+```
+Screenshot + pytesseract — vrátí rozpoznaný text. Funguje i bez Ollamy.
+
+### Webcam
+```
+„Zapni kameru"
+„Webcam — co vidíš?"
+```
+Zachytí snímek z kamery (cv2) a pošle do LLaVA.
+
+### Instalace
+```bash
+ollama pull llava:7b
+sudo apt install tesseract-ocr tesseract-ocr-ces
+pip install pytesseract opencv-python
+```
+
+---
+
 ## MCP integrace
 
-JARVIS integruje [Model Context Protocol](https://modelcontextprotocol.io) pro pokročilé schopnosti. Servery běží přes `npx` jako subprocesy.
+JARVIS integruje [Model Context Protocol](https://modelcontextprotocol.io). Servery běží přes `npx` / `uvx` jako subprocesy.
 
-### Dostupné MCP skills
+> **Požadavky:** Node.js 18+ (`sudo apt install nodejs npm`) a `pip install mcp`
 
-| Skill | Příkaz | API klíč |
+### Dostupné MCP servery
+
+| Server | Příkaz | API klíč |
 |---|---|---|
-| **Filesystem** | „přečti soubor notes.txt", „strom ~/Projekty", „hledej v souborech TODO" | ❌ není potřeba |
-| **Web Fetch** | „hledej online Python asyncio", „načti stránku github.com" | ❌ není potřeba |
-| **Git** | „git log", „git status", „git diff", „větve" | ❌ není potřeba |
-| **Memory Graph** | „zapamatuj si X", „co víš o X", „zapomeň X" | ❌ není potřeba |
+| **Filesystem** | „přečti soubor notes.txt", „strom ~/Projekty" | ❌ |
+| **Web Fetch** | „načti stránku github.com" | ❌ |
+| **Git** | „git log", „git status", „git diff" | ❌ |
+| **Memory Graph** | „zapamatuj si X", „co víš o X" | ❌ |
 | **Brave Search** | „vyhledej X", „novinky o X" | ✅ BRAVE_API_KEY |
+| **Computer Control** | klikání, psaní, okna, OCR obrazovky | ❌ |
+| **Sequential Thinking** | vícesvůlové plánování | ❌ |
+| **Time** | přesný čas + časová pásma | ❌ |
 
 ### Konfigurace Brave Search
 ```bash
-# Nastav do .env (nikdy do gitu!)
 echo "BRAVE_API_KEY=tvůj_klíč" >> .env
 # Klíč zdarma: https://api.search.brave.com/
 ```
@@ -193,13 +285,11 @@ def get_actions():
     return {}
 ```
 
-Při příštím startu se načte automaticky. Žádný restart kódu není potřeba.
+Při příštím startu se načte automaticky.
 
 ---
 
 ## Smart Memory
-
-JARVIS si pamatuje informace o tobě **permanentně** (přes restarty).
 
 ### User Profile (`~/.jarvis_user_profile.json`)
 Fakta se extrahují automaticky z každé konverzace:
@@ -207,20 +297,15 @@ Fakta se extrahují automaticky z každé konverzace:
 - „bydlím v Brně" → `město: Brno`
 - „baví mě python" → `zájmy: [python]`
 
-Profil se vkládá do každého LLM dotazu — JARVIS ví kdo jsi.
+Profil se vkládá do každého LLM dotazu.
 
-### Neural Memory / SQLite Memory (`memory_data/memories.db`)
-- Ukládá konverzace s důležitostí a tagy
+### Neural Memory / SQLite (`memory_data/memories.db`)
+- SQLite backend — rychlý i pro tisíce vzpomínek
 - Keyword recall s recency scoring
 - Automatický decay + maintenance každých 6 hodin
-- **SQLite backend** — rychlý i pro tisíce vzpomínek, bez RAM overhead
-- Automatická migrace z původního JSON při prvním spuštění
-
-### Daily Summarizer
-Každou půlnoc Ollama zpracuje dnešní konverzace a extrahuje fakta do UserProfile.
 
 ### MCP Knowledge Graph (`~/.jarvis_mcp_memory/`)
-Persistentní knowledge graph přes `@modelcontextprotocol/server-memory` — entity a vztahy.
+Persistentní knowledge graph přes `@modelcontextprotocol/server-memory`.
 
 ---
 
@@ -228,43 +313,46 @@ Persistentní knowledge graph přes `@modelcontextprotocol/server-memory` — en
 
 ```
 jarvis.py               — bootstrap (10 řádků)
-app_core.py             — orchestrátor, event loop, lazy init (rychlý start)
-gui/                    — GUI package (OpenCode styl — top bar, fullwidth chat)
-  ├── app_window.py     — JarvisGUI hlavní okno + všechny callbacks
+app_core.py             — orchestrátor, event loop, lazy init
+gui/                    — GUI package (OpenCode styl)
+  ├── app_window.py     — hlavní okno + callbacks + historie šipkami
   ├── orb.py            — animovaný orb + částice
-  ├── chat.py           — chat panel, render zpráv, export do .md
-  ├── settings.py       — SettingsDialog
-  └── constants.py      — barvy, ORB_COLORS, blend/lerp
-llm.py                  — lokální router + Ollama streaming + user profil inject
-commands/               — balíček příkazů (system, apps, media, files, utils)
-  ├── system.py         — shutdown, restart, hlasitost, jas, systém info
-  ├── apps.py           — open/kill/install aplikace (safe_run)
-  ├── media.py          — YouTube, screenshot, klávesnice, timer (safe_run)
-  ├── files.py          — soubory, složky, clipboard, web (safe_run)
-  └── utils.py          — kalkulačka, překlad, poznámky, počasí, wiki, měna + safe_run helper
-tts.py                  — edge-tts / pyttsx3, queue worker (sériové přehrávání)
+  ├── chat.py           — chat panel, export do .md
+  ├── settings.py       — SettingsDialog (STT, TTS, MCP, logy)
+  └── constants.py      — barvy, fonty
+llm.py                  — lokální router + Ollama streaming
+agent_react.py          — ReAct smyčka (Thought→Action→Observation)
+agent_tools.py          — ToolRegistry (12 nástrojů pro agenta)
+vision.py               — VisionEngine (OCR, screen describe, webcam)
+commands/               — balíček příkazů
+  ├── system.py         — shutdown, hlasitost, jas, systém info
+  ├── apps.py           — open/kill/install aplikace
+  ├── media.py          — YouTube, screenshot, klávesnice, vision
+  ├── files.py          — soubory, clipboard, web
+  └── utils.py          — kalkulačka, překlad, poznámky, počasí + safe_run
+tts.py                  — edge-tts / pyttsx3, queue worker
 stt.py                  — Google STT + offline Sphinx fallback
-memory.py               — SQLite memory + DailySummarizer (migrace z JSON)
+memory.py               — SQLite memory + DailySummarizer
 user_profile.py         — permanentní fakta o uživateli
-security_v2.py          — audit log, 3 úrovně oprávnění, dangerous patterns
-event_bus.py            — pub/sub event systém
-agents.py               — background agents (CPU/RAM monitor, idle detector)
-scheduler.py            — plánování úloh (at/after/every/every_day_at)
+security_v2.py          — audit log, 3 úrovně oprávnění
+mcp_bridge.py           — MCP klient (8 serverů)
 plugin_system.py        — skill loader (manifest.json + lazy loading)
-mcp_bridge.py           — MCP klient (filesystem, brave-search, git, memory)
 dashboard.py            — web dashboard FastAPI (port 8002)
-wake_word_detector.py   — wake word detekce (pause/resume při STT)
+agents.py               — background agents (CPU/RAM monitor)
+scheduler.py            — plánování úloh
+event_bus.py            — pub/sub event systém
 
 plugins/custom/
 ├── greeting/           — pozdravy dle denní doby
-├── calculator/         — výpočty, procenta, sqrt
-├── timer/              — timer/alarm hlasem + callback
-├── clipboard/          — schránka (xclip/pyperclip)
-├── mcp_filesystem/     — čtení souborů, strom, full-text hledání
-├── mcp_fetch/          — DuckDuckGo search + URL fetch
-├── mcp_git/            — git log/status/diff/blame
-├── mcp_brave/          — Brave Search (vyžaduje API klíč)
-└── mcp_memory/         — knowledge graph přes MCP
+├── calculator/         — výpočty, procenta
+├── timer/              — timer/alarm hlasem
+├── clipboard/          — schránka
+├── mcp_filesystem/     — čtení souborů, full-text hledání
+├── mcp_fetch/          — DuckDuckGo + URL fetch
+├── mcp_git/            — git log/status/diff
+├── mcp_brave/          — Brave Search
+├── mcp_memory/         — knowledge graph
+└── mcp_computer_control/ — klikání, psaní, okna, OCR
 ```
 
 ### Datový tok
@@ -274,15 +362,16 @@ Uživatel (hlas/text)
   │
   ▼
 JarvisApp._process_command()
-  ├─ 1. Skill routes     (greeting, calculator, timer, MCP skills…)
-  ├─ 2. Lokální router   (95% příkazů bez LLM — otevři, hlasitost…)
-  └─ 3. Ollama stream    (AI konverzace, kód, překlad, vysvětlení)
+  ├─ 1. Skill routes       (greeting, calculator, timer, MCP skills…)
+  ├─ 2. Lokální router     (95% příkazů bez LLM — otevři, hlasitost…)
+  ├─ 3. ReAct agent        (vícesvůlové úkoly — najdi X a ulož Y)
+  └─ 4. Ollama stream      (AI konverzace, kód, překlad)
            │
-           ├─ UserProfile kontext (jméno, město, zájmy…)
-           └─ Memory kontext (relevantní vzpomínky)
+           ├─ UserProfile kontext
+           └─ Memory kontext
   │
   ▼
-Security check → CommandExecutor / MCP → TTS worker queue
+Security check → CommandExecutor / MCP / VisionEngine → TTS
 ```
 
 ---
@@ -306,8 +395,9 @@ Security check → CommandExecutor / MCP → TTS worker queue
 ### .env (secrets — není v gitu)
 ```bash
 cp .env.example .env
-# Vyplň:
-BRAVE_API_KEY=tvůj_klíč   # pro Brave Search MCP
+BRAVE_API_KEY=tvůj_klíč        # Brave Search MCP
+MCP_BRAVE_ENABLED=true
+MCP_FILESYSTEM_ENABLED=true
 ```
 
 ### Doporučené modely Ollama
@@ -316,10 +406,11 @@ BRAVE_API_KEY=tvůj_klíč   # pro Brave Search MCP
 | `qwen2.5:3b` | ~3 GB | ⚡⚡⚡ | ★★★ |
 | `llama3.2:3b` | ~3 GB | ⚡⚡⚡ | ★★★ |
 | `llama3.1:8b` | ~8 GB | ⚡ | ★★★★★ |
+| `llava:7b` | ~8 GB | ⚡ | ★★★★ (vision) |
 
 ### Security
-- **SAFE** — vždy povoleno (čas, počasí, otevřít URL…)
-- **STANDARD** — bez potvrzení (vytvořit soubor, poznámka…)
+- **SAFE** — vždy povoleno (čas, počasí, OCR, popis obrazovky…)
+- **STANDARD** — bez potvrzení (vytvořit soubor, poznámka, webcam…)
 - **ELEVATED** — dialog potvrzení (smazat soubor, shutdown…)
 
 Audit log: `~/.jarvis_audit.jsonl`
@@ -333,7 +424,6 @@ Audit log: `~/.jarvis_audit.jsonl`
 - CPU / RAM / Disk v reálném čase
 - Status Ollama + aktuální model
 - Stav background agentů
-- Naplánované úlohy
 - Audit log (posledních 20 akcí)
 - Live logy přes WebSocket
 
@@ -344,8 +434,7 @@ Audit log: `~/.jarvis_audit.jsonl`
 ### Ollama se nespustí
 ```bash
 curl http://localhost:11434/api/tags
-ollama serve
-ollama pull qwen2.5:3b
+ollama serve && ollama pull qwen2.5:3b
 ```
 
 ### TTS nefunguje
@@ -360,18 +449,28 @@ sudo usermod -a -G audio $USER
 python -c "import speech_recognition as sr; print(sr.Microphone.list_microphone_names())"
 ```
 
-### MCP filesystem nefunguje
+### MCP nefunguje
 ```bash
-node --version        # potřeba Node.js 18+
-npx --version
-npx -y @modelcontextprotocol/server-filesystem ~
+node --version   # potřeba Node.js 18+
+pip install mcp
 ```
 
 ### Brave Search nefunguje
 ```bash
-# Zkontroluj .env
 cat .env | grep BRAVE
-# Klíč zdarma: https://api.search.brave.com/
+pip install python-dotenv
+```
+
+### OCR nefunguje
+```bash
+sudo apt install tesseract-ocr tesseract-ocr-ces
+pip install pytesseract
+```
+
+### Vision / LLaVA nefunguje
+```bash
+ollama pull llava:7b
+pip install opencv-python
 ```
 
 ---
@@ -380,14 +479,14 @@ cat .env | grep BRAVE
 
 ### Spuštění testů
 ```bash
-source ~/Stažené/jarvis-env/bin/activate
-python -m pytest test_jarvis.py -v
+source venv/bin/activate
+python -m pytest tests/ -v
 ```
 
-**177+ testů** pokrývají: config, STT, TTS (worker queue), LocalRouter, CommandExecutor (sandbox kalkulačka), AsyncEngine, ErrorHandler, PluginManager, Security (audit, dangerous patterns), WakeWord (pause/resume), UserProfile (normalizace diakritiky), GUI (headless), safe_run helper.
+**200+ testů** pokrývají: config, STT, TTS, LocalRouter, CommandExecutor, AsyncEngine, ErrorHandler, PluginManager, Security, WakeWord, UserProfile, GUI (headless), safe_run, MCP bridge (mock), ReAct agent (mock LLM), Vision (mock pytesseract/cv2).
 
 ### CI/CD
-GitHub Actions běží automaticky na každý push — Python 3.11 + 3.12, ubuntu-latest.
+GitHub Actions — Python 3.11 + 3.12, ubuntu-latest, každý push.
 
 ### Závislosti
 ```bash
@@ -397,21 +496,31 @@ pip install -r requirements.txt
 | Balíček | Účel |
 |---|---|
 | `customtkinter` | Sci-fi HUD GUI |
-| `requests` | Ollama API, počasí, web fetch |
+| `requests` | Ollama API, web fetch |
 | `edge-tts` | Kvalitní český hlas |
 | `yt-dlp` | YouTube bez prohlížeče |
-| `ffplay` (ffmpeg) | Audio/video přehrávač |
 | `mcp` | Model Context Protocol klient |
 | `fastapi` + `uvicorn` | Web dashboard |
 | `psutil` | Systémové metriky |
 | `SpeechRecognition` + `PyAudio` | Mikrofon (volitelné) |
+| `pytesseract` | OCR (volitelné) |
+| `opencv-python` | Webcam (volitelné) |
+| `python-dotenv` | Načítání `.env` |
 
 ### Přidání nové akce
 1. Pattern do `LocalRouter.route()` v `llm.py`
-2. Implementace `cmd_nazev()` v příslušném modulu `commands/` (system/apps/media/files/utils)
-3. Export z `commands/__init__.py` do `CommandExecutor.execute()`
-4. Oprávnění do `ACTION_PERMISSIONS` v `security_v2.py`
-5. Test do `test_jarvis.py` nebo `tests/`
+2. Implementace `cmd_nazev()` v `commands/`
+3. Export z `commands/__init__.py`
+4. Oprávnění do `security_v2.py`
+5. Test do `tests/`
+
+---
+
+## Plánované featury (v4.x)
+
+- [ ] Lokální embeddingy pro memory (sentence-transformers)
+- [ ] Plugin marketplace (stahování z GitHub jedním příkazem)
+- [ ] Docker image pro headless server
 
 ---
 
