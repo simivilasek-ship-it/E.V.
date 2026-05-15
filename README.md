@@ -1,4 +1,4 @@
-# JARVIS v4.1 — Lokální AI asistent
+# JARVIS v4.2 — Lokální AI asistent
 
 Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český hlas, ovládání celého PC, dlouhodobá paměť, grafový agent (Planner→Router→Executor→Critic), lokální embeddingy, plugin marketplace, MCP integrace a multi-modalita (OCR, kamera, popis obrazovky).
 
@@ -22,6 +22,13 @@ Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český 
 ---
 
 ## Co je nového
+
+### v4.2
+| Změna | Detail |
+|---|---|
+| **TTS streaming** | Hlasová odezva ~1s místo ~5s — JARVIS mluví větu po větě z generátoru |
+| **Graf timeout** | Circuit breaker 120s — grafový agent nikdy nezamrzne |
+| **Fuzzy matching** | rapidfuzz zachytí překlepy: „otrevi crhome" → otevři chrome |
 
 ### v4.1
 | Změna | Detail |
@@ -397,6 +404,7 @@ MCP_FILESYSTEM_ENABLED=true
 | OCR nefunguje | `sudo apt install tesseract-ocr tesseract-ocr-ces && pip install pytesseract` |
 | Vision / LLaVA | `ollama pull llava:7b && pip install opencv-python` |
 | Embeddingy | `pip install sentence-transformers` |
+| Fuzzy matching nefunguje | `pip install rapidfuzz` |
 
 ---
 
@@ -407,7 +415,7 @@ source venv/bin/activate
 python -m pytest tests/ -v
 ```
 
-**230+ testů:** config, STT, TTS, LocalRouter, CommandExecutor, AsyncEngine, PluginManager, Security, WakeWord, UserProfile, GUI (headless), safe_run, MCP bridge (mock), ReAct (mock LLM), **Grafový agent (mock LLM, 27 testů)**, Vision (mock), Embeddingy (8), Marketplace (8).
+**250+ testů:** config, STT, TTS + streaming (16), LocalRouter + fuzzy, CommandExecutor, AsyncEngine, PluginManager, Security, WakeWord, UserProfile, GUI (headless), safe_run, MCP bridge (mock), ReAct (mock LLM), Grafový agent (27), Vision (mock), Embeddingy (8), Marketplace (8).
 
 ### Přidání nové akce
 1. Pattern → `LocalRouter.route()` v `llm.py`
