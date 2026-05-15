@@ -116,6 +116,31 @@ class TTSEngine:
             return
         self._queue.put(text)
 
+    def speak_streaming(self, generator) -> None:
+        """
+        Přijme generátor chunků (z Ollama stream_ask) a přehrává věty
+        okamžitě po dokončení — odezva klesá z ~5s na ~1s.
+        Interpunkce: . ! ? ; a čárka před spojkami.
+        """
+        if not self.enabled:
+            return
+        import re
+        _SENT_END = re.compile(
+            r'(?<=[.!?;])\s+'           # po tečce/vykřičníku/otazníku/středníku
+            r'|(?<=,)\s+(?=a\s|ale\s|nebo\s|takže\s|protože\s)'  # čárka před spojkou
+        )
+        buffer = ""
+        for chunk in generator:
+            buffer += chunk
+            parts = _SENT_END.split(buffer)
+            for sentence in parts[:-1]:
+                s = sentence.strip()
+                if s:
+                    self.speak(s)
+            buffer = parts[-1]
+        if buffer.strip():
+            self.speak(buffer.strip())
+
     def stop(self) -> None:
         """Zastaví aktuální přehrávání a vymaže frontu."""
         # Vyprázdni frontu

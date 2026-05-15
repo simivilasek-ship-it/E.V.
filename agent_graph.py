@@ -31,6 +31,7 @@ MAX_STEPS    = 8     # max Executor volání celkem
 MAX_RETRIES  = 2     # max opakování jednoho kroku při chybě
 MAX_REPLANS  = 1     # max přeplánování při záseknutí
 LLM_TOKENS   = 500
+GLOBAL_TIMEOUT = 120  # max celková doba běhu v sekundách
 
 
 # ── Stav grafu ────────────────────────────────────────────────────
@@ -141,14 +142,28 @@ class AgentGraph:
     # ── Veřejné API ──────────────────────────────────────────────
 
     def run(self, task: str, on_step: Optional[Callable] = None) -> str:
-        state = AgentState(task=task, on_step=on_step)
+        import time
+        state      = AgentState(task=task, on_step=on_step)
+        deadline   = time.monotonic() + GLOBAL_TIMEOUT
         state.notify(f"Plánuji: {task[:60]}")
 
         while state.status not in (NodeStatus.DONE, NodeStatus.FAILED):
+            # Circuit breaker: limit kroků
             if state.exec_count >= MAX_STEPS:
                 state.final_answer = (
                     "Dosažen limit kroků. Částečný výsledek:\n" +
                     state.steps_summary()
+                )
+                state.status = NodeStatus.DONE
+                break
+
+            # Circuit breaker: globální timeout
+            if time.monotonic() > deadline:
+                elapsed = int(GLOBAL_TIMEOUT)
+                logger.warning(f"GraphAgent timeout po {elapsed}s")
+                state.final_answer = (
+                    f"Úkol trvá příliš dlouho (>{elapsed}s). "
+                    "Částečný výsledek:\n" + state.steps_summary()
                 )
                 state.status = NodeStatus.DONE
                 break

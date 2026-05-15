@@ -425,32 +425,23 @@ class JarvisApp:
                 return
 
             full_response = ""
-            sentence_buf  = ""
             is_command    = False
 
-            for chunk in self.llm.stream_ask(text):
-                full_response += chunk
+            def _collecting_generator():
+                nonlocal full_response, is_command
+                for chunk in self.llm.stream_ask(text):
+                    full_response += chunk
+                    if "COMMAND:" in full_response:
+                        is_command = True
+                        return
+                    yield chunk
 
-                if "COMMAND:" in full_response:
-                    is_command = True
-                    break
-
-                sentence_buf += chunk
-                while True:
-                    m = re.search(r"[.!?][\s\n]", sentence_buf)
-                    if not m:
-                        break
-                    sentence = sentence_buf[: m.end()].strip()
-                    sentence_buf = sentence_buf[m.end():]
-                    if sentence:
-                        self._speak(sentence)
+            # speak_streaming přehrává větu po větě okamžitě
+            self.tts.speak_streaming(_collecting_generator())
 
             if is_command:
                 for chunk in self.llm.drain_stream():
                     full_response += chunk
-
-            if sentence_buf.strip():
-                self._speak(sentence_buf.strip())
 
             full_text = full_response.strip()
             if full_text:

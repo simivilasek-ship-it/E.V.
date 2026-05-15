@@ -243,6 +243,28 @@ def _extract_app_name(text: str) -> str:
     return t
 
 
+try:
+    from rapidfuzz import fuzz as _fuzz
+    _HAS_FUZZY = True
+except ImportError:
+    _HAS_FUZZY = False
+
+# Fuzzy aliasy: (fráze, normalizovaný trigger, akce, params_fn)
+_FUZZY_COMMANDS = [
+    ("otevri chrome",    "open_app",   lambda: {"app": "chrome"}),
+    ("otevri firefox",   "open_app",   lambda: {"app": "firefox"}),
+    ("otevri spotify",   "open_app",   lambda: {"app": "spotify"}),
+    ("otevri discord",   "open_app",   lambda: {"app": "discord"}),
+    ("kolik je hodin",   "get_time",   lambda: {}),
+    ("jake je datum",    "get_date",   lambda: {}),
+    ("screenshot",       "screenshot", lambda: {}),
+    ("info o systemu",   "system_info",lambda: {}),
+    ("vypni pocitac",    "shutdown",   lambda: {"delay": 0}),
+    ("restartuj pocitac","restart",    lambda: {"delay": 0}),
+]
+_FUZZY_THRESHOLD = 82  # 0–100, 82 = toleruje 1–2 překlepy
+
+
 class LocalRouter:
     """
     Zpracovává příkazy lokálně bez volání LLM.
@@ -253,6 +275,15 @@ class LocalRouter:
         # Normalizujeme diakritiku → "otevři" == "otevri", "spusť" == "spust"
         t  = _norm(text)
         dt = datetime.now()
+
+        # ── FUZZY PRE-PASS (překlepy a alternativní formulace) ───────
+        if _HAS_FUZZY and len(t) < 40:
+            for phrase, action, params_fn in _FUZZY_COMMANDS:
+                score = _fuzz.partial_ratio(t, phrase)
+                if score >= _FUZZY_THRESHOLD:
+                    logger.debug(f"Fuzzy match: '{t}' → '{phrase}' ({score})")
+                    params = params_fn()
+                    return None, {"action": action, "params": params}
 
         # ── VISION ───────────────────────────────────
         if t in ("co vidis", "popis obrazovky", "co je na obrazovce") or \
