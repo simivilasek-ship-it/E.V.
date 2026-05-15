@@ -14,7 +14,8 @@ from .files  import (cmd_open_url, cmd_search_web, cmd_open_file,
                      cmd_move_file, cmd_find_files, cmd_clipboard_set)
 from .media  import (cmd_screenshot, cmd_type_key, cmd_write_text, cmd_media,
                      cmd_set_timer, cmd_youtube_play, cmd_youtube_download,
-                     cmd_youtube_info, cmd_youtube_subtitles)
+                     cmd_youtube_info, cmd_youtube_subtitles,
+                     cmd_screen_describe, cmd_screen_ocr, cmd_webcam_describe)
 from .system import (cmd_get_time, cmd_get_date, cmd_system_info,
                      cmd_shutdown, cmd_restart, cmd_sleep_pc,
                      cmd_update_system, cmd_volume, cmd_set_brightness)
@@ -115,6 +116,11 @@ class CommandExecutor:
         return cmd_memory_store(self.config, content, importance)
     def _cmd_memory_stats(self, **_):               return cmd_memory_stats(self.config)
     def _cmd_memory_maintenance(self, **_):         return cmd_memory_maintenance(self.config)
+
+    # ── vision ───────────────────────────────────────
+    def _cmd_screen_describe(self, **_):           return cmd_screen_describe()
+    def _cmd_screen_ocr(self, **_):                return cmd_screen_ocr()
+    def _cmd_webcam_describe(self, **_):           return cmd_webcam_describe()
 
     # ── no-ops ───────────────────────────────────────
     def _cmd_answer(self, **_):                     return "ok"

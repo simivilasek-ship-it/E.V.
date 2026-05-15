@@ -183,6 +183,21 @@ def cmd_youtube_info(query: str) -> str:
         return f"Chyba: {e}"
 
 
+def cmd_screen_describe() -> str:
+    from vision import VisionEngine
+    return VisionEngine().screen_describe()
+
+
+def cmd_screen_ocr() -> str:
+    from vision import VisionEngine
+    return VisionEngine().screen_ocr()
+
+
+def cmd_webcam_describe() -> str:
+    from vision import VisionEngine
+    return VisionEngine().webcam_describe()
+
+
 def cmd_youtube_subtitles(query: str, lang: str = "cs", path: str = "") -> str:
     try:
         import yt_dlp

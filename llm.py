@@ -254,6 +254,17 @@ class LocalRouter:
         t  = _norm(text)
         dt = datetime.now()
 
+        # ── VISION ───────────────────────────────────
+        if t in ("co vidis", "popis obrazovky", "co je na obrazovce") or \
+           re.search(r"\b(popís|popis|describe)\s+(obrazovku|screen)\b", text, re.I):
+            return "Popisuji obrazovku.", {"action": "screen_describe", "params": {}}
+
+        if re.search(r"\b(precti|prečti)\s+(text|obrazovku)|ocr\b", t, re.I):
+            return "Čtu text z obrazovky.", {"action": "screen_ocr", "params": {}}
+
+        if re.search(r"\b(kamera|webcam|co\s+vidi\s+kamera|koukni\s+kamerou)\b", t, re.I):
+            return "Dívám se kamerou.", {"action": "webcam_describe", "params": {}}
+
         # ── ČAS ──────────────────────────────────────
         if re.search(r"\b(kolik je|jaky je|cas|hodin|time)\b", t) and \
            not re.search(r"\b(pracovni|volny|cas na)\b", t):
