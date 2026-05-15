@@ -347,6 +347,11 @@ class LocalRouter:
         # ── HUDBA ─────────────────────────────────────
         if re.search(r"\b(pust|zahraj|prehraj|spust|play)\b", t):
             audio_only = bool(re.search(r"\b(jen\s+zvuk|audio|mp3|poslouchat)\b", t))
+            # Pokud query odpovídá známé aplikaci → otevři ji, nehraj hudbu
+            for app_name, app_cmd in _APPS.items():
+                if _norm(app_name) in t.split():
+                    return f"Spouštím {app_name}.", {
+                        "action": "open_app", "params": {"app": app_cmd}}
             for site, url in _SITES.items():
                 if site in t:
                     rest = re.sub(rf"\b{site}\b", "", t)
