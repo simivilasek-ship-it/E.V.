@@ -12,6 +12,7 @@ Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český 
 - [Multi-modalita](#multi-modalita)
 - [Smart Memory & Embeddingy](#smart-memory--embeddingy)
 - [Plugin Marketplace](#plugin-marketplace)
+- [Plugin sandbox](#plugin-sandbox)
 - [MCP integrace](#mcp-integrace)
 - [Skills — přidání vlastního](#skills--přidání-vlastního)
 - [Architektura](#architektura)
@@ -29,6 +30,7 @@ Plnohodnotný AI asistent běžící **100% lokálně** — Ollama LLM, český 
 | **TTS streaming** | Hlasová odezva ~1s místo ~5s — JARVIS mluví větu po větě z generátoru |
 | **Graf timeout** | Circuit breaker 120s — grafový agent nikdy nezamrzne |
 | **Fuzzy matching** | rapidfuzz zachytí překlepy: „otrevi crhome" → otevři chrome |
+| **Plugin sandbox** | AST kontrola importů před načtením pluginu, 7 named permissions v manifestu |
 
 ### v4.1
 | Změna | Detail |
@@ -69,6 +71,8 @@ python jarvis.py
 ### Pro embeddingy a vision (nepovinné)
 ```bash
 pip install sentence-transformers          # sémantická paměť
+pip install vosk                           # offline STT bez internetu
+pip install rapidfuzz                      # fuzzy matching příkazů (doporučeno)
 ollama pull llava:7b                       # popis obrazovky + webcam
 sudo apt install tesseract-ocr tesseract-ocr-ces && pip install pytesseract opencv-python
 ```
@@ -254,6 +258,44 @@ Stahování pluginů jedním příkazem — žádná ruční instalace.
 
 ---
 
+## Plugin sandbox
+
+Každý plugin je před načtením staticky analyzován (AST) — spustitelný kód se **nikdy nespustí dřív**, než projde kontrolou importů.
+
+### Jak funguje
+
+1. `plugin_system.py` přečte zdrojový soubor a parsuje všechny `import` / `from … import` příkazy
+2. Povolené moduly jsou: stdlib utility, `requests`, `pydantic`, `numpy`, `pandas` a vlastní `jarvis_skill_*` moduly
+3. Zakázané moduly (např. `subprocess`, `socket`, `os`) jsou odmítnuty s chybou v logu — plugin se **nenačte**
+4. Manifest může explicitně odemknout skupiny modulů přes pole `permissions`
+
+### Named permissions
+
+| Permission | Odemkne moduly |
+|---|---|
+| `os` | `os`, `os.path` |
+| `subprocess` | `subprocess` |
+| `socket` | `socket`, `ssl`, `asyncio` |
+| `filesystem` | `shutil`, `glob`, `tempfile`, `fnmatch` |
+| `system` | `psutil`, `platform`, `resource` |
+| `database` | `sqlite3`, `sqlalchemy` |
+| `crypto` | `cryptography`, `hmac`, `secrets` |
+
+### Příklad manifestu s rozšířenými právy
+
+```json
+{
+  "name": "muj_plugin",
+  "version": "1.0.0",
+  "permissions": ["filesystem", "system"],
+  "triggers": ["muj příkaz"]
+}
+```
+
+> **Poznámka:** Sandbox kontroluje deklarované importy, ne runtime chování. Pro plnou izolaci (škodlivý kód bez importů) by bylo potřeba spouštění v samostatném procesu.
+
+---
+
 ## MCP integrace
 
 > **Požadavky:** Node.js 18+ a `pip install mcp`
@@ -334,9 +376,13 @@ security_v2.py          — audit log, 3 úrovně oprávnění
 mcp_bridge.py           — MCP klient (8 serverů)
 plugin_system.py        — skill loader (lazy loading)
 dashboard.py            — web dashboard FastAPI (port 8002)
+health_check.py         — monitoring zdraví komponent (Ollama, MCP, paměť)
+cache_manager.py        — LRU + disk cache pro LLM odpovědi a API volání
+offline_mode.py         — offline fronta příkazů + fallback LLM bez Ollamy
+async_utils.py          — AsyncEngine s prioritní frontou + task pool
 agents.py / scheduler.py / event_bus.py
 
-plugins/custom/
+plugins/custom/         — [sandbox chráněno](#plugin-sandbox) před načtením
 ├── greeting / calculator / timer / clipboard
 ├── mcp_filesystem / mcp_fetch / mcp_git / mcp_brave / mcp_memory
 └── mcp_computer_control / marketplace
@@ -405,6 +451,8 @@ MCP_FILESYSTEM_ENABLED=true
 | Vision / LLaVA | `ollama pull llava:7b && pip install opencv-python` |
 | Embeddingy | `pip install sentence-transformers` |
 | Fuzzy matching nefunguje | `pip install rapidfuzz` |
+| Vosk offline STT | `pip install vosk` + stáhnout model z [alphacephei.com/vosk/models](https://alphacephei.com/vosk/models) do `~/.vosk/` |
+| Plugin odmítnut sandboxem | Přidej potřebnou permission do `manifest.json` (viz [Plugin sandbox](#plugin-sandbox)) |
 
 ---
 
@@ -415,7 +463,7 @@ source venv/bin/activate
 python -m pytest tests/ -v
 ```
 
-**250+ testů:** config, STT, TTS + streaming (16), LocalRouter + fuzzy, CommandExecutor, AsyncEngine, PluginManager, Security, WakeWord, UserProfile, GUI (headless), safe_run, MCP bridge (mock), ReAct (mock LLM), Grafový agent (27), Vision (mock), Embeddingy (8), Marketplace (8).
+**330+ testů:** config, STT + Vosk (10), TTS + streaming (6), LocalRouter + fuzzy, CommandExecutor (24), AsyncEngine, PluginManager, Security (22), WakeWord, UserProfile, GUI (headless), safe_run (13), MCP bridge (11), ReAct (17), Grafový agent (27), Vision (15), Embeddingy (8), Marketplace (8), nové moduly (23), vylepšení (16), integrace (108).
 
 ### Přidání nové akce
 1. Pattern → `LocalRouter.route()` v `llm.py`

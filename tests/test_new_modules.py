@@ -164,10 +164,15 @@ class TestOfflineManager:
     """Test OfflineManager"""
     
     @pytest.fixture
-    def offline_manager(self, mock_config):
-        """Create OfflineManager instance"""
+    def offline_manager(self, mock_config, tmp_path):
+        """Create OfflineManager instance with tmp dir to avoid slow disk I/O."""
         from offline_mode import OfflineManager
-        return OfflineManager(mock_config)
+        from unittest.mock import patch
+        cfg = {**mock_config, "offline_cache_dir": str(tmp_path)}
+        with patch.object(OfflineManager, "_persist_queue", return_value=None):
+            mgr = OfflineManager(cfg)
+        mgr._persist_queue = lambda: None  # no-op for all subsequent calls
+        return mgr
     
     def test_offline_manager_init(self, offline_manager):
         """Test OfflineManager initialization"""
@@ -192,17 +197,21 @@ class TestOfflineManager:
         assert response is not None
         assert isinstance(response, str)
     
-    def test_sync_commands(self, offline_manager):
+    def test_sync_commands(self, offline_manager, tmp_path):
         """Test syncing queued commands"""
+        import pytest
         offline_manager.queue_command("test", {"param": "value"})
-        
-        # Mock sync function
+
+        synced = []
+
         def mock_sync(action, params):
+            synced.append(action)
             return True
-        
+
         stats = offline_manager.sync_commands(mock_sync)
         assert "total" in stats
         assert "synced" in stats
+        assert stats["total"] >= 1
 
 
 class TestOfflineLLMFallback:

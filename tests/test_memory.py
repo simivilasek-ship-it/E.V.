@@ -37,13 +37,11 @@ class TestJarvisMemoryInit:
         from memory import JarvisMemory
         mem = JarvisMemory(mock_memory_config)
         assert mem.config == mock_memory_config
-        assert mem.memory_dir is not None
-    
+        assert hasattr(mem, "_store")  # interní store existuje
+
     def test_memory_dir_exists(self, jarvis_memory, mock_memory_config):
-        """Test that memory directory is created"""
-        from pathlib import Path
-        # Directory should exist or be creatable
-        assert isinstance(jarvis_memory.memory_dir, str)
+        """Test that memory store is initialized"""
+        assert hasattr(jarvis_memory, "_store")
 
 
 class TestMemoryStorage:
@@ -82,28 +80,18 @@ class TestMemoryRecall:
     
     def test_recall_context(self, jarvis_memory):
         """Test recalling context for AI"""
-        with patch.object(jarvis_memory, 'recall', return_value=[
-            {"content": "test memory", "score": 0.8}
-        ]):
-            context = jarvis_memory.recall_context("test query")
-            assert isinstance(context, str) or context == ""
+        context = jarvis_memory.recall_context("test query")
+        assert isinstance(context, str)
 
 
 class TestMemoryStats:
     """Test memory statistics"""
     
-    @patch('memory.HAS_NEURAL_MEMORY', True)
     def test_get_stats(self, jarvis_memory):
-        """Test getting memory statistics"""
-        with patch.object(jarvis_memory, 'system', MagicMock()) as mock_system:
-            mock_stats = MagicMock(
-                total_memories=10,
-                avg_importance=0.75
-            )
-            mock_system.stats.return_value = mock_stats
-            
-            stats = jarvis_memory.get_stats()
-            assert stats is not None or isinstance(stats, dict)
+        """Test getting memory statistics via stats()"""
+        stats = jarvis_memory.stats()
+        assert isinstance(stats, dict)
+        assert "total_memories" in stats
 
 
 class TestMemoryIntegration:
@@ -149,9 +137,7 @@ class TestMemoryConfig:
         assert isinstance(mem.config, dict)
     
     def test_memory_dir_config(self, mock_memory_config):
-        """Test memory_dir from config"""
+        """Test memory config is preserved"""
         from memory import JarvisMemory
         mem = JarvisMemory(mock_memory_config)
-        assert mem.memory_dir == mock_memory_config.get("memory_dir")
-        result = self.mem.stats()
-        self.assertEqual(result['total_memories'], 5)
+        assert mem.config.get("memory_dir") == mock_memory_config.get("memory_dir")

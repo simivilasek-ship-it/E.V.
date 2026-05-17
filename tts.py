@@ -1,5 +1,5 @@
 """
-JARVIS v3.1 — Text-to-Speech (TTS)
+JARVIS v4.2 — Text-to-Speech (TTS)
 Jeden worker vlákno + queue → věty se přehrávají sériově,
 žádné souběžné přehrávání, žádné blokování více vláken.
 """
@@ -47,6 +47,11 @@ class TTSEngine:
         self._player = self._find_player()
         self._pyttsx3_engine = None
         self._has_pyttsx3 = False
+
+        # Streaming je výchozí pokud ffplay je dostupný
+        self._streaming_enabled = (self._player == "ffplay") and config.get("tts_streaming", True)
+        if self._streaming_enabled:
+            logger.info("TTS: streaming mód aktivní (nižší latence)")
 
         if HAS_PYTTSX3:
             try:
@@ -100,9 +105,12 @@ class TTSEngine:
                 self._queue.task_done()
 
     def _play(self, text: str) -> None:
-        """Blokující přehrávání — volá se výhradně z worker vlákna."""
+        """Volá se z worker vlákna. Preferuje streaming pokud ffplay je dostupný."""
         if HAS_EDGE_TTS:
-            asyncio.run(self._speak_edge_tts(text))
+            if self._player == "ffplay" and self._streaming_enabled:
+                asyncio.run(self._speak_edge_tts_streaming(text))
+            else:
+                asyncio.run(self._speak_edge_tts(text))
         elif self._has_pyttsx3:
             self._speak_pyttsx3(text)
         else:
@@ -170,6 +178,50 @@ class TTSEngine:
         return self.enabled and (HAS_EDGE_TTS or self._has_pyttsx3)
 
     # ── Interní přehrávání ────────────────────────────
+
+    async def _speak_edge_tts_streaming(self, text: str) -> None:
+        """Streamuje audio přímo do ffplay stdin — žádný dočasný soubor, nižší latence."""
+        if not HAS_EDGE_TTS:
+            return
+        try:
+            communicate = edge_tts.Communicate(text, self.voice)
+
+            # Spusť ffplay s stdin jako vstupem
+            proc = subprocess.Popen(
+                ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet",
+                 "-i", "pipe:0"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            self._current_proc = proc
+
+            try:
+                async for chunk in communicate.stream():
+                    if chunk["type"] == "audio":
+                        if proc.stdin and not proc.stdin.closed:
+                            try:
+                                proc.stdin.write(chunk["data"])
+                            except BrokenPipeError:
+                                break  # ffplay skončil
+
+                if proc.stdin and not proc.stdin.closed:
+                    proc.stdin.close()
+
+                proc.wait(timeout=30)
+            except Exception as e:
+                logger.error(f"TTS streaming chyba: {e}")
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+            finally:
+                self._current_proc = None
+
+        except Exception as e:
+            logger.error(f"edge-tts streaming init chyba: {e}")
+            # Fallback na file-based TTS
+            await self._speak_edge_tts(text)
 
     async def _speak_edge_tts(self, text: str) -> None:
         try:

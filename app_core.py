@@ -38,7 +38,7 @@ class JarvisApp:
 
     def __init__(self):
         setup_logging()
-        logger.info("Spouštím JARVIS v3.0...")
+        logger.info("Spouštím JARVIS v4.2...")
 
         # Inicializace nových systémů (async, error handling, plugins)
         self._init_new_systems()
@@ -87,7 +87,7 @@ class JarvisApp:
         logger.info("JARVIS připraven.")
 
     def _init_new_systems(self):
-        """Inicializuje všechny systémy v2.0."""
+        """Inicializuje všechny systémy."""
         from agents import AgentManager
         from scheduler import get_scheduler
         from security_v2 import get_security_manager
@@ -103,7 +103,7 @@ class JarvisApp:
         self.async_engine.on_task_complete = self._on_task_complete
         self.async_engine.on_task_error    = self._on_task_error
 
-        # ── v2.0: Event Bus ──────────────────────────
+        # ── Event Bus ────────────────────────────────
         self.bus = get_event_bus()
         self.bus.subscribe(EventType.AGENT_ALERT,  self._on_agent_alert)
         self.bus.subscribe(EventType.CPU_HIGH,      self._on_agent_alert)
@@ -111,14 +111,14 @@ class JarvisApp:
         self.bus.subscribe(EventType.DISK_LOW,      self._on_agent_alert)
         self.bus.subscribe(EventType.TASK_FIRED,    self._on_task_fired)
 
-        # ── v2.0: Background Agents ──────────────────
+        # ── Background Agents ────────────────────────
         self.agent_manager = AgentManager.create_default(self.bus)
         self.agent_manager.start_all()
 
-        # ── v2.0: Scheduler ──────────────────────────
+        # ── Scheduler ────────────────────────────────
         self.scheduler = get_scheduler()
 
-        # ── v2.0: Security Manager ───────────────────
+        # ── Security Manager ─────────────────────────
         self.security = get_security_manager()
 
         # ── Wake Word ─────────────────────────────────

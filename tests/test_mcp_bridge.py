@@ -23,6 +23,7 @@ def _make_bridge(brave_key="TEST_KEY", brave_enabled=True):
         "mcp_sequential_thinking_enabled": False,
         "mcp_puppeteer_enabled": False,
         "mcp_time_enabled": False,
+        "mcp_computer_control_enabled": False,
     }
     return create_mcp_bridge(cfg)
 

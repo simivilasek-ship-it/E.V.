@@ -1,5 +1,5 @@
 """
-JARVIS v3.0 — Neural Memory System + Daily Summarizer
+JARVIS v4.2 — Neural Memory System + Daily Summarizer
 Integrovaný brain-inspired memory layer pro JARVIS.
 DailySummarizer extrahuje fakta z dnešních konverzací a ukládá do UserProfile.
 """

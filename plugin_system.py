@@ -8,6 +8,7 @@ Skills se načítají lazy — pouze pokud manifest existuje nebo .py soubor nal
 """
 
 from __future__ import annotations
+import ast
 import sys
 import json
 import importlib
@@ -16,7 +17,7 @@ import inspect
 import logging
 import concurrent.futures
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -24,6 +25,41 @@ _PLUGIN_ROUTE_TIMEOUT = 3.0   # max sekundy na jedno routování
 _PLUGIN_ACTION_TIMEOUT = 10.0  # max sekundy na jedno vykonání akce
 
 logger = logging.getLogger(__name__)
+
+# Moduly povolené v pluginech bez explicitního svolení v manifestu.
+# Pokrývá stdlib utility a běžné datové knihovny — vynechává os.system,
+# subprocess, socket, ctypes a další nebezpečné moduly záměrně.
+_SAFE_IMPORTS: Set[str] = {
+    # stdlib — bezpečné
+    "abc", "base64", "bisect", "calendar", "cmath", "collections",
+    "contextlib", "copy", "csv", "dataclasses", "datetime", "decimal",
+    "difflib", "enum", "fractions", "functools", "hashlib", "heapq",
+    "html", "html.parser", "http.client", "http.cookiejar",
+    "inspect", "io", "itertools", "json", "logging", "math",
+    "operator", "pathlib", "pprint", "queue", "random", "re",
+    "shlex", "signal", "statistics", "string", "struct", "textwrap",
+    "threading", "time", "traceback", "typing", "unicodedata",
+    "unittest", "unittest.mock", "urllib", "urllib.parse",
+    "urllib.request", "uuid", "warnings", "weakref", "xml",
+    "xml.etree", "xml.etree.ElementTree", "zipfile",
+    # třetí strany — běžně používané v JARVIS pluginech
+    "requests", "bs4", "beautifulsoup4", "pydantic", "yaml",
+    "numpy", "pandas", "PIL", "pillow",
+    # vlastní moduly projektu
+    "jarvis_skill_",
+}
+
+# Moduly které manifest může explicitně povolit přes "permissions".
+# Klíč = název permission, hodnota = množina kořenových modulů.
+_PERMISSION_MODULES: Dict[str, Set[str]] = {
+    "os":         {"os", "os.path"},
+    "subprocess": {"subprocess"},
+    "socket":     {"socket", "ssl", "asyncio"},
+    "filesystem": {"shutil", "glob", "tempfile", "fnmatch"},
+    "system":     {"psutil", "platform", "resource"},
+    "database":   {"sqlite3", "sqlalchemy"},
+    "crypto":     {"cryptography", "hmac", "secrets"},
+}
 
 
 # ── Datové struktury ──────────────────────────────────
@@ -113,12 +149,52 @@ class ModuleSkillWrapper(PluginBase):
 
 # ── Skill Loader ──────────────────────────────────────
 
+def _collect_imports(source: str) -> Set[str]:
+    """Vrátí množinu kořenových názvů modulů použitých v zdrojovém kódu."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return set()
+    roots: Set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                roots.add(alias.name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                roots.add(node.module.split(".")[0])
+    return roots
+
+
+def _check_imports(source: str, permissions: List[str], plugin_name: str) -> Optional[str]:
+    """Zkontroluje importy pluginu. Vrátí chybový řetězec nebo None."""
+    allowed = set(_SAFE_IMPORTS)
+    for perm in permissions:
+        extra = _PERMISSION_MODULES.get(perm)
+        if extra:
+            allowed.update(extra)
+        else:
+            logger.warning(f"Plugin '{plugin_name}': neznámá permission '{perm}'")
+
+    used = _collect_imports(source)
+    # Povolíme cokoli co začíná prefixem jarvis_skill_ (inter-plugin importy)
+    blocked = {m for m in used if m not in allowed and not m.startswith("jarvis_skill_")}
+    if blocked:
+        return f"Zakázané importy: {', '.join(sorted(blocked))}"
+    return None
+
+
 class SkillLoader:
     """Statická třída pro načítání skill modulů."""
 
     @staticmethod
-    def load_module(path: str, module_name: str):
-        """Načte Python modul ze souboru."""
+    def load_module(path: str, module_name: str, permissions: List[str] = None):
+        """Načte Python modul ze souboru po kontrole importů."""
+        source = Path(path).read_text(encoding="utf-8")
+        err = _check_imports(source, permissions or [], module_name)
+        if err:
+            raise ImportError(f"Sandbox odmítl plugin '{module_name}': {err}")
+
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None:
             raise ImportError(f"Nelze načíst spec pro {path}")
@@ -261,7 +337,7 @@ class PluginManager:
                 py_file = skill_path  # standalone soubor
 
             module_name = f"jarvis_skill_{manifest.name}"
-            module = SkillLoader.load_module(str(py_file), module_name)
+            module = SkillLoader.load_module(str(py_file), module_name, manifest.permissions)
 
             # Preferuj PluginBase třídu, fallback na module-level API
             plugin_class = SkillLoader.find_plugin_class(module)

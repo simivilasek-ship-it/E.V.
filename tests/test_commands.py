@@ -211,4 +211,3 @@ class TestCommandIntegration:
         result = command_executor._cmd_system_info()
         assert isinstance(result, str)
         assert len(result) > 0
-            mock_pg.press.assert_called_with("volumemute")
