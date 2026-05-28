@@ -52,7 +52,7 @@ class TestLLMRouter:
     def test_parse_command_simple(self):
         """Test parsing simple commands"""
         from llm import LocalRouter as LLMRouter
-        router = LLMRouter({})
+        router = LLMRouter()
         # Router should recognize common patterns
         assert callable(router.route) or True
     
@@ -204,13 +204,13 @@ class TestLLMRouterIntegration:
     def test_route_safe_action(self):
         """Test routing safe action"""
         from llm import LocalRouter as LLMRouter
-        router = LLMRouter({})
+        router = LLMRouter()
         # Router should be callable
         assert callable(router.route)
     
     def test_route_with_params(self):
         """Test routing with parameters"""
         from llm import LocalRouter as LLMRouter
-        router = LLMRouter({})
+        router = LLMRouter()
         # Should handle action routing
         assert hasattr(router, 'route')

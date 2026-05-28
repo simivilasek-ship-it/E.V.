@@ -2,11 +2,11 @@
 
 import logging
 import platform
-import subprocess
 from datetime import datetime
-from pathlib import Path
 
 import psutil
+
+from commands.utils import safe_run
 
 logger = logging.getLogger(__name__)
 
@@ -36,58 +36,53 @@ def cmd_system_info() -> str:
 
 def cmd_shutdown(delay: int = 0) -> str:
     if _IS_WINDOWS:
-        subprocess.run(["shutdown", "/s", "/t", str(delay)], check=False)
+        safe_run(["shutdown", "/s", "/t", str(delay)], timeout=5)
     else:
         cmd = ["shutdown", "-h", f"+{delay // 60}"] if delay else ["shutdown", "-h", "now"]
-        subprocess.run(cmd, check=False)
+        safe_run(cmd, timeout=5)
     return "ok"
 
 
 def cmd_restart(delay: int = 0) -> str:
     if _IS_WINDOWS:
-        subprocess.run(["shutdown", "/r", "/t", str(delay)], check=False)
+        safe_run(["shutdown", "/r", "/t", str(delay)], timeout=5)
     else:
-        subprocess.run(["reboot"], check=False)
+        safe_run(["reboot"], timeout=5)
     return "ok"
 
 
 def cmd_sleep_pc() -> str:
     if _IS_WINDOWS:
-        subprocess.run(["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"], check=False)
+        safe_run(["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"], timeout=5)
     else:
-        subprocess.run(["systemctl", "suspend"], check=False)
+        safe_run(["systemctl", "suspend"], timeout=5)
     return "ok"
 
 
 def cmd_update_system() -> str:
     if _IS_LINUX:
-        # Dva oddělené příkazy bez shell stringu — apt update pak upgrade
-        subprocess.Popen(["pkexec", "apt", "update"])
-        subprocess.Popen(["pkexec", "apt", "upgrade", "-y"])
+        safe_run(["pkexec", "apt", "update"], bg=True)
+        safe_run(["pkexec", "apt", "upgrade", "-y"], bg=True)
     return "Spouštím aktualizaci..."
 
 
 def _set_volume_linux(level: int) -> None:
     """Nastaví hlasitost přes pactl (PulseAudio) nebo amixer."""
-    if subprocess.run(["which", "pactl"], capture_output=True).returncode == 0:
-        subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{level}%"],
-                       capture_output=True)
+    if safe_run(["which", "pactl"], timeout=3)["rc"] == 0:
+        safe_run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{level}%"], timeout=5)
     else:
-        subprocess.run(["amixer", "-q", "sset", "Master", f"{level}%"],
-                       capture_output=True)
+        safe_run(["amixer", "-q", "sset", "Master", f"{level}%"], timeout=5)
 
 
 def cmd_volume(level: int = None, action: str = None) -> str:
     try:
         if action == "mute":
             if _IS_LINUX:
-                subprocess.run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "1"],
-                                capture_output=True)
+                safe_run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "1"], timeout=5)
             return "Ztlumeno."
         if action == "unmute":
             if _IS_LINUX:
-                subprocess.run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "0"],
-                                capture_output=True)
+                safe_run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "0"], timeout=5)
             return "Odtlumeno."
         if level is not None:
             level = max(0, min(100, int(level)))
@@ -102,22 +97,20 @@ def cmd_volume(level: int = None, action: str = None) -> str:
 def cmd_set_brightness(level: int = 50) -> str:
     level = max(1, min(100, int(level)))
     if _IS_LINUX:
-        if subprocess.run(["which", "brightnessctl"], capture_output=True).returncode == 0:
-            subprocess.run(["brightnessctl", "set", f"{level}%"], capture_output=True)
+        if safe_run(["which", "brightnessctl"], timeout=3)["rc"] == 0:
+            safe_run(["brightnessctl", "set", f"{level}%"], timeout=5)
         else:
             try:
-                # xrandr bez shell=True — parsujeme výstup v Pythonu
-                r = subprocess.run(["xrandr"], capture_output=True, text=True, timeout=5)
+                r = safe_run(["xrandr"], timeout=5)
                 displays = [
                     line.split()[0]
-                    for line in r.stdout.splitlines()
+                    for line in r["stdout"].splitlines()
                     if " connected" in line
                 ]
                 for d in displays:
                     if d:
-                        subprocess.run(["xrandr", "--output", d,
-                                        "--brightness", str(level / 100)],
-                                       capture_output=True, timeout=5)
+                        safe_run(["xrandr", "--output", d,
+                                  "--brightness", str(level / 100)], timeout=5)
             except Exception as e:
                 return f"Chyba jasu: {e}"
     return f"Jas: {level}%"

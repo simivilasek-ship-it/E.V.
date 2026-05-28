@@ -20,7 +20,9 @@ import re
 import requests
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+
+from llm import _norm
 
 if TYPE_CHECKING:
     from agent_tools import ToolRegistry
@@ -55,6 +57,7 @@ class AgentState:
     replan_count:    int              = 0
     exec_count:      int              = 0
     last_tool:       str              = ""
+    last_args:       Dict[str, Any]   = field(default_factory=dict)
     last_result:     str              = ""
     final_answer:    str              = ""
     status:          NodeStatus       = NodeStatus.PLANNING
@@ -369,14 +372,6 @@ _COMPLEX = re.compile(
     r")",
     re.IGNORECASE,
 )
-
-
-def _norm(text: str) -> str:
-    import unicodedata
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', text.lower())
-        if unicodedata.category(c) != 'Mn'
-    )
 
 
 def should_handle(text: str) -> bool:

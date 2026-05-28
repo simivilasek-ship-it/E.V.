@@ -13,11 +13,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-try:
-    from loguru import logger as loguru_logger
-except ImportError:
-    loguru_logger = logging.getLogger(__name__)
-
 logger = logging.getLogger(__name__)
 
 
@@ -150,8 +145,12 @@ class HealthChecker:
     
     def _check_ollama(self) -> HealthCheckResult:
         """Kontrola Ollama API"""
-        url: str = self.config.get("ollama_url", "http://localhost:11434/api/tags")
-        
+        base = self.config.get("ollama_url", "http://localhost:11434/api/chat")
+        # /api/chat je POST endpoint — pro health check vždy používáme /api/tags (GET)
+        url: str = base.replace("/api/chat", "/api/tags").rstrip("/")
+        if not url.endswith("/api/tags"):
+            url = base.rsplit("/", 1)[0] + "/api/tags"
+
         try:
             response = requests.get(url, timeout=5)
             

@@ -55,10 +55,14 @@ class MCPBridge:
     aby nerozbil GUI vlákno.
     """
 
-    def __init__(self):
+    _DEFAULT_RESULT_LIMIT = 32_000
+
+    def __init__(self, config: Dict[str, Any] = None):
         self._servers: Dict[str, MCPServerConfig] = {}
         self._tools:   Dict[str, MCPTool] = {}   # key = "server/tool"
         self._lock = threading.Lock()
+        cfg = config or {}
+        self._result_limit: int = int(cfg.get("mcp_result_limit", self._DEFAULT_RESULT_LIMIT))
 
     # ── Registrace serverů ────────────────────────────
 
@@ -149,8 +153,9 @@ class MCPBridge:
                                 parts.append(str(item.data))
                         text = "\n".join(parts) if parts else "(prázdný výsledek)"
                         # Ochrana LLM před obřím výstupem (HTML stránky apod.)
-                        if len(text) > 32_000:
-                            text = text[:32_000] + "\n…[výstup zkrácen]"
+                        limit = self._result_limit
+                        if len(text) > limit:
+                            text = text[:limit] + "\n…[výstup zkrácen]"
                         return text
             except Exception as e:
                 logger.error(f"MCP call '{server_name}/{tool_name}': {e}")
@@ -213,7 +218,7 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
     Vytvoří MCPBridge s výchozími servery.
     Brave Search vyžaduje BRAVE_API_KEY v .env nebo config.
     """
-    bridge = MCPBridge()
+    bridge = MCPBridge(config)
 
     # ── Filesystem MCP ────────────────────────────────
     home = os.path.expanduser("~")

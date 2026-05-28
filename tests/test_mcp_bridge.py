@@ -37,7 +37,9 @@ class TestMCPBridgeRegistration:
         assert "brave-search" in bridge.get_server_names()
 
     def test_brave_vypnut_bez_klice(self):
-        bridge = _make_bridge(brave_key="")
+        import unittest.mock
+        with unittest.mock.patch.dict("os.environ", {"BRAVE_API_KEY": ""}, clear=False):
+            bridge = _make_bridge(brave_key="")
         assert "brave-search" not in bridge.get_server_names()
 
     def test_brave_vypnut_pres_config(self):
@@ -171,3 +173,106 @@ class TestMCPNotInstalled:
                 name="x", command="npx", args=["-y", "x"]))
             result = bridge.call_tool("x", "tool", {})
             assert "pip install mcp" in result
+
+
+# ── Rozšířené mock testy (B3) ─────────────────────────────────────
+
+def _make_mock_session(tool_result_text: str):
+    """Vytvoří mock ClientSession který vrátí zadaný text."""
+    mock_content = MagicMock()
+    mock_content.text = tool_result_text
+    mock_result = MagicMock()
+    mock_result.content = [mock_content]
+
+    session = AsyncMock()
+    session.initialize = AsyncMock()
+    session.call_tool = AsyncMock(return_value=mock_result)
+    session.list_tools = AsyncMock(return_value=MagicMock(tools=[]))
+    return session
+
+
+class TestMCPBridgeCallTool:
+    """Testuje call_tool() s mockovaným mcp.ClientSession."""
+
+    def test_call_tool_returns_text(self):
+        """call_tool() vrátí text z mock session."""
+        from mcp_bridge import MCPBridge, MCPServerConfig
+        bridge = MCPBridge()
+        bridge.register(MCPServerConfig("test", "echo", ["hello"], enabled=True))
+
+        mock_session = _make_mock_session("výsledek testu")
+
+        with patch("mcp_bridge.stdio_client") as mock_client, \
+             patch("mcp_bridge.ClientSession") as mock_cls:
+            mock_client.return_value.__aenter__ = AsyncMock(return_value=(AsyncMock(), AsyncMock()))
+            mock_client.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = bridge.call_tool("test", "some_tool", {"arg": "val"})
+
+        assert result == "výsledek testu"
+
+    def test_call_tool_server_not_registered(self):
+        """call_tool() pro neregistrovaný server vrátí chybový string."""
+        from mcp_bridge import MCPBridge
+        bridge = MCPBridge()
+        result = bridge.call_tool("neexistujici", "tool", {})
+        assert "není registrován" in result
+
+    def test_call_tool_no_mcp(self):
+        """Pokud HAS_MCP=False, call_tool() vrátí info string."""
+        from mcp_bridge import MCPBridge
+        with patch("mcp_bridge.HAS_MCP", False):
+            bridge = MCPBridge()
+            bridge._servers["x"] = MagicMock()
+            result = bridge.call_tool("x", "tool", {})
+        assert "není nainstalován" in result or "MCP" in result
+
+    def test_discover_tools_returns_list(self):
+        """discover_tools() vrátí seznam MCPTool objektů."""
+        from mcp_bridge import MCPBridge, MCPServerConfig
+        bridge = MCPBridge()
+        bridge.register(MCPServerConfig("test", "echo", ["x"], enabled=True))
+
+        mock_tool = MagicMock()
+        mock_tool.name = "test_tool"
+        mock_tool.description = "popis"
+        mock_tool.inputSchema = {}
+
+        mock_session = AsyncMock()
+        mock_session.initialize = AsyncMock()
+        mock_session.list_tools = AsyncMock(return_value=MagicMock(tools=[mock_tool]))
+
+        with patch("mcp_bridge.stdio_client") as mock_client, \
+             patch("mcp_bridge.ClientSession") as mock_cls:
+            mock_client.return_value.__aenter__ = AsyncMock(return_value=(AsyncMock(), AsyncMock()))
+            mock_client.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            tools = bridge.discover_tools("test")
+
+        assert len(tools) == 1
+        assert tools[0].name == "test_tool"
+
+    def test_call_tool_truncates_long_output(self):
+        """Výstup delší než limit je zkrácen."""
+        from mcp_bridge import MCPBridge, MCPServerConfig
+        bridge = MCPBridge()
+        bridge.register(MCPServerConfig("test", "echo", ["x"], enabled=True))
+
+        long_text = "x" * 50_000
+        mock_session = _make_mock_session(long_text)
+
+        with patch("mcp_bridge.stdio_client") as mock_client, \
+             patch("mcp_bridge.ClientSession") as mock_cls:
+            mock_client.return_value.__aenter__ = AsyncMock(return_value=(AsyncMock(), AsyncMock()))
+            mock_client.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = bridge.call_tool("test", "tool", {})
+
+        assert len(result) < 50_000
+        assert "zkrácen" in result or len(result) <= 32_001

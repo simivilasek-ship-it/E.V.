@@ -144,8 +144,20 @@ class STTEngine:
         if self._vosk.available:
             logger.info("STT: Vosk offline engine dostupný jako fallback")
 
+    # Jazyky podporované Google Speech Recognition
+    _SUPPORTED_LANGUAGES = {
+        "cs-CZ", "en-US", "en-GB", "de-DE", "fr-FR", "es-ES",
+        "it-IT", "pl-PL", "sk-SK", "ru-RU", "zh-CN", "ja-JP",
+        "ko-KR", "pt-BR", "nl-NL", "sv-SE", "da-DK", "fi-FI",
+        "nb-NO", "hu-HU", "ro-RO", "tr-TR", "uk-UA",
+    }
+
     def set_language(self, language: str) -> bool:
-        """Nastaví jazyk rozpoznávání."""
+        """Nastaví jazyk rozpoznávání. Vrátí False pro nepodporovaný jazyk."""
+        if language not in self._SUPPORTED_LANGUAGES:
+            logger.warning(f"Nepodporovaný jazyk STT: '{language}'. "
+                           f"Podporované: {sorted(self._SUPPORTED_LANGUAGES)}")
+            return False
         self.language = language
         logger.info(f"Jazyk STT změněn na: {language}")
         return True

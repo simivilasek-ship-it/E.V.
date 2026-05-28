@@ -12,6 +12,22 @@ audit.log
 # Runtime data
 memory_data/
 jarvis.db
+jarvis.log
+.offline_queue.json
+.offline_kb.json
+
+# Python env
+venv/
+.venv/
+
+# Pytest cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Build / packaging
 dist/

@@ -38,7 +38,15 @@ jobs:
             SpeechRecognition \
             fastapi uvicorn \
             mcp \
-            pytest pytest-timeout pytest-cov
+            pytest pytest-timeout pytest-cov \
+            ruff
+
+      - name: Install linter
+        run: pip install ruff
+
+      - name: Lint (ruff)
+        run: ruff check . --output-format=github
+        continue-on-error: true  # neblokuj CI dokud neopravíme všechny chyby
 
       - name: Start Xvfb
         run: |

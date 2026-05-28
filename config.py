@@ -72,6 +72,7 @@ DEFAULT_CONFIG = {
     "mcp_brave_enabled": False,
     "mcp_fetch_enabled": True,
     "mcp_playwright_enabled": False,
+    "mcp_result_limit": 32_000,   # max znaků z MCP nástroje před zkrácením
 }
 
 

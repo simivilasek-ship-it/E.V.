@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import threading
 import tkinter as tk
 from datetime import datetime
 from typing import Optional
@@ -281,22 +282,26 @@ class JarvisGUI:
         self.root.after(1000, self._tick_clock)
 
     def _refresh_vol(self):
-        try:
-            result = subprocess.run(
-                ["pactl", "get-sink-volume", "@DEFAULT_SINK@"],
-                capture_output=True, text=True, timeout=1,
-            )
-            if result.returncode == 0:
-                m = re.search(r"(\d+)%", result.stdout)
-                if m:
-                    pct = int(m.group(1))
-                    if pct != getattr(self, "_last_vol_pct", None):
-                        self._last_vol_pct = pct
-                        icon = "🔊" if pct > 50 else ("🔉" if pct > 0 else "🔇")
-                        col  = RED if pct > 90 else (CYAN if pct > 50 else FG2)
-                        self._vol_lbl.configure(text=f"{icon} {pct}%", text_color=col)
-        except Exception:
-            pass
+        def _fetch():
+            try:
+                result = subprocess.run(
+                    ["pactl", "get-sink-volume", "@DEFAULT_SINK@"],
+                    capture_output=True, text=True, timeout=1,
+                )
+                if result.returncode == 0:
+                    m = re.search(r"(\d+)%", result.stdout)
+                    if m:
+                        pct = int(m.group(1))
+                        if pct != getattr(self, "_last_vol_pct", None):
+                            self._last_vol_pct = pct
+                            icon = "🔊" if pct > 50 else ("🔉" if pct > 0 else "🔇")
+                            col  = RED if pct > 90 else (CYAN if pct > 50 else FG2)
+                            self.root.after(0, lambda: self._vol_lbl.configure(
+                                text=f"{icon} {pct}%", text_color=col))
+            except Exception:
+                pass
+
+        threading.Thread(target=_fetch, daemon=True).start()
         self.root.after(3000, self._refresh_vol)
 
     # ── VEŘEJNÉ API ─────────────────────────────────────

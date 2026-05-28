@@ -60,8 +60,8 @@ class OfflineManager:
         # Offline knowledge base
         self._knowledge_base: Dict[str, Any] = self._load_knowledge_base()
         
-        # Persist queue do souboru
-        self._queue_file: Path = Path(".offline_queue.json")
+        # Persist queue do souboru — absolutní cesta vedle offline_mode.py
+        self._queue_file: Path = Path(__file__).parent / ".offline_queue.json"
         self._load_queued_commands()
     
     def set_status(self, status: OfflineStatus) -> None:
@@ -162,7 +162,7 @@ class OfflineManager:
     
     def _load_knowledge_base(self) -> Dict[str, Any]:
         """Načti offline knowledge base"""
-        kb_file = Path(".offline_kb.json")
+        kb_file = Path(__file__).parent / ".offline_kb.json"
         
         if not kb_file.exists():
             # Vytvoř výchozí knowledge base

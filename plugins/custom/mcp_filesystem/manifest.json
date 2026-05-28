@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "description": "Pokročilé operace se soubory přes MCP filesystem server — čtení obsahu, stromová struktura, full-text hledání, přesouvání.",
   "author": "JARVIS",
-  "permissions": ["find_files", "open_file", "create_folder", "create_file", "delete_file", "move_file"],
+  "permissions": ["files", "mcp"],
   "triggers": ["čti soubor", "obsah souboru", "strom složek", "hledej v souborech", "přečti"]
 }

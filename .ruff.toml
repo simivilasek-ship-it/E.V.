@@ -1,0 +1,28 @@
+# .ruff.toml — JARVIS linter konfigurace
+target-version = "py311"
+line-length = 100
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",  # line too long (handled separately)
+    "B008",  # do not perform function calls in default arguments
+    "SIM108",# ternary operator (sometimes less readable)
+    "UP007", # X | Y union syntax (Python 3.10+, we support 3.11+)
+    "F401",  # unused import (plugins use star imports)
+]
+
+[lint.per-file-ignores]
+"test_*.py" = ["F811", "F401"]
+"tests/*.py" = ["F811", "F401"]
+"plugins/*" = ["F401", "F811"]
+"agent_graph.py" = ["F821"]  # _norm importován z llm, ruff false positive

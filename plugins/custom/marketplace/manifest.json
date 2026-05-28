@@ -4,7 +4,7 @@
   "description": "JARVIS Plugin Marketplace — instalace, seznam a správa pluginů z GitHubu",
   "author": "JARVIS team",
   "entry_point": "skill",
-  "permissions": ["network", "filesystem"],
+  "permissions": ["files"],
   "triggers": [
     "marketplace seznam",
     "nainstaluj plugin",

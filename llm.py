@@ -145,6 +145,32 @@ def _parse_translate(a: str) -> dict:
     return {"text": text, "to_lang": to_lang}
 
 
+def _parse_currency(a: str) -> dict:
+    # Předpokládá "100 USD na CZK" nebo "1 EUR CZK"
+    parts = a.upper().split()
+    amount = 1.0
+    from_curr = "USD"
+    to_curr = "CZK"
+    try:
+        if parts and parts[0].replace(".", "").isdigit():
+            amount = float(parts[0])
+            parts = parts[1:]
+        if parts:
+            from_curr = parts[0]
+        found = False
+        for sep in ("NA", "TO", "IN"):
+            if sep in parts:
+                idx = parts.index(sep)
+                to_curr = parts[idx + 1] if idx + 1 < len(parts) else to_curr
+                found = True
+                break
+        if not found and len(parts) >= 2:
+            to_curr = parts[-1]
+    except (ValueError, IndexError):
+        pass
+    return {"amount": amount, "from_curr": from_curr, "to_curr": to_curr}
+
+
 def _parse_reminder(a: str) -> dict:
     # Předpokládá "text za 5 minut"
     parts = a.split(" za ", 1)
@@ -599,7 +625,10 @@ class LLMEngine:
         self.memory  = memory or JarvisMemory(config)
         self._stream_resp = None
         self._profile_context = ""   # injektovaný souhrn UserProfile
-        logger.info(f"LLM: {self.model} @ {self.url} + Neural Memory")
+
+        from llm_router import LLMRouter
+        self._llm_router = LLMRouter(self.url, self.model)
+        logger.info(f"LLM: {self.model} @ {self.url} + Neural Memory + LLMRouter")
 
     def _extract_user_facts(self, text: str) -> None:
         """Zkusí extrahovat fakta o uživateli z jeho zprávy do UserProfile."""
@@ -626,13 +655,13 @@ class LLMEngine:
 
     # ── QUICK MATCH (lokální router) ─────────────────
 
-    def _quick_match(self, text: str) -> tuple:
+    def quick_match(self, text: str) -> tuple:
         return _router.route(text)
 
     # ── ASK (non-streaming) ──────────────────────────
 
     def ask(self, user_text: str) -> Tuple[str, Dict]:
-        msg, action = self._quick_match(user_text)
+        msg, action = self.quick_match(user_text)
         if action is not None:
             # Do LLM history ukládáme jen informační odpovědi, ne akce (otevři, zavři…)
             action_name = action.get("action", "")
@@ -653,12 +682,15 @@ class LLMEngine:
         if context:
             system += f"\n\nRelevantní kontext z paměti:\n{context}"
 
+        task = self._llm_router.detect_task(user_text)
+        routed_model, temperature, max_tokens = self._llm_router.get_model_for_task(task)
+
         payload = {
-            "model":    self.model,
+            "model":    routed_model,
             "messages": [{"role": "system", "content": system},
                          *list(self.history)],
             "stream":   False,
-            "options":  {"temperature": 0.3, "num_predict": 800},
+            "options":  {"temperature": temperature, "num_predict": max_tokens},
         }
         try:
             resp = requests.post(self.url, json=payload, timeout=60)
@@ -677,7 +709,7 @@ class LLMEngine:
     # ── STREAM ASK ───────────────────────────────────
 
     def stream_ask(self, user_text: str):
-        msg, action = self._quick_match(user_text)
+        msg, action = self.quick_match(user_text)
         if action is not None:
             # Do LLM history ukládáme jen informační odpovědi, ne akce (otevři, zavři…)
             action_name = action.get("action", "")
@@ -700,12 +732,15 @@ class LLMEngine:
         if context:
             system += f"\n\nRelevantní kontext z paměti:\n{context}"
 
+        task = self._llm_router.detect_task(user_text)
+        routed_model, temperature, max_tokens = self._llm_router.get_model_for_task(task)
+
         payload = {
-            "model":    self.model,
+            "model":    routed_model,
             "messages": [{"role": "system", "content": system},
                          *list(self.history)],
             "stream":   True,
-            "options":  {"temperature": 0.3, "num_predict": 800},
+            "options":  {"temperature": temperature, "num_predict": max_tokens},
         }
         try:
             self._stream_resp = requests.post(

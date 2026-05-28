@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "description": "Operace se schránkou — 'zkopíruj', 'vlož', 'co je ve schránce'.",
   "author": "JARVIS",
-  "permissions": ["clipboard_set"],
+  "permissions": ["system"],
   "triggers": ["zkopiruj", "vloz", "schranky", "clipboard"]
 }

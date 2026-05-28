@@ -51,6 +51,36 @@ _SAFE_IMPORTS: Set[str] = {
 
 # Moduly které manifest může explicitně povolit přes "permissions".
 # Klíč = název permission, hodnota = množina kořenových modulů.
+MANIFEST_SCHEMA = {
+    "required": ["name", "version", "description", "permissions"],
+    "types": {
+        "name":        str,
+        "version":     str,
+        "description": str,
+        "author":      str,
+        "permissions": list,
+        "triggers":    list,
+    },
+    "valid_permissions": {"answer", "system", "media", "files", "mcp"},
+}
+
+
+class ManifestValidator:
+    @staticmethod
+    def validate(manifest: dict) -> tuple:
+        """Vrátí (True, '') nebo (False, 'chybová zpráva')."""
+        for field in MANIFEST_SCHEMA["required"]:
+            if field not in manifest:
+                return False, f"Chybí povinné pole: {field}"
+        for field, expected_type in MANIFEST_SCHEMA["types"].items():
+            if field in manifest and not isinstance(manifest[field], expected_type):
+                return False, f"Pole '{field}' musí být {expected_type.__name__}"
+        for perm in manifest.get("permissions", []):
+            if perm not in MANIFEST_SCHEMA["valid_permissions"]:
+                return False, f"Neplatné oprávnění: '{perm}'"
+        return True, ""
+
+
 _PERMISSION_MODULES: Dict[str, Set[str]] = {
     "os":         {"os", "os.path"},
     "subprocess": {"subprocess"},
@@ -293,6 +323,10 @@ class PluginManager:
     def _parse_manifest(self, manifest_file: Path, skill_dir: Path) -> Optional[SkillManifest]:
         try:
             data = json.loads(manifest_file.read_text(encoding="utf-8"))
+            valid, err = ManifestValidator.validate(data)
+            if not valid:
+                logger.warning(f"Skill '{skill_dir}' má neplatný manifest: {err} — přeskočen")
+                return None
             return SkillManifest(
                 name=data.get("name", skill_dir.name),
                 version=data.get("version", "1.0.0"),
@@ -449,12 +483,23 @@ class PluginManager:
 
     def call_route(self, handler: Callable, text: str,
                    plugin_name: str = "?") -> Optional[Tuple]:
-        """Zavolá plugin route handler s timeoutem."""
-        result, err = self._call_with_timeout(
-            handler, (text,), {}, _PLUGIN_ROUTE_TIMEOUT, plugin_name)
-        if err:
-            return None
-        return result
+        """Zavolá handler s timeoutem. Při chybě vrátí (None, None)."""
+        timeout = self.config.get("plugin_handler_timeout", 5.0)
+        # cancel_futures=True zajistí že shutdown nečeká na running thread
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = pool.submit(handler, text)
+        try:
+            result = future.result(timeout=timeout)
+            return result
+        except concurrent.futures.TimeoutError:
+            logger.warning(f"Plugin '{plugin_name}' handler timeout ({timeout}s)")
+            future.cancel()
+            return None, None
+        except Exception as e:
+            logger.error(f"Plugin '{plugin_name}' handler chyba: {e}")
+            return None, None
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def call_action(self, action_fn: Callable, plugin_name: str = "?",
                     **kwargs) -> Tuple[Optional[Any], Optional[str]]:

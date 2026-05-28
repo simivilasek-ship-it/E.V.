@@ -185,7 +185,7 @@ class TestLLMEngine(unittest.TestCase):
         self.llm = LLMEngine(_CFG)
 
     def test_has_api(self):
-        for m in ("ask", "stream_ask", "clear_history", "is_available", "_quick_match"):
+        for m in ("ask", "stream_ask", "clear_history", "is_available", "quick_match"):
             self.assertTrue(hasattr(self.llm, m))
 
     def test_clear_history(self):
@@ -194,14 +194,14 @@ class TestLLMEngine(unittest.TestCase):
         self.assertEqual(len(self.llm.history), 0)
 
     def test_quick_match_time(self):
-        msg, action = self.llm._quick_match("kolik je hodin")
+        msg, action = self.llm.quick_match("kolik je hodin")
         self.assertIsNotNone(action)
         self.assertEqual(action["action"], "get_time")
         self.assertIn(":", msg)
 
     def test_quick_match_unknown(self):
         # Čistě konverzační dotaz
-        _, action = self.llm._quick_match("ahoj jak se máš")
+        _, action = self.llm.quick_match("ahoj jak se máš")
         self.assertIsNone(action)
 
     @patch("requests.post")
@@ -240,7 +240,7 @@ class TestCommands(unittest.TestCase):
         self.assertEqual(result, "ok")
         mock_run.assert_called()
 
-    @patch("commands.system.subprocess.run")
+    @patch("commands.utils.subprocess.run")
     def test_volume_mute(self, mock_run):
         mock_run.return_value = MagicMock(returncode=0)
         result = self.cmds.execute("volume", {"action": "mute"})
@@ -667,20 +667,23 @@ class TestPluginTimeout(unittest.TestCase):
 
     def test_slow_handler_times_out(self):
         import time as _time
+        # Nastavíme krátký timeout pro test
+        self.pm.config["plugin_handler_timeout"] = 0.3
 
         def slow_handler(text):
-            _time.sleep(10)   # daleko přes 3s limit
+            _time.sleep(10)
             return "Nikdy", {}
 
         result = self.pm.call_route(slow_handler, "test", plugin_name="slow")
-        self.assertIsNone(result)
+        self.assertEqual(result, (None, None))  # call_route vrátí (None, None)
+        self.pm.config["plugin_handler_timeout"] = 5.0  # reset
 
     def test_crashing_handler_returns_none(self):
         def bad_handler(text):
             raise RuntimeError("plugin explodoval")
 
         result = self.pm.call_route(bad_handler, "test", plugin_name="bad")
-        self.assertIsNone(result)
+        self.assertEqual(result, (None, None))  # call_route vrátí (None, None)
 
     def test_action_timeout(self):
         from unittest.mock import patch

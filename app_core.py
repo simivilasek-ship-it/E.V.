@@ -170,7 +170,7 @@ class JarvisApp:
         try:
             from agent_react import get_react_agent
             self.react_agent = get_react_agent(
-                executor=self.cmd, mcp_bridge=mcp,
+                executor=self.cmds, mcp_bridge=mcp,
                 ollama_url=url, model=model)
             logger.info("ReactAgent připraven")
         except Exception as e:
@@ -180,7 +180,7 @@ class JarvisApp:
         try:
             from agent_graph import get_graph_agent
             self.graph_agent = get_graph_agent(
-                executor=self.cmd, mcp_bridge=mcp,
+                executor=self.cmds, mcp_bridge=mcp,
                 ollama_url=url, model=model)
             logger.info("GraphAgent připraven")
         except Exception as e:
@@ -377,76 +377,9 @@ class JarvisApp:
         self._gui(lambda: self.gui.set_status("Zpracovávám..."))
 
         try:
-            # 1. Zkus plugin routes (nové)
-            if self.plugin_manager:
-                plugin_result = self._try_plugin_routes(text)
-                if plugin_result:
-                    msg, action_data = plugin_result
-                    self._execute_result(msg, action_data)
-                    return
-
-            # 2. Zkus lokální router (LLM quick match)
-            msg, action_data = self.llm._quick_match(text)
-            if action_data is not None:
-                self._execute_result(msg, action_data)
+            if self._try_fast_path(text):
                 return
-
-            # 3. Složitý úkol → Grafový agent (Planner+Router+Executor+Critic)
-            from agent_graph import should_handle as _graph_should
-            if getattr(self, "graph_agent", None) and _graph_should(text):
-                self._gui(lambda: self.gui.set_status("Plánovač přemýšlí…"))
-
-                def _on_graph_step(s: str):
-                    self._gui(lambda m=s: self.gui.set_status(m))
-
-                answer = self.graph_agent.run(text, on_step=_on_graph_step)
-                self._execute_result(answer, {"action": "answer", "params": {}})
-                return
-
-            # 3b. Vícesvůlový úkol → ReAct agent (fallback)
-            from agent_react import should_handle as _react_should
-            if getattr(self, "react_agent", None) and _react_should(text):
-                self._gui(lambda: self.gui.set_status("Agent přemýšlí…"))
-
-                def _on_step(s: str):
-                    self._gui(lambda m=s: self.gui.set_status(m))
-
-                answer = self.react_agent.run(text, on_step=_on_step)
-                self._execute_result(answer, {"action": "answer", "params": {}})
-                return
-
-            # 4. Pokud nic nesedí, použij LLM
-            if not self._ollama_reachable():
-                offline_msg = (
-                    "Ollama není dostupná. Lokální příkazy fungují normálně — "
-                    "zkus např. 'kolik je hodin', 'otevři chrome' nebo 'hlasitost na 50'."
-                )
-                self._execute_result(offline_msg, {"action": "answer", "params": {}})
-                return
-
-            full_response = ""
-            is_command    = False
-
-            def _collecting_generator():
-                nonlocal full_response, is_command
-                for chunk in self.llm.stream_ask(text):
-                    full_response += chunk
-                    if "COMMAND:" in full_response:
-                        is_command = True
-                        return
-                    yield chunk
-
-            # speak_streaming přehrává větu po větě okamžitě
-            self.tts.speak_streaming(_collecting_generator())
-
-            if is_command:
-                for chunk in self.llm.drain_stream():
-                    full_response += chunk
-
-            full_text = full_response.strip()
-            if full_text:
-                self._execute_result(full_text, {"action": "answer", "params": {}}, speak=False)
-
+            self._run_llm_path(text)
         except Exception as e:
             logger.error(f"Chyba: {e}", exc_info=True)
             self.error_handler.log_error(
@@ -460,6 +393,74 @@ class JarvisApp:
         finally:
             self._gui(lambda: self.gui.set_state("idle"))
             self._gui(lambda: self.gui.set_status(""))
+
+    def _try_fast_path(self, text: str) -> bool:
+        """Zkusí rychlé cesty (plugin → lokální router → agenti). Vrátí True pokud obslouženo."""
+        # 1. Plugin routes
+        if self.plugin_manager:
+            plugin_result = self._try_plugin_routes(text)
+            if plugin_result:
+                msg, action_data = plugin_result
+                self._execute_result(msg, action_data)
+                return True
+
+        # 2. Lokální router (bez LLM)
+        msg, action_data = self.llm.quick_match(text)
+        if action_data is not None:
+            self._execute_result(msg, action_data)
+            return True
+
+        # 3. Grafový agent (Planner+Router+Executor+Critic) pro složité úkoly
+        from agent_graph import should_handle as _graph_should
+        if getattr(self, "graph_agent", None) and _graph_should(text):
+            self._gui(lambda: self.gui.set_status("Plánovač přemýšlí…"))
+            answer = self.graph_agent.run(
+                text, on_step=lambda s: self._gui(lambda m=s: self.gui.set_status(m)))
+            self._execute_result(answer, {"action": "answer", "params": {}})
+            return True
+
+        # 4. ReAct agent (fallback pro vícesvůlové úkoly)
+        from agent_react import should_handle as _react_should
+        if getattr(self, "react_agent", None) and _react_should(text):
+            self._gui(lambda: self.gui.set_status("Agent přemýšlí…"))
+            answer = self.react_agent.run(
+                text, on_step=lambda s: self._gui(lambda m=s: self.gui.set_status(m)))
+            self._execute_result(answer, {"action": "answer", "params": {}})
+            return True
+
+        return False
+
+    def _run_llm_path(self, text: str):
+        """Zpracuje příkaz přes LLM (streaming)."""
+        if not self._ollama_reachable():
+            self._execute_result(
+                "Ollama není dostupná. Lokální příkazy fungují normálně — "
+                "zkus např. 'kolik je hodin', 'otevři chrome' nebo 'hlasitost na 50'.",
+                {"action": "answer", "params": {}},
+            )
+            return
+
+        full_response = ""
+        is_command    = False
+
+        def _collecting_generator():
+            nonlocal full_response, is_command
+            for chunk in self.llm.stream_ask(text):
+                full_response += chunk
+                if "COMMAND:" in full_response:
+                    is_command = True
+                    return
+                yield chunk
+
+        self.tts.speak_streaming(_collecting_generator())
+
+        if is_command:
+            for chunk in self.llm.drain_stream():
+                full_response += chunk
+
+        full_text = full_response.strip()
+        if full_text:
+            self._execute_result(full_text, {"action": "answer", "params": {}}, speak=False)
 
     def _try_plugin_routes(self, text: str) -> Optional[Tuple[str, dict]]:
         """Zkusí routovat příkaz přes pluginy"""
@@ -545,7 +546,8 @@ class JarvisApp:
                     message=f"Akce {action} selhala: {e}",
                     exception=e,
                 )
-                self._gui(lambda: self.gui.set_status(f"Chyba: {e}"))
+                err_msg = str(e)
+                self._gui(lambda: self.gui.set_status(f"Chyba: {err_msg}"))
 
     def _gui(self, fn):
         try:
