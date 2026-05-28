@@ -30,11 +30,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-MAX_STEPS    = 8     # max Executor volání celkem
-MAX_RETRIES  = 2     # max opakování jednoho kroku při chybě
-MAX_REPLANS  = 1     # max přeplánování při záseknutí
-LLM_TOKENS   = 500
-GLOBAL_TIMEOUT = 120  # max celková doba běhu v sekundách
+from config import CONFIG as _CONFIG
+MAX_STEPS      = _CONFIG.get("agent_max_steps",    8)
+MAX_RETRIES    = _CONFIG.get("agent_max_retries",  2)
+MAX_REPLANS    = _CONFIG.get("agent_max_replans",  1)
+LLM_TOKENS     = _CONFIG.get("agent_llm_tokens",  500)
+GLOBAL_TIMEOUT = _CONFIG.get("agent_timeout",      120)
 
 
 # ── Stav grafu ────────────────────────────────────────────────────

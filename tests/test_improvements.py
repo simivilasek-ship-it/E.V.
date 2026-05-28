@@ -168,12 +168,12 @@ class TestFuzzyMatching:
 
     def test_router_bez_rapidfuzz_funguje(self):
         """LocalRouter funguje i bez rapidfuzz (fallback)."""
-        import llm
-        original = llm._HAS_FUZZY
-        llm._HAS_FUZZY = False
+        import local_router
+        original = local_router._HAS_FUZZY
+        local_router._HAS_FUZZY = False
         try:
-            r = llm.LocalRouter()
+            r = local_router.LocalRouter()
             msg, action = r.route("kolik je hodin")
             assert action is not None   # regex zachytí
         finally:
-            llm._HAS_FUZZY = original
+            local_router._HAS_FUZZY = original

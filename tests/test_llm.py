@@ -50,17 +50,29 @@ class TestLLMRouter:
     """Test LLM router (local command recognition)"""
     
     def test_parse_command_simple(self):
-        """Test parsing simple commands"""
+        """Test parsing simple commands — route() vrátí tuple (message, action_dict)"""
         from llm import LocalRouter as LLMRouter
         router = LLMRouter()
-        # Router should recognize common patterns
-        assert callable(router.route) or True
-    
-    def test_parse_command_action(self):
-        """Test command action recognition"""
-        # Should recognize action from user input
-        # Examples: "otevři chrome", "kolik je hodin", atd.
-        pass
+        result = router.route("kolik je hodin")
+        assert isinstance(result, tuple) and len(result) == 2
+        _msg, action = result
+        assert isinstance(action, dict)
+        assert action.get("action") == "get_time"
+
+    def test_parse_command_open_app(self):
+        """Test rozpoznání příkazu pro otevření aplikace"""
+        from llm import LocalRouter as LLMRouter
+        router = LLMRouter()
+        _msg, action = router.route("otevři chrome")
+        assert isinstance(action, dict)
+        assert action.get("action") == "open_app"
+
+    def test_parse_command_unknown_returns_none(self):
+        """Neznámý vstup vrátí (None, None)"""
+        from llm import LocalRouter as LLMRouter
+        router = LLMRouter()
+        result = router.route("nějaký nesmysl xyz")
+        assert result == (None, None)
 
 
 class TestSystemPrompt:

@@ -1,5 +1,5 @@
 """
-JARVIS v3.1 — hlavní okno (OpenCode styl)
+JARVIS v4.2 — hlavní okno (OpenCode styl)
 Top bar → fullwidth chat → bottom input bar.
 """
 
@@ -188,7 +188,7 @@ class JarvisGUI:
         self._chat = ctk.CTkScrollableFrame(
             self.root, fg_color=BG, corner_radius=0)
         self._chat.pack(fill="both", expand=True, side="top")
-        self._add_sys("JARVIS v3.1 připraven.  Ctrl+L = clear  Ctrl+E = export  Space = mic")
+        self._add_sys("JARVIS v4.2 připraven.  Ctrl+L = clear  Ctrl+E = export  Space = mic")
 
     # ── INPUT BAR ───────────────────────────────────────
 

@@ -1,7 +1,9 @@
 """
-JARVIS v3.0 — Konfigurace
+JARVIS — Konfigurace
 Načítání a validace z .env, config.json s fallbackem na defaults
 """
+
+__version__ = "4.2.0"
 
 import os
 import json
@@ -73,6 +75,12 @@ DEFAULT_CONFIG = {
     "mcp_fetch_enabled": True,
     "mcp_playwright_enabled": False,
     "mcp_result_limit": 32_000,   # max znaků z MCP nástroje před zkrácením
+    # Agent graph
+    "agent_max_steps": 8,         # max Executor volání celkem
+    "agent_max_retries": 2,       # max opakování jednoho kroku při chybě
+    "agent_max_replans": 1,       # max přeplánování při záseknutí
+    "agent_timeout": 120,         # max celková doba běhu grafu v sekundách
+    "agent_llm_tokens": 500,      # max tokenů na jeden LLM call v grafu
 }
 
 

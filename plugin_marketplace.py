@@ -10,6 +10,7 @@ Příkazy (přes LocalRouter):
 """
 
 from __future__ import annotations
+from pathlib import Path
 
 
 class PluginMarketplace:
@@ -83,21 +84,34 @@ class PluginMarketplace:
         return "\n".join(lines)
 
     def install(self, name: str) -> str:
-        """Stáhne plugin z GitHub jako ZIP a rozbalí do plugins/custom/."""
-        import zipfile, io, requests
+        """Stáhne plugin z GitHub jako ZIP, nebo zkopíruje vestavěný plugin."""
+        import zipfile, io, requests, shutil
         info = self.REGISTRY.get(name.lower())
         if not info:
-            return f"Plugin '{name}' není v marketplace. Zkus 'marketplace seznam'."
+            available = ", ".join(self.REGISTRY.keys())
+            return f"Plugin '{name}' není v marketplace. Dostupné: {available}"
         dest = self.plugins_dir / name
         if dest.exists():
             return f"Plugin '{name}' je již nainstalován. Použij 'aktualizuj plugin {name}'."
+
+        # Vestavěné pluginy — kopíruj z builtin adresáře
+        if info.get("builtin"):
+            src = Path(info["builtin_path"])
+            if src.exists():
+                shutil.copytree(src, dest)
+                return f"Plugin '{name}' nainstalován (builtin). Restartuj JARVIS pro aktivaci."
+            return f"Vestavěný plugin '{name}' nebyl nalezen v {src}."
+
         repo = info["repo"]
+        if not repo:
+            return f"Plugin '{name}' nemá URL repozitáře."
         url = f"https://github.com/{repo}/archive/refs/heads/main.zip"
         try:
             r = requests.get(url, timeout=15)
+            if r.status_code == 404:
+                return f"Repozitář '{repo}' nenalezen na GitHubu (404). Zkontroluj název."
             r.raise_for_status()
             with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-                # Extrahuj do tmp, přesuň do plugins_dir/name
                 repo_name = repo.split("/")[1]
                 prefix = f"{repo_name}-main/"
                 dest.mkdir(parents=True, exist_ok=True)
@@ -107,10 +121,10 @@ class PluginMarketplace:
                         rel = member[len(prefix):]
                         (dest / rel).parent.mkdir(parents=True, exist_ok=True)
                         (dest / rel).write_bytes(data)
-            return f"Plugin '{name}' nainstalován do {dest}. Restartuj JARVIS pro aktivaci."
+            return f"Plugin '{name}' nainstalován. Restartuj JARVIS pro aktivaci."
         except Exception as e:
             if dest.exists():
-                import shutil; shutil.rmtree(dest, ignore_errors=True)
+                shutil.rmtree(dest, ignore_errors=True)
             return f"Chyba instalace '{name}': {e}"
 
     def uninstall(self, name: str) -> str:
