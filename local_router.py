@@ -250,6 +250,18 @@ class LocalRouter:
         t  = _norm(text)
         dt = datetime.now()
 
+        # ── ZAVŘÍT / UKONČIT (před fuzzy pasem — jinak "zavři X" matchuje "otevři X") ──
+        if _CLOSE_TRIGGER.search(t):
+            app_name = _extract_app_name(text)
+            if len(app_name) > 1:
+                proc = app_name.lower()
+                for alias, real in _PROC_ALIASES.items():
+                    if _norm(alias) in proc:
+                        proc = real
+                        break
+                return f"Ukončuji {app_name}.", {
+                    "action": "kill_process", "params": {"name": proc}}
+
         # ── FUZZY PRE-PASS (překlepy a alternativní formulace) ───────
         if _HAS_FUZZY and len(t) < 40:
             for phrase, action, params_fn in _FUZZY_COMMANDS:
@@ -330,18 +342,6 @@ class LocalRouter:
             return "Další skladba.", {"action": "media", "params": {"action": "next"}}
         if re.search(r"\b(predchozi\s+skladb|zpet\s+skladb)\b", t):
             return "Předchozí.", {"action": "media", "params": {"action": "prev"}}
-
-        # ── ZAVŘÍT APLIKACI ───────────────────────────
-        if _CLOSE_TRIGGER.search(t):
-            app_name = _extract_app_name(text)
-            if len(app_name) > 1:
-                proc = app_name.lower()
-                for alias, real in _PROC_ALIASES.items():
-                    if _norm(alias) in proc:
-                        proc = real
-                        break
-                return f"Ukončuji {app_name}.", {
-                    "action": "kill_process", "params": {"name": proc}}
 
         # ── YT-DLP: STÁHNOUT ──────────────────────────
         if re.search(r"\b(stahni|download|stahnout|uloz\s+video|uloz\s+audio)\b", t):

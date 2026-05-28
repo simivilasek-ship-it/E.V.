@@ -315,6 +315,75 @@ if HAS_FASTAPI:
         except Exception:
             return []
 
+    # ── CORS pro React frontend na portu 3000 ────────
+    try:
+        from fastapi.middleware.cors import CORSMiddleware
+        app.add_middleware(CORSMiddleware,
+            allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+            allow_methods=["*"], allow_headers=["*"])
+    except Exception:
+        pass
+
+    @app.post("/api/command")
+    async def run_command(body: dict):
+        """Spustí příkaz přes JARVIS a vrátí odpověď."""
+        cmd = body.get("command", "").strip()
+        if not cmd:
+            return {"error": "Prázdný příkaz"}
+        try:
+            from llm import LLMEngine, LocalRouter
+            from config import CONFIG
+            router = LocalRouter()
+            msg, action = router.route(cmd)
+            if action:
+                from commands import CommandExecutor
+                cmds = CommandExecutor(CONFIG)
+                result = cmds.execute(action["action"], action.get("params", {}))
+                return {"response": result or msg, "action": action["action"]}
+            # Fallback — LLM
+            llm = LLMEngine(CONFIG)
+            resp, _ = llm.ask(cmd)
+            return {"response": resp}
+        except Exception as e:
+            return {"response": f"Chyba: {e}", "error": str(e)}
+
+    @app.get("/api/plugins")
+    async def list_plugins():
+        """Seznam načtených pluginů."""
+        try:
+            from plugin_system import create_plugin_manager
+            from config import CONFIG
+            pm = create_plugin_manager(CONFIG)
+            skills = pm.discover_skills()
+            return {"plugins": [{"name": s.name, "version": getattr(s, 'version', '1.0'),
+                                  "description": getattr(s, 'description', '')} for s in skills]}
+        except Exception as e:
+            return {"plugins": [], "error": str(e)}
+
+    @app.get("/api/memory")
+    async def memory_query(q: str = ""):
+        """Dotaz do JARVIS paměti."""
+        try:
+            from memory import JarvisMemory
+            from config import CONFIG
+            mem = JarvisMemory(CONFIG)
+            results = mem.recall(q, top_k=5) if q else []
+            stats   = mem.stats()
+            return {"results": results, "stats": stats}
+        except Exception as e:
+            return {"results": [], "error": str(e)}
+
+    @app.get("/api/config")
+    async def get_config():
+        """Vrátí aktuální konfiguraci (bez secrets)."""
+        try:
+            from config import CONFIG
+            safe = {k: v for k, v in CONFIG.items()
+                    if k not in ("brave_api_key",) and "key" not in k.lower()}
+            return safe
+        except Exception:
+            return {}
+
     @app.websocket("/ws/logs")
     async def ws_logs(ws: WebSocket):
         await ws.accept()

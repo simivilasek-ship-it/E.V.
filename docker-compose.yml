@@ -1,5 +1,4 @@
-version: '3.8'
-
+# JARVIS v4.3 — Docker Compose
 services:
   ollama:
     image: ollama/ollama:latest
@@ -8,23 +7,40 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
-    command: serve
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   jarvis:
     build: .
     depends_on:
-      - ollama
+      ollama:
+        condition: service_healthy
+    ports:
+      - "8002:8002"
     environment:
-      - DISPLAY=${DISPLAY}
+      - OLLAMA_URL=http://ollama:11434/api/chat
+      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
     volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ${HOME}/.config/pulse:/home/jarvis/.config/pulse:rw
-      - ${HOME}/.Xauthority:/home/jarvis/.Xauthority:rw
-    devices:
-      - /dev/snd:/dev/snd
-    network_mode: host
+      - jarvis_memory:/app/memory_data
+      - jarvis_config:/app/config.json
     restart: unless-stopped
-    command: ["python", "jarvis.py"]
+
+  # Desktop mód — přidej GUI přes X11 (Linux only)
+  # jarvis-desktop:
+  #   build: .
+  #   command: python jarvis.py
+  #   environment:
+  #     - DISPLAY=${DISPLAY}
+  #   volumes:
+  #     - /tmp/.X11-unix:/tmp/.X11-unix:rw
+  #   devices:
+  #     - /dev/snd:/dev/snd
+  #   network_mode: host
 
 volumes:
   ollama_data:
+  jarvis_memory:
+  jarvis_config:

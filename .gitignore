@@ -39,3 +39,5 @@ build/
 .idea/
 *.swp
 *~
+web_dist/
+web/node_modules/

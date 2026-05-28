@@ -78,15 +78,15 @@ class TestSecurityPipeline:
         return SecurityManager(max_permission=PermissionLevel.ELEVATED)
 
     def test_safe_action_allowed(self, security):
-        ok, reason = security.check_action("get_time", {})
+        ok, reason = security.check("get_time", {})
         assert ok is True
 
     def test_elevated_action_allowed_within_limit(self, security):
-        ok, reason = security.check_action("delete_file", {"path": "/tmp/x.txt"})
+        ok, reason = security.check("delete_file", {"path": "/tmp/x.txt"})
         assert ok is True
 
     def test_dangerous_pattern_blocked(self, security):
-        ok, reason = security.check_action("run_script", {"cmd": "rm -rf /"})
+        ok, reason = security.check("run_script", {"cmd": "rm -rf /"})
         assert ok is False
         assert reason != ""
 

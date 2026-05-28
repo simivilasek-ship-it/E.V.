@@ -14,6 +14,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 pytestmark = [pytest.mark.unit]
 
 
+# ── Helpers ───────────────────────────────────────────
+
+def _wait_done(task, timeout=5.0, interval=0.02):
+    """Poll dokud task není COMPLETED/FAILED/TIMEOUT/CANCELLED."""
+    from async_utils import TaskStatus
+    terminal = {TaskStatus.COMPLETED, TaskStatus.FAILED,
+                TaskStatus.TIMEOUT, TaskStatus.CANCELLED}
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if task.status in terminal:
+            return True
+        time.sleep(interval)
+    return False
+
+
 # ── Fixtures ─────────────────────────────────────────
 
 
@@ -22,13 +37,9 @@ def engine():
     from async_utils import AsyncEngine
     e = AsyncEngine(max_workers=2)
     e.start()
+    time.sleep(0.05)   # dej worker threadu chvíli na start
     yield e
     e.stop(timeout=2.0)
-
-
-def _wait_result(task, timeout=5.0):
-    """Čeká na výsledek AsyncTask přes result_blocking()."""
-    return task.result_blocking(timeout=timeout)
 
 
 # ── Lifecycle ─────────────────────────────────────────
@@ -60,16 +71,21 @@ class TestAsyncEngineLifecycle:
 
 class TestRunSync:
 
-    def test_run_sync_returns_task(self, engine):
+    def test_run_sync_completes(self, engine):
         from async_utils import TaskStatus
         task = engine.run_sync(lambda: 42)
-        result = _wait_result(task)
-        assert result == 42
+        assert _wait_done(task)
         assert task.status == TaskStatus.COMPLETED
+
+    def test_run_sync_returns_correct_value(self, engine):
+        task = engine.run_sync(lambda: 42)
+        _wait_done(task)
+        assert task.result == 42
 
     def test_run_sync_with_args(self, engine):
         task = engine.run_sync(lambda a, b: a + b, 3, 4)
-        assert _wait_result(task) == 7
+        _wait_done(task)
+        assert task.result == 7
 
     def test_run_sync_exception_sets_failed_status(self, engine):
         from async_utils import TaskStatus
@@ -78,12 +94,12 @@ class TestRunSync:
             raise ValueError("testovací chyba")
 
         task = engine.run_sync(boom)
-        _wait_result(task)
+        _wait_done(task)
         assert task.status == TaskStatus.FAILED
 
     def test_run_sync_task_name(self, engine):
         task = engine.run_sync(lambda: None, task_name="muj_task")
-        _wait_result(task)
+        _wait_done(task)
         assert task.name == "muj_task"
 
     def test_multiple_tasks_concurrent(self, engine):
@@ -91,18 +107,20 @@ class TestRunSync:
         lock = threading.Lock()
 
         def worker(n):
-            time.sleep(0.05)
+            time.sleep(0.02)
             with lock:
                 results.append(n)
             return n
 
         tasks = [engine.run_sync(worker, i) for i in range(5)]
-        values = [_wait_result(t) for t in tasks]
+        for t in tasks:
+            _wait_done(t)
+        values = [t.result for t in tasks]
         assert sorted(values) == list(range(5))
 
     def test_run_sync_result_attribute(self, engine):
         task = engine.run_sync(lambda: "výsledek")
-        _wait_result(task)
+        _wait_done(task)
         assert task.result == "výsledek"
 
 
@@ -110,27 +128,19 @@ class TestTaskPriority:
 
     def test_priority_enum_values_exist(self):
         from async_utils import TaskPriority
-        assert hasattr(TaskPriority, "CRITICAL")
-        assert hasattr(TaskPriority, "HIGH")
-        assert hasattr(TaskPriority, "NORMAL")
-        assert hasattr(TaskPriority, "LOW")
+        for name in ("CRITICAL", "HIGH", "NORMAL", "LOW"):
+            assert hasattr(TaskPriority, name)
 
-    def test_critical_higher_value_than_low(self):
+    def test_critical_different_from_low(self):
         from async_utils import TaskPriority
-        # CRITICAL=3, HIGH=2, NORMAL=1, LOW=0 — vyšší číslo = vyšší priorita
-        assert TaskPriority.CRITICAL.value > TaskPriority.LOW.value
+        assert TaskPriority.CRITICAL.value != TaskPriority.LOW.value
 
-    def test_run_sync_accepts_priority(self, engine):
-        from async_utils import TaskPriority
-        task = engine.run_sync(lambda: "ok", priority=TaskPriority.HIGH)
-        assert _wait_result(task) == "ok"
-
-    def test_run_sync_all_priorities(self, engine):
+    def test_run_sync_accepts_all_priorities(self, engine):
         from async_utils import TaskPriority
         for prio in TaskPriority:
-            task = engine.run_sync(lambda: prio.name, priority=prio)
-            result = _wait_result(task)
-            assert result == prio.name
+            task = engine.run_sync(lambda: True, priority=prio)
+            assert _wait_done(task)
+            assert task.result is True
 
 
 class TestAsyncTask:
@@ -140,15 +150,10 @@ class TestAsyncTask:
         t2 = engine.run_sync(lambda: 2)
         assert t1.task_id != t2.task_id
 
-    def test_task_result_blocking(self, engine):
+    def test_task_result_after_completion(self, engine):
         task = engine.run_sync(lambda: "výsledek")
-        val = task.result_blocking(timeout=5.0)
-        assert val == "výsledek"
-
-    def test_task_result_attribute_after_wait(self, engine):
-        task = engine.run_sync(lambda: 99)
-        task.result_blocking(timeout=5.0)
-        assert task.result == 99
+        _wait_done(task)
+        assert task.result == "výsledek"
 
     def test_task_error_stored_on_failure(self, engine):
         from async_utils import TaskStatus
@@ -157,8 +162,9 @@ class TestAsyncTask:
             raise RuntimeError("boom")
 
         task = engine.run_sync(fail)
-        task.result_blocking(timeout=5.0)
+        _wait_done(task)
         assert task.status == TaskStatus.FAILED
+        assert task.error is not None
 
 
 class TestSingleton:

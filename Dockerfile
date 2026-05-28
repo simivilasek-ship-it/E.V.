@@ -1,37 +1,23 @@
-# JARVIS v2.0 — Docker kontejner
+# JARVIS v4.3 — Docker image
+# Headless mód: pouze dashboard + LLM backend, bez GUI
 FROM python:3.11-slim
 
-# Nainstaluj systémové závislosti
-RUN apt-get update && apt-get install -y \
-    portaudio19-dev \
-    espeak-ng \
-    ffmpeg \
-    curl \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    portaudio19-dev espeak-ng ffmpeg curl \
+    tesseract-ocr tesseract-ocr-ces \
     && rm -rf /var/lib/apt/lists/*
 
-# Vytvoř uživatele
-RUN useradd -m jarvis
-
-# Nastav pracovní adresář
+RUN useradd -m -u 1000 jarvis
 WORKDIR /app
 
-# Zkopíruj závislosti
-COPY requirements.txt .
+COPY requirements.txt pyproject.toml ./
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir fastapi uvicorn rapidfuzz
 
-# Nainstaluj Python závislosti
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --chown=jarvis:jarvis . .
 
-# Zkopíruj aplikaci
-COPY . .
-
-# Nastav vlastnictví
-RUN chown -R jarvis:jarvis /app
-
-# Přepni na uživatele
 USER jarvis
+EXPOSE 8002
 
-# Expose port pro Ollama (pokud by běžel v kontejneru)
-EXPOSE 11434
-
-# Spusť JARVIS
-CMD ["python", "jarvis.py"]
+# Výchozí: dashboard + headless backend (bez Tkinter GUI)
+CMD ["python", "-c", "import dashboard; dashboard.run_dashboard()"]
