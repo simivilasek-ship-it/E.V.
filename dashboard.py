@@ -5,8 +5,11 @@ Spuštění: python dashboard.py  (port 8002)
 """
 
 from __future__ import annotations
+import asyncio
+import json
 import time
 import threading
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -20,6 +23,31 @@ except ImportError:
 
 import psutil
 
+# Structured logging — loguru pokud dostupný, jinak stdlib logging
+try:
+    from loguru import logger as _loguru
+    import logging
+
+    class _InterceptHandler(logging.Handler):
+        def emit(self, record):
+            try:
+                level = _loguru.level(record.levelname).name
+            except ValueError:
+                level = record.levelno
+            frame, depth = logging.currentframe(), 2
+            while frame.f_code.co_filename == logging.__file__:
+                frame = frame.f_back
+                depth += 1
+            _loguru.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
+    logging.basicConfig(handlers=[_InterceptHandler()], level=0, force=True)
+    logger = _loguru
+    HAS_LOGURU = True
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
+    HAS_LOGURU = False
+
 logger_module_available = False
 try:
     from event_bus import get_event_bus, EventType, Event
@@ -30,6 +58,8 @@ try:
     logger_module_available = True
 except ImportError:
     pass
+
+_start_time = time.time()
 
 
 DASHBOARD_HTML = """
@@ -256,6 +286,37 @@ if HAS_FASTAPI:
     app = FastAPI(title="JARVIS Dashboard", docs_url=None, redoc_url=None)
     _ws_clients = set()
 
+    @app.get("/health")
+    async def health():
+        """Strukturovaný health check endpoint."""
+        cpu  = psutil.cpu_percent(interval=0.1)
+        ram  = psutil.virtual_memory()
+        disk = psutil.disk_usage("/")
+        uptime = round(time.time() - _start_time)
+
+        ollama_ok = False
+        try:
+            import requests as _r
+            r = _r.get("http://localhost:11434/api/tags", timeout=1)
+            ollama_ok = r.status_code == 200
+        except Exception:
+            pass
+
+        status = "healthy" if ollama_ok and ram.percent < 90 else "degraded"
+        return JSONResponse({
+            "status": status,
+            "uptime_s": uptime,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "version": "4.3",
+            "checks": {
+                "ollama": {"ok": ollama_ok},
+                "cpu":    {"ok": cpu < 95, "value": cpu},
+                "ram":    {"ok": ram.percent < 90, "value": round(ram.percent, 1)},
+                "disk":   {"ok": disk.percent < 95, "value": round(disk.percent, 1)},
+            },
+            "logging": "loguru" if HAS_LOGURU else "stdlib",
+        }, status_code=200 if status == "healthy" else 503)
+
     @app.get("/", response_class=HTMLResponse)
     async def root():
         return DASHBOARD_HTML
@@ -383,6 +444,79 @@ if HAS_FASTAPI:
             return safe
         except Exception:
             return {}
+
+    @app.post("/api/chat")
+    async def chat_rest(body: dict):
+        """REST fallback pro chat — vrátí celou odpověď najednou."""
+        text = body.get("text", "").strip()
+        if not text:
+            return {"response": "Prázdná zpráva"}
+        try:
+            from local_router import LocalRouter
+            from config import CONFIG
+            msg, action = LocalRouter().route(text)
+            if action and action.get("action") not in ("answer", None):
+                from commands import CommandExecutor
+                result = CommandExecutor(CONFIG).execute(action["action"], action.get("params", {}))
+                return {"response": result or msg or "Hotovo."}
+            from llm import LLMEngine
+            resp, _ = LLMEngine(CONFIG).ask(text)
+            return {"response": resp}
+        except Exception as e:
+            return {"response": f"Chyba: {e}"}
+
+    @app.websocket("/ws/chat")
+    async def ws_chat(ws: WebSocket):
+        """WebSocket chat — streaming odpovědi chunk po chunku."""
+        await ws.accept()
+
+        async def send(obj: dict):
+            try:
+                await ws.send_text(json.dumps(obj))
+            except Exception:
+                pass
+
+        try:
+            while True:
+                raw  = await ws.receive_text()
+                data = json.loads(raw)
+                # Podpora obou field names: "command" (nový) i "text" (starý)
+                text = (data.get("command") or data.get("text") or "").strip()
+                if not text:
+                    continue
+
+                try:
+                    from llm import LocalRouter, LLMEngine
+                    from config import CONFIG
+
+                    msg, action = LocalRouter().route(text)
+
+                    if action and action.get("action") not in ("answer", None):
+                        from commands import CommandExecutor
+                        result = CommandExecutor(CONFIG).execute(
+                            action["action"], action.get("params", {}))
+                        reply = result or msg or "Hotovo."
+                        await send({"type": "chunk", "data": reply})
+                        await send({"type": "done"})
+                    else:
+                        # Streaming LLM odpověď
+                        llm = LLMEngine(CONFIG)
+                        buffer = []
+                        for chunk in llm.stream_ask(text):
+                            if isinstance(chunk, str) and chunk:
+                                buffer.append(chunk)
+                                await send({"type": "chunk", "data": chunk})
+                                await asyncio.sleep(0)  # yield event loop
+                        await send({"type": "done"})
+
+                except Exception as e:
+                    logger.error(f"ws_chat chyba: {e}")
+                    await send({"type": "error", "data": str(e)})
+
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:
+            logger.warning(f"ws_chat uzavřen: {e}")
 
     @app.websocket("/ws/logs")
     async def ws_logs(ws: WebSocket):

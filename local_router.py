@@ -269,6 +269,11 @@ class LocalRouter:
                 if score >= _FUZZY_THRESHOLD:
                     logger.debug(f"Fuzzy match: '{t}' → '{phrase}' ({score})")
                     params = params_fn()
+                    # Akce vracející zprávu generujeme zde přímo
+                    if action == "get_time":
+                        return f"Je {dt.strftime('%H:%M:%S')}.", {"action": action, "params": params}
+                    if action == "get_date":
+                        return f"Dnes je {dt.strftime('%-d. %-m. %Y')}.", {"action": action, "params": params}
                     return None, {"action": action, "params": params}
 
         # ── VISION ───────────────────────────────────
