@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "jarvis-assistant"
+version = "4.3.0"
+description = "Lokální AI asistent — ovládej celý PC hlasem nebo textem, 100 % offline"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "simivilasek-ship-it" }]
+keywords = ["ai", "assistant", "voice", "ollama", "local", "jarvis"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Environment :: X11 Applications",
+]
+
+dependencies = [
+    "customtkinter>=5.2.0",
+    "requests>=2.31.0",
+    "pyautogui>=0.9.54",
+    "psutil>=5.9.0",
+    "Pillow>=10.0.0",
+    "edge-tts>=7.0.0",
+    "SpeechRecognition>=3.10.0",
+]
+
+[project.optional-dependencies]
+full = [
+    "sentence-transformers>=2.2.0",
+    "rapidfuzz>=3.0.0",
+    "vosk>=0.3.45",
+    "pytesseract>=0.3.10",
+    "opencv-python>=4.8.0",
+    "mcp>=1.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-mock>=3.12.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+jarvis = "jarvis:main"
+
+[project.urls]
+Homepage = "https://github.com/simivilasek-ship-it/Jarvis"
+Repository = "https://github.com/simivilasek-ship-it/Jarvis"
+"Bug Tracker" = "https://github.com/simivilasek-ship-it/Jarvis/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["commands*", "gui*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["F821", "F811", "E711", "E712", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "test_jarvis.py"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

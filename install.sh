@@ -1,42 +1,109 @@
 #!/usr/bin/env bash
 set -e
 
+JARVIS_VERSION="4.3.0"
+DEFAULT_MODEL="qwen2.5:3b"
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+ok()   { echo -e "${GREEN}  ✓ $1${NC}"; }
+warn() { echo -e "${YELLOW}  ! $1${NC}"; }
+err()  { echo -e "${RED}  ✗ $1${NC}"; }
+
 echo "============================================"
-echo "  JARVIS v2.0 — Instalace (Linux/Mac)"
+echo "  JARVIS v${JARVIS_VERSION} — Instalace"
 echo "============================================"
 echo
 
-echo "[1/4] Aktualizuji pip..."
+# ── Python verze ──────────────────────────────
+echo "[1/5] Kontrola Python..."
+PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
+PY_MAJOR=$(echo "$PY_VER" | cut -d. -f1)
+PY_MINOR=$(echo "$PY_VER" | cut -d. -f2)
+if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 11 ]; }; then
+    err "Vyžadován Python 3.11+, nalezena verze $PY_VER"
+    echo "  Instalace: https://www.python.org/downloads/"
+    exit 1
+fi
+ok "Python $PY_VER"
+
+# ── Virtuální prostředí ───────────────────────
+echo "[2/5] Virtuální prostředí..."
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+    ok "venv vytvořeno"
+else
+    ok "venv již existuje"
+fi
+source venv/bin/activate
 python3 -m pip install --upgrade pip --quiet
 
-echo "[2/4] Systémové závislosti pro PyAudio..."
+# ── Systémové závislosti ──────────────────────
+echo "[3/5] Systémové závislosti..."
 if command -v apt-get &>/dev/null; then
-    sudo apt-get install -y portaudio19-dev python3-pyaudio espeak espeak-ng 2>/dev/null || true
+    sudo apt-get install -y -qq \
+        portaudio19-dev python3-pyaudio espeak espeak-ng ffmpeg \
+        tesseract-ocr tesseract-ocr-ces 2>/dev/null || warn "Některé apt balíčky se nepodařilo nainstalovat (pokračuji)"
+    ok "apt závislosti"
 elif command -v pacman &>/dev/null; then
-    sudo pacman -S --noconfirm portaudio espeak-ng 2>/dev/null || true
+    sudo pacman -S --noconfirm --needed portaudio espeak-ng ffmpeg tesseract 2>/dev/null || warn "Některé pacman balíčky selhaly"
+    ok "pacman závislosti"
 elif command -v brew &>/dev/null; then
-    brew install portaudio espeak 2>/dev/null || true
-fi
-
-echo "[3/4] Instaluji Python závislosti..."
-pip3 install -r requirements.txt
-
-echo "[4/4] Kontroluji Ollama..."
-if ! command -v ollama &>/dev/null; then
-    echo
-    echo "============================================"
-    echo "  POZOR: Ollama není nainstalovaná!"
-    echo "  Instalace: curl -fsSL https://ollama.com/install.sh | sh"
-    echo "  Poté spusť: ollama pull llama3.1:8b"
-    echo "============================================"
+    brew install portaudio espeak ffmpeg tesseract 2>/dev/null || warn "Některé brew balíčky selhaly"
+    ok "brew závislosti"
 else
-    echo "Ollama nalezena. Stahuji model llama3.1:8b..."
-    ollama pull llama3.1:8b
+    warn "Neznámý package manager — systémové závislosti přeskoč a nainstaluj ručně: portaudio, ffmpeg, tesseract"
 fi
 
+# ── Python balíčky ────────────────────────────
+echo "[4/5] Python závislosti..."
+pip install -r requirements.txt --quiet
+ok "requirements.txt nainstalováno"
+
+# Volitelné — doporučené
+echo "  Instaluji doporučené balíčky (rapidfuzz, sentence-transformers)..."
+pip install rapidfuzz sentence-transformers --quiet 2>/dev/null && \
+    ok "rapidfuzz + sentence-transformers" || \
+    warn "sentence-transformers se nepodařilo nainstalovat — paměť bude bez embeddings"
+
+# ── Ollama ────────────────────────────────────
+echo "[5/5] Ollama..."
+if ! command -v ollama &>/dev/null; then
+    warn "Ollama není nainstalovaná — stahuji..."
+    curl -fsSL https://ollama.com/install.sh | sh
+    ok "Ollama nainstalována"
+else
+    ok "Ollama nalezena ($(ollama --version 2>/dev/null || echo 'verze neznámá'))"
+fi
+
+# Spusť Ollama daemon pokud neběží
+if ! curl -s http://localhost:11434/api/tags &>/dev/null; then
+    echo "  Spouštím ollama serve na pozadí..."
+    ollama serve &>/dev/null &
+    sleep 3
+fi
+
+# Stáhni výchozí model
+echo "  Stahuji model ${DEFAULT_MODEL}..."
+if ollama pull "${DEFAULT_MODEL}" 2>/dev/null; then
+    ok "Model ${DEFAULT_MODEL} připraven"
+else
+    warn "Model ${DEFAULT_MODEL} se nepodařilo stáhnout — zkus ručně: ollama pull ${DEFAULT_MODEL}"
+fi
+
+# ── Hotovo ────────────────────────────────────
 echo
 echo "============================================"
-echo "  Hotovo! Spusť JARVIS příkazy:"
-echo "    1. ollama serve"
-echo "    2. python3 jarvis.py"
+echo -e "  ${GREEN}Instalace dokončena!${NC}"
+echo "============================================"
+echo
+echo "  Rychlý start:"
+echo "    source venv/bin/activate"
+echo "    python jarvis.py --setup   # průvodce prvního spuštění"
+echo "    python jarvis.py           # nebo rovnou spustit"
+echo
+echo "  Web dashboard:"
+echo "    python dashboard.py        # localhost:8002"
 echo "============================================"

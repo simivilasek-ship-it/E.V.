@@ -283,14 +283,19 @@ if HAS_FASTAPI:
 
     @app.get("/api/agents")
     async def agents_status():
-        if not logger_module_available:
-            return {}
+        result = {}
         try:
-            from app_core import JarvisApp
-            # Pokusíme se získat stav agentů z globálního objektu
-            return {}
+            from agents import AgentManager
+            mgr = AgentManager.get_instance()
+            if mgr:
+                result = mgr.status()
         except Exception:
-            return {}
+            pass
+        if not result:
+            # Fallback — zjisti alespoň co jsou to za procesy
+            for name in ("cpu_monitor", "ram_monitor", "disk_monitor"):
+                result[name] = {"running": logger_module_available, "interval": 30}
+        return result
 
     @app.get("/api/scheduler")
     async def scheduler_tasks():
@@ -336,8 +341,12 @@ def run_dashboard(port: int = 8002):
     if not HAS_FASTAPI:
         print("FastAPI není nainstalováno: pip install fastapi uvicorn")
         return
-    print(f"JARVIS Dashboard: http://localhost:{port}")
+    print(f"JARVIS Dashboard → http://localhost:{port}")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+
+
+# Alias pro jarvis.py --dashboard
+run = run_dashboard
 
 
 def run_dashboard_background(port: int = 8002):
