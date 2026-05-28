@@ -13,6 +13,8 @@ const STATE_COLORS = {
 
 export default function App() {
   const connect  = useJarvis(s => s.connect)
+  const connError   = useJarvis(s => s.connError)
+  const retry       = useJarvis(s => s.retry)
   const isConn   = useJarvis(s => s.isConnected)
   const connStatus = useJarvis(s => s.connStatus)
   const orbState = useJarvis(s => s.orbState)
@@ -21,7 +23,7 @@ export default function App() {
   const connectMetrics = useJarvis(s => s.connectMetrics)
   useEffect(() => { connect(); connectMetrics() }, [])
 
-  const connColor = { connected:'#00e676', connecting:'#fbbf24', disconnected:'#ef4444', error:'#ef4444' }[connStatus] || '#3a5a78'
+  const connColor = { connected:'#00e676', connecting:'#fbbf24', disconnected:'#ef4444', error:'#ef4444', failed:'#ef4444' }[connStatus] || '#3a5a78'
 
   return (
     <div className="app">
@@ -68,6 +70,22 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* Error banner */}
+      {connError && (
+        <div style={{
+          background:'rgba(239,68,68,.08)', borderBottom:'1px solid rgba(239,68,68,.2)',
+          padding:'8px 24px', display:'flex', alignItems:'center', gap:12, fontSize:12,
+        }}>
+          <span style={{ color:'#ef4444' }}>⚠</span>
+          <span style={{ color:'#ef9090', flex:1 }}>{connError}</span>
+          <button onClick={retry} style={{
+            padding:'3px 12px', borderRadius:6, fontSize:11, cursor:'pointer',
+            background:'rgba(239,68,68,.15)', color:'#ef4444',
+            border:'1px solid rgba(239,68,68,.3)',
+          }}>Zkusit znovu</button>
+        </div>
+      )}
 
       {/* Main */}
       <main style={{ overflow:'hidden', height:'100%' }}>

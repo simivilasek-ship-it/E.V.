@@ -19,14 +19,25 @@ function renderContent(text) {
       const lang = p.match(/^```(\w+)/)?.[1] || ''
       const code = p.replace(/^```\w*\n?/, '').replace(/\n?```$/, '')
       return (
-        <pre key={i}>
+        <pre key={i} style={{ marginTop: 8, padding: '10px 12px', background: '#050a15',
+          border: '1px solid rgba(0,212,255,.15)', borderRadius: 8,
+          fontSize: 12, color: '#60c8f8', overflowX: 'auto', whiteSpace: 'pre' }}>
           {lang && <span style={{ color:'#3a5a78', fontSize:10, float:'right' }}>{lang}</span>}
           {code}
         </pre>
       )
     }
-    return p.split(/(`[^`]+`)/g).map((chunk, j) =>
-      chunk.startsWith('`') ? <code key={j}>{chunk.slice(1,-1)}</code> : <span key={j}>{chunk}</span>
+    // Wrap inline chunks in a single <span> — prevents block-level stacking
+    const chunks = p.split(/(`[^`]+`)/g)
+    return (
+      <span key={i}>
+        {chunks.map((chunk, j) =>
+          chunk.startsWith('`')
+            ? <code key={j} style={{ background:'rgba(0,212,255,.08)', padding:'1px 5px',
+                borderRadius:4, fontSize:12, color:'#60c8f8' }}>{chunk.slice(1,-1)}</code>
+            : chunk
+        )}
+      </span>
     )
   })
 }

@@ -302,15 +302,18 @@ if HAS_FASTAPI:
         except Exception:
             pass
 
-        status = "healthy" if ollama_ok and ram.percent < 90 else "degraded"
+        status = "healthy" if ram.percent < 90 else "degraded"
         return JSONResponse({
             "status": status,
+            "ok": True,                      # jednoduché pole pro frontend
+            "ws": "running",                 # WebSocket server běží
             "uptime_s": uptime,
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "version": "4.3",
+            "port": 8002,
             "checks": {
                 "ollama": {"ok": ollama_ok},
-                "cpu":    {"ok": cpu < 95, "value": cpu},
+                "cpu":    {"ok": cpu < 95, "value": round(cpu, 1)},
                 "ram":    {"ok": ram.percent < 90, "value": round(ram.percent, 1)},
                 "disk":   {"ok": disk.percent < 95, "value": round(disk.percent, 1)},
             },

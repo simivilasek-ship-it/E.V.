@@ -1,11 +1,12 @@
 import { create } from 'zustand'
 
-const API = 'http://localhost:8002'
-const WS  = 'ws://localhost:8002'
+const API    = 'http://localhost:8002'
+const WS_URL = 'ws://localhost:8002'
+const MAX_ATTEMPTS = 5
 
-// Exponential backoff: 1s, 2s, 4s, 8s, max 30s
+// Exponential backoff: 1s, 2s, 4s, 8s, 16s — pak stop
 function backoff(attempt) {
-  return Math.min(1000 * Math.pow(2, attempt), 30000)
+  return Math.min(1000 * Math.pow(2, attempt), 16000)
 }
 
 export const useJarvis = create((set, get) => ({
@@ -16,45 +17,97 @@ export const useJarvis = create((set, get) => ({
   agents:      [],
   plugins:     [],
   isConnected: false,
-  connStatus:  'disconnected', // disconnected | connecting | connected | error
+  connStatus:  'disconnected', // disconnected | connecting | connected | error | failed
+  connError:   null,           // null nebo chybová zpráva pro UI
   isMicActive: false,
 
   _ws:       null,
   _attempt:  0,
   _retryId:  null,
+  _metricsWs: null,
 
-  // ── WebSocket ────────────────────────────────────────
+  // ── Health check před WebSocket ──────────────────────
 
-  connect() {
-    const { _ws } = get()
-    if (_ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING)) return
+  async checkBackend() {
+    try {
+      const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(3000) })
+      if (r.ok) {
+        const d = await r.json()
+        return d.ws === 'running'
+      }
+    } catch {}
+    return false
+  },
 
-    set({ connStatus: 'connecting' })
+  // ── WebSocket logy ───────────────────────────────────
+
+  async connect() {
+    const { _ws, _attempt } = get()
+    if (_ws?.readyState === WebSocket.OPEN) return
+
+    // Max pokusů
+    if (_attempt >= MAX_ATTEMPTS) {
+      set({
+        connStatus: 'failed',
+        connError:  `Backend na ${API} nedostupný po ${MAX_ATTEMPTS} pokusech. Spusť: python dashboard.py`,
+      })
+      return
+    }
+
+    // Health check — ověří že backend vůbec běží
+    if (_attempt === 0) {
+      set({ connStatus: 'connecting', connError: null })
+      const backendUp = await get().checkBackend()
+      if (!backendUp) {
+        set({
+          connStatus: 'error',
+          connError: `Backend není dostupný na ${API}. Spusť: python dashboard.py`,
+        })
+        get()._scheduleReconnect()
+        return
+      }
+    }
+
+    set({ connStatus: 'connecting', connError: null })
+
     let ws
     try {
-      ws = new WebSocket(`${WS}/ws/logs`)
+      ws = new WebSocket(`${WS_URL}/ws/logs`)
     } catch (e) {
+      set({ connStatus: 'error', connError: String(e) })
       get()._scheduleReconnect()
       return
     }
 
+    const timeout = setTimeout(() => {
+      if (ws.readyState !== WebSocket.OPEN) {
+        ws.close()
+        set({ connStatus: 'error', connError: 'Připojení vypršelo (10s)' })
+        get()._scheduleReconnect()
+      }
+    }, 10000)
+
     ws.onopen = () => {
-      set({ isConnected: true, connStatus: 'connected', _ws: ws, _attempt: 0 })
+      clearTimeout(timeout)
+      set({ isConnected: true, connStatus: 'connected', _ws: ws, _attempt: 0, connError: null })
+      // Spusť metriky WebSocket
+      get().connectMetrics()
     }
 
     ws.onclose = (ev) => {
+      clearTimeout(timeout)
       set({ isConnected: false, connStatus: 'disconnected', _ws: null })
-      // Don't reconnect if closed cleanly (code 1000)
       if (ev.code !== 1000) get()._scheduleReconnect()
     }
 
     ws.onerror = () => {
+      clearTimeout(timeout)
       set({ connStatus: 'error' })
     }
 
     ws.onmessage = (e) => {
-      const text = typeof e.data === 'string' ? e.data : ''
-      set(s => ({ logs: [...s.logs.slice(-300), { text, ts: Date.now() }] }))
+      if (e.data === '{"type":"ping"}') return  // ignore keep-alive
+      set(s => ({ logs: [...s.logs.slice(-300), { text: e.data, ts: Date.now() }] }))
     }
 
     set({ _ws: ws })
@@ -62,20 +115,47 @@ export const useJarvis = create((set, get) => ({
 
   _scheduleReconnect() {
     const { _retryId, _attempt } = get()
-    if (_retryId) return
+    if (_retryId || _attempt >= MAX_ATTEMPTS) return
     const delay = backoff(_attempt)
     const id = setTimeout(() => {
       set(s => ({ _retryId: null, _attempt: s._attempt + 1 }))
       get().connect()
     }, delay)
-    set({ _retryId: id })
+    set({ _retryId: id, connStatus: 'connecting' })
   },
 
   disconnect() {
-    const { _ws, _retryId } = get()
+    const { _ws, _retryId, _metricsWs } = get()
     if (_retryId) { clearTimeout(_retryId); set({ _retryId: null }) }
-    _ws?.close(1000, 'user disconnect')
-    set({ isConnected: false, connStatus: 'disconnected', _ws: null, _attempt: 0 })
+    _ws?.close(1000)
+    _metricsWs?.close(1000)
+    set({ isConnected: false, connStatus: 'disconnected', _ws: null, _metricsWs: null, _attempt: 0 })
+  },
+
+  retry() {
+    set({ _attempt: 0, connError: null })
+    get().connect()
+  },
+
+  // ── /ws/agents — real-time metriky ───────────────────
+
+  connectMetrics() {
+    const { _metricsWs } = get()
+    if (_metricsWs?.readyState === WebSocket.OPEN) return
+    let ws
+    try { ws = new WebSocket(`${WS_URL}/ws/agents`) } catch { return }
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data)
+        if (d.type === 'metrics') get().setSystem({ cpu: d.cpu, ram: d.ram, disk: d.disk })
+      } catch {}
+    }
+    ws.onclose = () => {
+      set({ _metricsWs: null })
+      // Reconnect metrics pouze pokud hlavní WS je connected
+      if (get().isConnected) setTimeout(() => get().connectMetrics(), 5000)
+    }
+    set({ _metricsWs: ws })
   },
 
   // ── Messages ─────────────────────────────────────────
@@ -98,14 +178,14 @@ export const useJarvis = create((set, get) => ({
     })
   },
 
-  setOrbState(state) { set({ orbState: state }) },
-  setSystem(data)    { set({ system: data }) },
-  setAgents(data)    { set({ agents: data }) },
-  setPlugins(data)   { set({ plugins: data }) },
-  clearMessages()    { set({ messages: [] }) },
-  clearLogs()        { set({ logs: [] }) },
+  setOrbState(s)  { set({ orbState: s }) },
+  setSystem(data) { set({ system: data }) },
+  setAgents(data) { set({ agents: data }) },
+  setPlugins(data){ set({ plugins: data }) },
+  clearMessages() { set({ messages: [] }) },
+  clearLogs()     { set({ logs: [] }) },
 
-  // ── Commands via streaming WebSocket ─────────────────
+  // ── Příkazy ──────────────────────────────────────────
 
   async sendCommand(text) {
     if (!text?.trim()) return
@@ -114,17 +194,12 @@ export const useJarvis = create((set, get) => ({
     get().setOrbState('thinking')
 
     try {
-      // Try streaming WebSocket first
-      const chatWs = new WebSocket(`${WS}/ws/chat`)
-      let resolved = false
-
+      const chatWs = new WebSocket(`${WS_URL}/ws/chat`)
       await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => { chatWs.close(); reject(new Error('timeout')) }, 15000)
-
+        const t = setTimeout(() => { chatWs.close(); reject(new Error('timeout')) }, 20000)
         chatWs.onopen  = () => chatWs.send(JSON.stringify({ command: text }))
-        chatWs.onerror = () => { clearTimeout(timeout); reject(new Error('ws error')) }
-        chatWs.onclose = () => { clearTimeout(timeout); if (!resolved) resolve() }
-
+        chatWs.onerror = () => { clearTimeout(t); reject(new Error('ws error')) }
+        chatWs.onclose = () => { clearTimeout(t); resolve() }
         chatWs.onmessage = (e) => {
           try {
             const msg = JSON.parse(e.data)
@@ -136,20 +211,13 @@ export const useJarvis = create((set, get) => ({
                 if (last?.streaming) msgs[msgs.length - 1] = { ...last, text: last.text + msg.data }
                 return { messages: msgs }
               })
-            } else if (msg.type === 'done') {
-              resolved = true
-              clearTimeout(timeout)
-              chatWs.close()
-              resolve()
-            } else if (msg.type === 'error') {
-              clearTimeout(timeout)
-              reject(new Error(msg.data))
-            }
+            } else if (msg.type === 'done') { clearTimeout(t); chatWs.close(); resolve() }
+            else if (msg.type === 'error')  { clearTimeout(t); reject(new Error(msg.data)) }
           } catch {}
         }
       })
     } catch {
-      // Fallback REST
+      // REST fallback
       try {
         const r = await fetch(`${API}/api/command`, {
           method: 'POST',
@@ -157,7 +225,7 @@ export const useJarvis = create((set, get) => ({
           body: JSON.stringify({ command: text }),
         })
         const data = await r.json()
-        get().updateLastMessage({ text: data.response || data.result || 'OK', streaming: false })
+        get().updateLastMessage({ text: data.response || 'OK', streaming: false })
       } catch (e) {
         get().updateLastMessage({ text: `Chyba: ${e.message}`, streaming: false, error: true })
       }
@@ -172,29 +240,8 @@ export const useJarvis = create((set, get) => ({
     }
   },
 
-  // ── /ws/agents — real-time metriky ───────────────────
-
-  _metricsWs: null,
-
-  connectMetrics() {
-    const { _metricsWs } = get()
-    if (_metricsWs?.readyState === WebSocket.OPEN) return
-    let ws
-    try { ws = new WebSocket(`${WS}/ws/agents`) } catch { return }
-    ws.onmessage = (e) => {
-      try {
-        const d = JSON.parse(e.data)
-        if (d.type === 'metrics') get().setSystem({ cpu: d.cpu, ram: d.ram, disk: d.disk })
-      } catch {}
-    }
-    ws.onclose = () => { set({ _metricsWs: null }); setTimeout(() => get().connectMetrics(), 5000) }
-    set({ _metricsWs: ws })
-  },
-
-  // ── REST fetches (fallback) ───────────────────────────
-
+  // REST fallback pro system
   async fetchSystem() {
-    // Metrics come via /ws/agents — this is only a fallback
     try { get().setSystem(await fetch(`${API}/api/system`).then(r => r.json())) } catch {}
   },
   async fetchAgents() {
