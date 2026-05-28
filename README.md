@@ -527,8 +527,20 @@ commands/media.py       — screenshot, youtube, timer, klávesnice
 commands/utils.py       — kalkulačka, překlad, poznámky, wiki, počasí
 
 ── Web & GUI ────────────────────────────────────────
-dashboard.py            — FastAPI web UI (localhost:8002)
+dashboard.py            — FastAPI web UI (localhost:8002) + WebSocket /ws/chat
 gui/app_window.py       — Tkinter: chat, orb, settings
 gui/settings.py         — SettingsDialog (STT, TTS, MCP, logy)
+
+── React Web UI (web/) ──────────────────────────────
+web/src/App.jsx               — root layout (StatusBar + OrbScene + ChatPanel)
+web/src/store/appStore.js     — Zustand store: chat, WebSocket, system metrics
+web/src/store/jarvis.js       — Zustand store: orb state, logy, pluginy (ws/logs)
+web/src/components/OrbScene.jsx        — 3D orb (@react-three/fiber)
+web/src/components/AIOrb.jsx           — orb shader + animace (idle/listening/thinking/speaking)
+web/src/components/ChatPanel.jsx       — chat UI, WebSocket streaming, návrhy příkazů
+web/src/components/StatusBar.jsx       — Ollama stav, model, CPU/RAM/disk
+web/src/components/ParticleBackground.jsx — hvězdné pozadí (Three.js)
+web/src/components/PluginStore.jsx     — přehled a instalace pluginů
+web/src/components/SystemPanel.jsx     — systémové metriky a živé logy
 ```
 </details>
