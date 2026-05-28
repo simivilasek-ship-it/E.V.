@@ -4,112 +4,120 @@ import AIOrb from './components/AIOrb'
 import ChatPanel from './components/ChatPanel'
 import SystemPanel from './components/SystemPanel'
 import PluginStore from './components/PluginStore'
-import ParticleBackground from './components/ParticleBackground'
 
-const NAV_ITEMS = ['CHAT', 'PLUGINY', 'SYSTÉM']
+const TABS = ['CHAT', 'PLUGINY', 'SYSTÉM']
+
+const STATE_COLORS = {
+  idle:'#3a5a78', listening:'#00d4ff', thinking:'#8b5cf6', speaking:'#00e676',
+}
 
 export default function App() {
   const connect  = useJarvis(s => s.connect)
   const isConn   = useJarvis(s => s.isConnected)
+  const connStatus = useJarvis(s => s.connStatus)
   const orbState = useJarvis(s => s.orbState)
   const [tab, setTab] = useState('CHAT')
 
-  useEffect(() => { connect() }, [])
+  const connectMetrics = useJarvis(s => s.connectMetrics)
+  useEffect(() => { connect(); connectMetrics() }, [])
+
+  const connColor = { connected:'#00e676', connecting:'#fbbf24', disconnected:'#ef4444', error:'#ef4444' }[connStatus] || '#3a5a78'
 
   return (
-    <div className="min-h-screen relative" style={{ background: '#070b12' }}>
-      <ParticleBackground />
+    <div className="app">
+      {/* Top bar */}
+      <header className="topbar">
+        {/* Logo */}
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{
+            width:32, height:32, borderRadius:'50%',
+            border:`1.5px solid rgba(0,212,255,.5)`,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:13, color:'#00d4ff',
+            boxShadow:'0 0 16px rgba(0,212,255,.25)',
+            flexShrink: 0,
+          }}>J</div>
+          <span style={{ color:'#00d4ff', letterSpacing:'.22em', fontSize:14,
+                         textShadow:'0 0 20px rgba(0,212,255,.7)' }}>JARVIS</span>
+          <span style={{ fontSize:10, color:'#3a5a78', padding:'2px 8px',
+                         border:'1px solid #1a3050', borderRadius:20 }}>v4.3</span>
+        </div>
 
-      <div className="relative flex flex-col min-h-screen" style={{ zIndex: 1 }}>
-        {/* Top bar */}
-        <header className="glass border-b sticky top-0" style={{ borderColor: 'rgba(0,212,255,0.12)', zIndex: 10 }}>
-          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full border flex items-center justify-center text-xs"
-                style={{ borderColor: 'rgba(0,212,255,0.5)', color: '#00d4ff',
-                         boxShadow: '0 0 12px rgba(0,212,255,0.3)' }}>J</div>
-              <span className="text-sm tracking-widest" style={{ color: '#00d4ff', textShadow: '0 0 20px rgba(0,212,255,0.8)' }}>
-                JARVIS
-              </span>
-              <span className="text-xs px-2 py-0.5 rounded"
-                style={{ background: 'rgba(0,212,255,0.08)', color: '#4a6080', border: '1px solid #1a3050' }}>
-                v4.3
-              </span>
-            </div>
+        {/* Tabs */}
+        <nav style={{ display:'flex', gap:4, marginLeft:16 }}>
+          {TABS.map(t => (
+            <button key={t} className={`nav-tab ${tab===t?'active':''}`} onClick={() => setTab(t)}>
+              {t}
+            </button>
+          ))}
+        </nav>
 
-            <nav className="flex gap-1 ml-4">
-              {NAV_ITEMS.map(t => (
-                <button key={t} onClick={() => setTab(t)}
-                  className="px-4 py-1.5 rounded text-xs tracking-wider transition-all"
-                  style={{
-                    color: tab === t ? '#00d4ff' : '#4a6080',
-                    background: tab === t ? 'rgba(0,212,255,0.08)' : 'transparent',
-                    border: `1px solid ${tab === t ? 'rgba(0,212,255,0.3)' : 'transparent'}`,
-                  }}>
-                  {t}
-                </button>
-              ))}
-            </nav>
-
-            <div className="ml-auto flex items-center gap-4">
-              <div className="flex items-center gap-2 text-xs" style={{ color: '#4a6080' }}>
-                <div className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: isConn ? '#00e676' : '#ff5252',
-                           boxShadow: isConn ? '0 0 6px #00e676' : 'none' }} />
-                {isConn ? 'online' : 'offline'}
-              </div>
-              <div className="text-xs font-mono" style={{
-                color: { idle:'#4a6080', listening:'#00d4ff', thinking:'#7c4dff', speaking:'#00e676' }[orbState]
-              }}>
-                {{ idle:'○ idle', listening:'◉ listening', thinking:'◎ thinking', speaking:'● speaking' }[orbState]}
-              </div>
-            </div>
+        {/* Right status */}
+        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:11 }}>
+            <div style={{
+              width:6, height:6, borderRadius:'50%',
+              background: connColor,
+              boxShadow: isConn ? `0 0 8px ${connColor}` : 'none',
+              transition:'all .5s',
+            }} />
+            <span style={{ color:'#3a5a78' }}>{connStatus}</span>
           </div>
-        </header>
+          <div style={{ fontSize:11, color: STATE_COLORS[orbState], transition:'color .5s' }}>
+            {{ idle:'○ idle', listening:'◉ listening', thinking:'◎ thinking', speaking:'● speaking' }[orbState]}
+          </div>
+        </div>
+      </header>
 
-        {/* Body */}
-        <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-6">
-          {tab === 'CHAT' && (
-            <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 300px 280px', height: 'calc(100vh - 120px)' }}>
-              <div style={{ minHeight: 0 }}>
-                <ChatPanel />
-              </div>
-              <div className="flex flex-col items-center gap-4">
-                <div className="glass rounded-xl p-4 flex flex-col items-center w-full"
-                  style={{ border: '1px solid rgba(0,212,255,0.2)', boxShadow: '0 0 24px rgba(0,212,255,0.06)' }}>
-                  <AIOrb size={260} />
+      {/* Main */}
+      <main style={{ overflow:'hidden', height:'100%' }}>
+        {tab === 'CHAT' && (
+          <div className="main-grid">
+            {/* Chat */}
+            <div className="panel chat-panel" style={{ overflow:'hidden' }}>
+              <ChatPanel />
+            </div>
+
+            {/* Orb column */}
+            <div className="orb-col">
+              <div className="panel orb-panel glow-cyan" style={{
+                border: `1px solid rgba(0,212,255,.18)`,
+                boxShadow: `0 0 40px rgba(0,212,255,.07), 0 0 80px rgba(0,212,255,.03)`,
+              }}>
+                <AIOrb size={280} />
+                <div style={{ width:'100%', marginTop:16, borderTop:'1px solid rgba(0,212,255,.08)', paddingTop:12 }}>
+                  <div style={{ fontSize:10, color:'#3a5a78', letterSpacing:'.1em', marginBottom:8 }}>ZKRATKY</div>
+                  {[['Enter','odeslat'],['Shift+Enter','nový řádek'],['↑ ↓','historie']].map(([k,v]) => (
+                    <div key={k} style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:5 }}>
+                      <span style={{ color:'#3a5a78' }}>{k}</span>
+                      <span style={{ color:'#6080a0' }}>{v}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="glass rounded-xl p-4 w-full text-xs" style={{ color: '#4a6080' }}>
-                  <div className="mb-2 tracking-widest">ZKRATKY</div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between"><span>Enter</span><span style={{ color: '#7ea8d4' }}>odeslat</span></div>
-                    <div className="flex justify-between"><span>Ctrl+L</span><span style={{ color: '#7ea8d4' }}>clear</span></div>
-                  </div>
-                </div>
-              </div>
-              <div style={{ minHeight: 0 }}>
-                <SystemPanel />
               </div>
             </div>
-          )}
 
-          {tab === 'PLUGINY' && (
-            <div style={{ maxWidth: 700 }}>
-              <PluginStore />
-            </div>
-          )}
-
-          {tab === 'SYSTÉM' && (
-            <div style={{ maxWidth: 500 }}>
+            {/* System */}
+            <div className="sys-col">
               <SystemPanel />
             </div>
-          )}
-        </main>
+          </div>
+        )}
 
-        <footer className="border-t px-6 py-2 text-xs" style={{ borderColor: '#1a3050', color: '#4a6080' }}>
-          JARVIS v4.3 · Lokální AI · 100% offline
-        </footer>
-      </div>
+        {tab === 'PLUGINY' && (
+          <div style={{ padding:16, maxWidth:680 }}>
+            <div className="panel" style={{ padding:20 }}>
+              <PluginStore />
+            </div>
+          </div>
+        )}
+
+        {tab === 'SYSTÉM' && (
+          <div style={{ padding:16, maxWidth:480 }}>
+            <SystemPanel />
+          </div>
+        )}
+      </main>
     </div>
   )
 }

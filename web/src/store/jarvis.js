@@ -172,9 +172,29 @@ export const useJarvis = create((set, get) => ({
     }
   },
 
-  // ── REST fetches ─────────────────────────────────────
+  // ── /ws/agents — real-time metriky ───────────────────
+
+  _metricsWs: null,
+
+  connectMetrics() {
+    const { _metricsWs } = get()
+    if (_metricsWs?.readyState === WebSocket.OPEN) return
+    let ws
+    try { ws = new WebSocket(`${WS}/ws/agents`) } catch { return }
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data)
+        if (d.type === 'metrics') get().setSystem({ cpu: d.cpu, ram: d.ram, disk: d.disk })
+      } catch {}
+    }
+    ws.onclose = () => { set({ _metricsWs: null }); setTimeout(() => get().connectMetrics(), 5000) }
+    set({ _metricsWs: ws })
+  },
+
+  // ── REST fetches (fallback) ───────────────────────────
 
   async fetchSystem() {
+    // Metrics come via /ws/agents — this is only a fallback
     try { get().setSystem(await fetch(`${API}/api/system`).then(r => r.json())) } catch {}
   },
   async fetchAgents() {

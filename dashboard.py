@@ -520,24 +520,56 @@ if HAS_FASTAPI:
 
     @app.websocket("/ws/logs")
     async def ws_logs(ws: WebSocket):
+        """Live logy přes WebSocket — posílá JSON {level, message, ts}."""
         await ws.accept()
         _ws_clients.add(ws)
         try:
-            if logger_module_available:
-                bus = get_event_bus()
-                async def forward(event):
-                    try:
-                        import json
-                        await ws.send_text(json.dumps({
-                            "level": "info",
-                            "message": f"[{event.type}] {event.data}",
-                        }))
-                    except Exception:
-                        pass
             while True:
-                await ws.receive_text()
+                # Keep-alive — čekáme na ping od klienta
+                try:
+                    await asyncio.wait_for(ws.receive_text(), timeout=30)
+                except asyncio.TimeoutError:
+                    await ws.send_text(json.dumps({"type": "ping"}))
         except WebSocketDisconnect:
             _ws_clients.discard(ws)
+        except Exception:
+            _ws_clients.discard(ws)
+
+    @app.websocket("/ws/agents")
+    async def ws_agents(ws: WebSocket):
+        """Streaming metrik systému — posílá JSON každé 2s."""
+        await ws.accept()
+        try:
+            while True:
+                cpu  = psutil.cpu_percent(interval=0.1)
+                ram  = psutil.virtual_memory()
+                disk = psutil.disk_usage("/")
+                payload = {
+                    "type": "metrics",
+                    "cpu":  round(cpu, 1),
+                    "ram":  round(ram.percent, 1),
+                    "disk": round(disk.percent, 1),
+                    "ts":   int(time.time() * 1000),
+                }
+                await ws.send_text(json.dumps(payload))
+                await asyncio.sleep(2)
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:
+            logger.debug(f"ws_agents uzavřen: {e}")
+
+    # ── Broadcast helper (voláno z app_core) ──────────
+    async def _broadcast_log(message: str, level: str = "info"):
+        dead = set()
+        payload = json.dumps({"type":"log","level":level,"message":message,"ts":int(time.time()*1000)})
+        for client in list(_ws_clients):
+            try:
+                await client.send_text(payload)
+            except Exception:
+                dead.add(client)
+        _ws_clients.difference_update(dead)
+
+    app.broadcast_log = _broadcast_log
 
 
 def run_dashboard(port: int = 8002):
