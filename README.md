@@ -334,7 +334,7 @@ BRAVE_API_KEY=tvůj_klíč   # Brave Search MCP
 
 ---
 
-## Web dashboard
+## Web dashboard (Python)
 
 ```bash
 python dashboard.py        # spustí na localhost:8002
@@ -342,6 +342,41 @@ python dashboard.py        # spustí na localhost:8002
 ```
 
 Zobrazí: stav systému, živé logy, audit trail, scheduler, stav agentů.
+
+---
+
+## React Web UI
+
+Moderní frontend s 3D orbem, real-time chatem a monitoringem systému.
+
+```bash
+cd web
+npm install
+npm run dev          # vývojový server — http://localhost:5173
+
+# nebo build pro produkci:
+npm run build        # výstup do web/dist/
+```
+
+**Konfigurace (volitelné):**
+```bash
+# web/.env
+VITE_API_URL=http://localhost:8002   # výchozí, změň pokud backend běží jinde
+```
+
+**Co Web UI obsahuje:**
+
+| Komponenta | Popis |
+|---|---|
+| `OrbScene` | 3D orb (Three.js / @react-three/fiber) — animuje se při přemýšlení |
+| `ChatPanel` | Chat s WebSocket streamingem (`/ws/chat`) + REST fallback |
+| `StatusBar` | Stav Ollamy, aktivní model, CPU / RAM / disk v reálném čase |
+| `ParticleBackground` | Animované hvězdné pole (1 500 částic) |
+| `PluginStore` | Přehled a instalace pluginů přímo z UI |
+| `SystemPanel` | Metriky a živé logy backendu |
+
+**WebSocket streaming:**
+Backend (`dashboard.py`) vystavuje `/ws/chat` — odpovědi se streamují po chunkcích, bez čekání na celou odpověď. Fallback na REST (`/api/chat`) pokud WebSocket není dostupný.
 
 ---
 
@@ -413,7 +448,7 @@ def test_muj_prikaz(): ...
 
 - [ ] `pip install jarvis-assistant` — instalace jedním příkazem
 - [ ] Docker image (headless server mód)
-- [ ] Webové GUI (React frontend na dashboardu)
+- [x] Webové GUI (React + Three.js, WebSocket streaming) ✓
 - [ ] Plugin autoupdate (verze v manifestu)
 - [ ] OfflineManager integrace do routing pipeline
 - [ ] Spotify Web API (aktuálně fallback na `xdg-open`)
