@@ -175,6 +175,23 @@ def pytest_configure(config):
 # Autouse fixtures
 @pytest.fixture(autouse=True)
 def reset_modules():
-    """Reset module state between tests"""
+    """Reset singleton state between tests to prevent test interference."""
     yield
-    # Cleanup after each test
+    import importlib, sys
+    # Reset agent singletons
+    for mod_name in ("agent_react", "agent_graph"):
+        mod = sys.modules.get(mod_name)
+        if mod:
+            if hasattr(mod, "_agent"):
+                mod._agent = None
+            if hasattr(mod, "_graph"):
+                mod._graph = None
+    # Reset event bus singleton
+    eb_mod = sys.modules.get("event_bus")
+    if eb_mod and hasattr(eb_mod, "_bus"):
+        try:
+            if eb_mod._bus is not None:
+                eb_mod._bus.stop(timeout=0.5)
+        except Exception:
+            pass
+        eb_mod._bus = None

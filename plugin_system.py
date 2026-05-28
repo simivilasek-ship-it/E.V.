@@ -61,7 +61,7 @@ MANIFEST_SCHEMA = {
         "permissions": list,
         "triggers":    list,
     },
-    "valid_permissions": {"answer", "system", "media", "files", "mcp"},
+    "valid_permissions": {"answer", "system", "media", "files", "mcp", "internal"},
 }
 
 
@@ -82,13 +82,26 @@ class ManifestValidator:
 
 
 _PERMISSION_MODULES: Dict[str, Set[str]] = {
+    # Základní permissions definované v MANIFEST_SCHEMA
+    "answer":     set(),  # jen stdlib — žádné extra moduly
+    "system":     {"os", "os.path", "subprocess", "shutil", "glob",
+                   "tempfile", "psutil", "platform", "pyautogui", "pyperclip"},
+    "media":      {"os", "os.path", "subprocess", "webbrowser", "yt_dlp",
+                   "pyautogui", "pyperclip"},
+    "files":      {"os", "os.path", "shutil", "glob", "tempfile",
+                   "fnmatch", "pathlib", "mcp_bridge"},
+    "mcp":        {"mcp_bridge", "mcp", "os", "os.path", "config",
+                   "memory", "from __future__"},
+    # Rozšířené permissions pro interní použití
     "os":         {"os", "os.path"},
     "subprocess": {"subprocess"},
     "socket":     {"socket", "ssl", "asyncio"},
     "filesystem": {"shutil", "glob", "tempfile", "fnmatch"},
-    "system":     {"psutil", "platform", "resource"},
     "database":   {"sqlite3", "sqlalchemy"},
     "crypto":     {"cryptography", "hmac", "secrets"},
+    # Speciální: povolí import interních JARVIS modulů
+    "internal":   {"mcp_bridge", "config", "memory", "llm", "commands",
+                   "plugin_marketplace", "vision", "stt", "tts"},
 }
 
 
@@ -196,8 +209,39 @@ def _collect_imports(source: str) -> Set[str]:
     return roots
 
 
+_DANGEROUS_BUILTINS = {"exec", "eval", "compile", "__import__", "breakpoint"}
+
+
+def _check_dangerous_calls(source: str) -> Optional[str]:
+    """Detekuje přímá volání exec/eval/compile i bez importu modulu."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            name = None
+            if isinstance(func, ast.Name):
+                name = func.id
+            elif isinstance(func, ast.Attribute):
+                name = func.attr
+            if name and name in _DANGEROUS_BUILTINS:
+                found.append(name)
+    if found:
+        return f"Zakázaná volání: {', '.join(sorted(set(found)))}"
+    return None
+
+
 def _check_imports(source: str, permissions: List[str], plugin_name: str) -> Optional[str]:
-    """Zkontroluje importy pluginu. Vrátí chybový řetězec nebo None."""
+    """Zkontroluje importy a nebezpečná volání pluginu. Vrátí chybový řetězec nebo None."""
+    # 1. Kontrola nebezpečných builtinů (exec/eval bez importu)
+    danger = _check_dangerous_calls(source)
+    if danger:
+        return danger
+
+    # 2. Kontrola importů
     allowed = set(_SAFE_IMPORTS)
     for perm in permissions:
         extra = _PERMISSION_MODULES.get(perm)
@@ -207,8 +251,11 @@ def _check_imports(source: str, permissions: List[str], plugin_name: str) -> Opt
             logger.warning(f"Plugin '{plugin_name}': neznámá permission '{perm}'")
 
     used = _collect_imports(source)
-    # Povolíme cokoli co začíná prefixem jarvis_skill_ (inter-plugin importy)
-    blocked = {m for m in used if m not in allowed and not m.startswith("jarvis_skill_")}
+    # Povolíme inter-plugin importy a __future__ (standardní Python)
+    blocked = {m for m in used
+               if m not in allowed
+               and not m.startswith("jarvis_skill_")
+               and m != "__future__"}
     if blocked:
         return f"Zakázané importy: {', '.join(sorted(blocked))}"
     return None
@@ -217,10 +264,23 @@ def _check_imports(source: str, permissions: List[str], plugin_name: str) -> Opt
 class SkillLoader:
     """Statická třída pro načítání skill modulů."""
 
+    _PLUGIN_ROOT: Path = Path(__file__).parent / "plugins"
+
     @staticmethod
     def load_module(path: str, module_name: str, permissions: List[str] = None):
-        """Načte Python modul ze souboru po kontrole importů."""
-        source = Path(path).read_text(encoding="utf-8")
+        """Načte Python modul ze souboru po kontrole importů.
+
+        Canonizuje cestu a zabrání path traversal útokům.
+        """
+        plugin_path = Path(path).resolve()
+        plugin_root = SkillLoader._PLUGIN_ROOT.resolve()
+        try:
+            plugin_path.relative_to(plugin_root)
+        except ValueError:
+            raise ImportError(
+                f"Sandbox odmítl plugin '{module_name}': cesta mimo plugins/ adresář: {plugin_path}"
+            )
+        source = plugin_path.read_text(encoding="utf-8")
         err = _check_imports(source, permissions or [], module_name)
         if err:
             raise ImportError(f"Sandbox odmítl plugin '{module_name}': {err}")

@@ -3,6 +3,13 @@
   "version": "1.0.0",
   "description": "Časové pásmo a aktuální čas kdekoliv na světě",
   "author": "JARVIS",
-  "permissions": ["answer"],
-  "triggers": ["kolik je hodin", "jaky je cas", "casove pasmo", "time zone"]
+  "permissions": [
+    "mcp"
+  ],
+  "triggers": [
+    "kolik je hodin",
+    "jaky je cas",
+    "casove pasmo",
+    "time zone"
+  ]
 }

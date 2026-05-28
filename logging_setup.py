@@ -3,6 +3,7 @@ JARVIS — Structured Logging Setup
 Logování s loguru pro JSON structured logs
 """
 
+import re
 import sys
 import json
 import logging
@@ -17,6 +18,26 @@ except ImportError:
     HAS_LOGURU = False
 
 from config import CONFIG
+
+# ── Secret masking ───────────────────────────────────
+
+_SECRET_PATTERNS = [
+    re.compile(r'(?i)(api[_-]?key|secret|password|token|bearer)\s*[=:]\s*\S+'),
+    re.compile(r'(?i)(BRAVE_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY)\s*[=:]\s*\S+'),
+]
+
+
+def _mask_secrets(text: str) -> str:
+    """Nahradí citlivé hodnoty v logovacím řetězci."""
+    for pattern in _SECRET_PATTERNS:
+        text = pattern.sub(lambda m: m.group(0).split("=")[0] + "=<REDACTED>", text)
+    return text
+
+
+class _SecretMaskingFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.msg = _mask_secrets(str(record.msg))
+        return True
 
 
 def setup_logging(log_file: str = "jarvis.log", 
@@ -72,7 +93,7 @@ def setup_logging(log_file: str = "jarvis.log",
                 "module": record["name"],
                 "function": record["function"],
                 "line": record["line"],
-                "message": record["message"],
+                "message": _mask_secrets(record["message"]),
                 "process_id": record["process"]["id"],
                 "thread_id": record["thread"]["id"],
             }
@@ -120,13 +141,17 @@ def setup_logging(log_file: str = "jarvis.log",
 def _setup_standard_logging(level: Optional[str] = None) -> None:
     """Fallback na standardní Python logging pokud loguru není dostupný"""
     log_level = (level or CONFIG.get("log_level", "INFO")).upper()
+    mask_filter = _SecretMaskingFilter()
+    handlers = [
+        logging.StreamHandler(),
+        logging.FileHandler("jarvis.log", encoding="utf-8"),
+    ]
+    for h in handlers:
+        h.addFilter(mask_filter)
     logging.basicConfig(
         level=getattr(logging, log_level, logging.INFO),
         format="%(asctime)s %(levelname)s: %(message)s",
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler("jarvis.log", encoding="utf-8"),
-        ],
+        handlers=handlers,
     )
 
 

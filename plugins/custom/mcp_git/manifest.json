@@ -3,6 +3,15 @@
   "version": "1.0.0",
   "description": "Git operace přes MCP — log, diff, status, větve, commity. Bez API klíče.",
   "author": "JARVIS",
-  "permissions": ["answer"],
-  "triggers": ["git log", "git status", "git diff", "commity", "větve", "git blame"]
+  "permissions": [
+    "mcp"
+  ],
+  "triggers": [
+    "git log",
+    "git status",
+    "git diff",
+    "commity",
+    "větve",
+    "git blame"
+  ]
 }

@@ -28,22 +28,31 @@ def cmd_search_web(query: str) -> str:
 
 
 def cmd_open_file(path: str) -> str:
-    path = os.path.expanduser(path)
+    try:
+        p = validate_path(path, must_exist=True)
+    except ValueError as e:
+        return f"Chyba: {e}"
     if platform.system() == "Windows":
-        os.startfile(path)
+        os.startfile(str(p))
     else:
-        safe_run(["xdg-open", path], bg=True)
+        safe_run(["xdg-open", str(p)], bg=True)
     return "ok"
 
 
 def cmd_create_folder(path: str = "") -> str:
-    p = Path(path).expanduser()
+    try:
+        p = validate_path(path)
+    except ValueError as e:
+        return f"Chyba: {e}"
     p.mkdir(parents=True, exist_ok=True)
     return f"Složka vytvořena: {p}"
 
 
 def cmd_create_file(path: str = "") -> str:
-    p = Path(path).expanduser()
+    try:
+        p = validate_path(path)
+    except ValueError as e:
+        return f"Chyba: {e}"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.touch()
     return f"Soubor vytvořen: {p}"

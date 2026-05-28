@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 import psutil
 
-from .utils import safe_run, validate_package_name
+from .utils import safe_run, validate_package_name, validate_path
 
 logger = logging.getLogger(__name__)
 
@@ -97,13 +97,25 @@ def cmd_uninstall_app(name: str = "") -> str:
     return f"Odinstaluji: {name}"
 
 
+_ALLOWED_SCRIPT_SUFFIXES = {".sh", ".py", ".bash"}
+
+
 def cmd_run_script(path: str = "") -> str:
-    safe_run(["bash", str(Path(path).expanduser())], bg=True)
-    return f"Spouštím: {path}"
+    try:
+        p = validate_path(path, must_exist=True)
+    except ValueError as e:
+        return f"Chyba cesty: {e}"
+    if p.suffix.lower() not in _ALLOWED_SCRIPT_SUFFIXES:
+        return f"Nepodporovaná přípona skriptu: {p.suffix} (povoleno: {', '.join(_ALLOWED_SCRIPT_SUFFIXES)})"
+    interpreter = "python3" if p.suffix == ".py" else "bash"
+    safe_run([interpreter, str(p)], bg=True)
+    return f"Spouštím: {p}"
 
 
 def cmd_vscode_open(path: str = "") -> str:
-    import os
-    p = os.path.expanduser(path)
-    safe_run(["code", p], bg=True)
+    try:
+        p = validate_path(path)
+    except ValueError as e:
+        return f"Chyba cesty: {e}"
+    safe_run(["code", str(p)], bg=True)
     return f"Otevřeno ve VSCode: {p}"

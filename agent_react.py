@@ -19,7 +19,10 @@ import json
 import logging
 import re
 import requests
+import threading
 from typing import TYPE_CHECKING, List, Optional
+
+from commands.utils import normalize_text as _norm
 
 if TYPE_CHECKING:
     from agent_tools import ToolRegistry
@@ -43,15 +46,6 @@ _MULTI_STEP = re.compile(
     r")",
     re.IGNORECASE | re.UNICODE,
 )
-
-
-def _norm(text: str) -> str:
-    """Odstraní diakritiku pro matching."""
-    import unicodedata
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', text.lower())
-        if unicodedata.category(c) != 'Mn'
-    )
 
 
 def should_handle(text: str) -> bool:
@@ -215,24 +209,27 @@ Pravidla:
 # ── Singleton factory ─────────────────────────────────────────────
 
 _agent: Optional[ReactAgent] = None
+_agent_lock = threading.Lock()
 
 
 def get_react_agent(executor=None, mcp_bridge=None,
                     ollama_url: str = "http://localhost:11434/api/chat",
                     model: str = "qwen2.5:3b") -> Optional[ReactAgent]:
-    """Vrátí singleton ReactAgent. Vytvoří ho při prvním volání."""
+    """Vrátí singleton ReactAgent. Thread-safe, vytvoří ho při prvním volání."""
     global _agent
-    if _agent is None:
-        if executor is None:
-            return None
-        from agent_tools import build_registry
-        registry = build_registry(executor, mcp_bridge)
-        _agent   = ReactAgent(registry, ollama_url, model)
-        logger.info(f"ReactAgent inicializován s {len(registry.all())} nástroji")
+    with _agent_lock:
+        if _agent is None:
+            if executor is None:
+                return None
+            from agent_tools import build_registry
+            registry = build_registry(executor, mcp_bridge)
+            _agent   = ReactAgent(registry, ollama_url, model)
+            logger.info(f"ReactAgent inicializován s {len(registry.all())} nástroji")
     return _agent
 
 
 def reset_agent():
     """Zruší singleton — použij při reinicializaci (testy, změna konfigurace)."""
     global _agent
-    _agent = None
+    with _agent_lock:
+        _agent = None

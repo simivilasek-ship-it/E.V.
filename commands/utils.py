@@ -8,6 +8,7 @@ import os
 import subprocess
 import threading
 import time
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -119,9 +120,20 @@ def validate_path(path: str, must_exist: bool = False) -> Path:
     return resolved
 
 
+def normalize_text(text: str) -> str:
+    """Odstraní diakritiku pro robustní matching (otevři == otevri)."""
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', text.lower())
+        if unicodedata.category(c) != 'Mn'
+    )
+
+
 def cmd_calculate(expr: str) -> str:
     import ast as _ast
     import operator as _op
+
+    if len(expr) > 500:
+        return "Chyba: výraz je příliš dlouhý (max 500 znaků)"
 
     ALLOWED_NAMES = {
         "sqrt": math.sqrt, "pow": math.pow, "abs": abs,
@@ -136,9 +148,11 @@ def cmd_calculate(expr: str) -> str:
         _ast.FloorDiv: _op.floordiv,
     }
 
-    def _eval(node):
+    def _eval(node, depth=0):
+        if depth > 50:
+            raise ValueError("Příliš hluboký výraz")
         if isinstance(node, _ast.Expression):
-            return _eval(node.body)
+            return _eval(node.body, depth + 1)
         if isinstance(node, _ast.Constant):
             if isinstance(node.value, (int, float)):
                 return node.value
@@ -146,14 +160,19 @@ def cmd_calculate(expr: str) -> str:
         if isinstance(node, _ast.BinOp):
             op = type(node.op)
             if op in OPERATORS:
-                return OPERATORS[op](_eval(node.left), _eval(node.right))
+                left  = _eval(node.left,  depth + 1)
+                right = _eval(node.right, depth + 1)
+                if op is _ast.Pow and isinstance(right, (int, float)) and abs(right) > 300:
+                    raise ValueError("Exponent je příliš velký (max 300)")
+                return OPERATORS[op](left, right)
             raise ValueError("Nepodporovaný operátor")
         if isinstance(node, _ast.UnaryOp):
-            val = _eval(node.operand)
+            val = _eval(node.operand, depth + 1)
             return -val if isinstance(node.op, _ast.USub) else val
         if isinstance(node, _ast.Call):
             if isinstance(node.func, _ast.Name) and node.func.id in ALLOWED_NAMES:
-                return ALLOWED_NAMES[node.func.id](*[_eval(a) for a in node.args])
+                return ALLOWED_NAMES[node.func.id](
+                    *[_eval(a, depth + 1) for a in node.args])
             raise ValueError("Neznámá funkce")
         if isinstance(node, _ast.Name):
             if node.id in ALLOWED_NAMES:

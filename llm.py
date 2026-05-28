@@ -7,7 +7,6 @@ LLM (qwen2.5:3b) slouží pro AI konverzaci, kód, vysvětlení.
 import os
 import re
 import json
-import unicodedata
 import requests
 import logging
 from datetime import datetime
@@ -15,6 +14,7 @@ from typing import Dict, Tuple
 from collections import deque
 
 from memory import JarvisMemory
+from commands.utils import normalize_text as _norm
 
 logger = logging.getLogger(__name__)
 
@@ -231,13 +231,6 @@ _PROC_ALIASES = {
     "gimp": "gimp", "telegram": "telegram", "steam": "steam",
     "kalkulačka": "gnome-calculator",
 }
-
-def _norm(text: str) -> str:
-    """Odstraní diakritiku pro robustní matching (otevři == otevri)."""
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', text.lower())
-        if unicodedata.category(c) != 'Mn'
-    )
 
 # Trigger slova pro hudbu (bez diakritiky)
 _MUSIC_STOP = re.compile(
@@ -685,10 +678,19 @@ class LLMEngine:
         task = self._llm_router.detect_task(user_text)
         routed_model, temperature, max_tokens = self._llm_router.get_model_for_task(task)
 
+        messages = [{"role": "system", "content": system}, *list(self.history)]
+        # Odhadni spotřebované tokeny (1 token ≈ 4 znaky) a zkraťuj historii dokud
+        # nezůstane alespoň 512 tokenů pro odpověď.
+        MAX_CONTEXT = 3072
+        while len(messages) > 2:
+            used = sum(len(m.get("content", "")) for m in messages) // 4
+            if used + max_tokens <= MAX_CONTEXT:
+                break
+            messages.pop(1)  # odstraň nejstarší user/assistant pár (index 1, za system)
+
         payload = {
             "model":    routed_model,
-            "messages": [{"role": "system", "content": system},
-                         *list(self.history)],
+            "messages": messages,
             "stream":   False,
             "options":  {"temperature": temperature, "num_predict": max_tokens},
         }
@@ -735,10 +737,17 @@ class LLMEngine:
         task = self._llm_router.detect_task(user_text)
         routed_model, temperature, max_tokens = self._llm_router.get_model_for_task(task)
 
+        messages = [{"role": "system", "content": system}, *list(self.history)]
+        MAX_CONTEXT = 3072
+        while len(messages) > 2:
+            used = sum(len(m.get("content", "")) for m in messages) // 4
+            if used + max_tokens <= MAX_CONTEXT:
+                break
+            messages.pop(1)
+
         payload = {
             "model":    routed_model,
-            "messages": [{"role": "system", "content": system},
-                         *list(self.history)],
+            "messages": messages,
             "stream":   True,
             "options":  {"temperature": temperature, "num_predict": max_tokens},
         }

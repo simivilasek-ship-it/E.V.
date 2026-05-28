@@ -77,10 +77,7 @@ class JarvisApp:
         signal.signal(signal.SIGINT,  self._sig)
         signal.signal(signal.SIGTERM, self._sig)
 
-        self.gui._clear_mem = lambda: (
-            self.llm.clear_history(),
-            self.gui._add_sys("Paměť vymazána.")
-        )
+        self.gui._clear_mem = self._clear_memory
 
         self.gui.root.after(800, self._check_ollama)
         self._schedule_memory_maintenance()
@@ -198,6 +195,15 @@ class JarvisApp:
                 self._speak(msg)
             timer_mod._on_timer_done = _timer_done
             logger.info("Timer skill callback navázan")
+
+    def _clear_memory(self):
+        """Vymaže LLM historii s error handlingem."""
+        try:
+            self.llm.clear_history()
+            self._gui(lambda: self.gui._add_sys("Paměť vymazána."))
+        except Exception as e:
+            logger.error(f"Chyba při mazání paměti: {e}")
+            self._gui(lambda: self.gui._add_sys(f"Chyba při mazání paměti: {e}"))
 
     # ── ERROR HANDLING CALLBACKS ─────────────────────
 

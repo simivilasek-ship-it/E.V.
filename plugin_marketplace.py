@@ -13,14 +13,58 @@ from __future__ import annotations
 
 
 class PluginMarketplace:
-    # Registr pluginů — URL na GitHub (raw manifest.json nebo zip)
+    # Registr vestavěných pluginů dodávaných s JARVIS.
+    # Tyto pluginy jsou součástí repozitáře v plugins/builtin/ —
+    # "instalace" jen zkopíruje složku do plugins/custom/.
     REGISTRY = {
         "hello-world": {
-            "repo": "simivilasek-ship-it/jarvis-plugin-hello",
-            "description": "Ukázkový plugin (hello world)",
-            "author": "JARVIS team",
+            "repo":        "simivilasek-ship-it/jarvis-plugin-hello",
+            "description": "Ukázkový plugin — základ pro vlastní vývoj",
+            "author":      "JARVIS team",
+            "builtin":     False,
         },
-        # Placeholder pro budoucí pluginy
+        "calculator": {
+            "repo":        None,
+            "description": "Rozšířená kalkulačka s historií výpočtů",
+            "author":      "JARVIS team",
+            "builtin":     True,
+            "builtin_path": "plugins/builtin/calculator",
+        },
+        "timer": {
+            "repo":        None,
+            "description": "Časovač s hlasovým upozorněním",
+            "author":      "JARVIS team",
+            "builtin":     True,
+            "builtin_path": "plugins/builtin/timer",
+        },
+        "clipboard": {
+            "repo":        None,
+            "description": "Správa schránky — kopírování, vkládání, historie",
+            "author":      "JARVIS team",
+            "builtin":     True,
+            "builtin_path": "plugins/builtin/clipboard",
+        },
+        "greeting": {
+            "repo":        None,
+            "description": "Pozdravy a základní konverzace",
+            "author":      "JARVIS team",
+            "builtin":     True,
+            "builtin_path": "plugins/builtin/greeting",
+        },
+        "mcp-filesystem": {
+            "repo":        None,
+            "description": "MCP Filesystem — čtení souborů a adresářů",
+            "author":      "JARVIS team",
+            "builtin":     True,
+            "builtin_path": "plugins/builtin/mcp_filesystem",
+        },
+        "mcp-brave": {
+            "repo":        None,
+            "description": "MCP Brave Search — webové vyhledávání (vyžaduje BRAVE_API_KEY)",
+            "author":      "JARVIS team",
+            "builtin":     True,
+            "builtin_path": "plugins/builtin/mcp_brave",
+        },
     }
 
     def __init__(self, plugins_dir: str = None):

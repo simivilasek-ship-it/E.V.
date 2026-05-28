@@ -160,12 +160,17 @@ class EventBus:
                     list(self._subscribers.get(EventType.ALL, []))
                 )
 
-            # Zavolej callbacky mimo zámek
+            # Zavolej callbacky mimo zámek — každý v separátním daemon vlákně
+            # s timeoutem 5 s, aby pomalý callback nezablokoval event loop.
             for cb in callbacks:
-                try:
-                    cb(event)
-                except Exception as e:
-                    logger.error(f"EventBus callback chyba ({event.type}): {e}")
+                t = threading.Thread(
+                    target=self._safe_call, args=(cb, event), daemon=True)
+                t.start()
+                t.join(timeout=5.0)
+                if t.is_alive():
+                    logger.warning(
+                        f"EventBus callback timeout (>5s): {getattr(cb, '__name__', cb)}"
+                    )
 
     # ── Historie ──────────────────────────────────────
 
@@ -189,6 +194,13 @@ class EventBus:
             "event_counts": counts,
             "subscribers":  {k: len(v) for k, v in self._subscribers.items()},
         }
+
+    @staticmethod
+    def _safe_call(cb: Callable, event: "Event") -> None:
+        try:
+            cb(event)
+        except Exception as e:
+            logger.error(f"EventBus callback chyba ({event.type}): {e}")
 
     def stop(self, timeout: float = 2.0):
         self._running = False

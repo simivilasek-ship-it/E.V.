@@ -3,6 +3,14 @@
   "version": "1.0.0",
   "description": "Ovládání počítače: screenshot, klikání, psaní, okna — přes computer-control-mcp (pyautogui + OCR)",
   "author": "JARVIS",
-  "permissions": ["answer"],
-  "triggers": ["screenshot", "klikni", "napiste", "okna", "presuń myš"]
+  "permissions": [
+    "mcp"
+  ],
+  "triggers": [
+    "screenshot",
+    "klikni",
+    "napiste",
+    "okna",
+    "presuń myš"
+  ]
 }

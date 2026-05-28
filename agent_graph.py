@@ -18,11 +18,12 @@ import json
 import logging
 import re
 import requests
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from llm import _norm
+from commands.utils import normalize_text as _norm
 
 if TYPE_CHECKING:
     from agent_tools import ToolRegistry
@@ -382,22 +383,26 @@ def should_handle(text: str) -> bool:
 # ── Singleton ─────────────────────────────────────────────────────
 
 _graph: Optional[AgentGraph] = None
+_graph_lock = threading.Lock()
 
 
 def get_graph_agent(executor=None, mcp_bridge=None,
                     ollama_url: str = "http://localhost:11434/api/chat",
                     model: str = "qwen2.5:3b") -> Optional[AgentGraph]:
+    """Vrátí singleton GraphAgent. Thread-safe, vytvoří ho při prvním volání."""
     global _graph
-    if _graph is None:
-        if executor is None:
-            return None
-        from agent_tools import build_registry
-        registry = build_registry(executor, mcp_bridge)
-        _graph   = AgentGraph(registry, ollama_url, model)
-        logger.info(f"GraphAgent inicializován ({len(registry.all())} nástrojů)")
+    with _graph_lock:
+        if _graph is None:
+            if executor is None:
+                return None
+            from agent_tools import build_registry
+            registry = build_registry(executor, mcp_bridge)
+            _graph   = AgentGraph(registry, ollama_url, model)
+            logger.info(f"GraphAgent inicializován ({len(registry.all())} nástrojů)")
     return _graph
 
 
 def reset_graph():
     global _graph
-    _graph = None
+    with _graph_lock:
+        _graph = None

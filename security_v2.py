@@ -122,7 +122,22 @@ class AuditLog:
         self._path: Path = path or Path.home() / ".jarvis_audit.jsonl"
         self._entries: List[AuditEntry] = []
         self._lock: threading.Lock = threading.Lock()
+        self._ensure_secure_file()
         self._load_recent()
+
+    def _ensure_secure_file(self) -> None:
+        """Vytvoří soubor s oprávněními 0o600 (čte jen vlastník)."""
+        import os
+        if not self._path.exists():
+            try:
+                self._path.touch(mode=0o600)
+            except Exception as e:
+                logger.warning(f"Audit log: nelze nastavit oprávnění: {e}")
+        else:
+            try:
+                os.chmod(self._path, 0o600)
+            except Exception as e:
+                logger.warning(f"Audit log chmod: {e}")
 
     def log(self, action: str, params: Dict[str, Any], allowed: bool,
             reason: str = "", user_text: str = "", result: str = "") -> None:

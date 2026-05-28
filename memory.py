@@ -174,21 +174,22 @@ class _SQLiteMemoryStore:
         for row in rows:
             age_days = (now - row["created_at"]) / 86400
             recency  = _math.exp(-age_days / 14)
+            importance = max(0.0, min(1.0, float(row["importance"])))
+            recency    = max(0.0, min(1.0, recency))
             if engine.available:
                 sem_score = engine.similarity(query, row["content"])
-                score = (0.5 * sem_score
-                         + 0.3 * row["importance"]
-                         + 0.2 * recency)
-                if sem_score == 0.0:
+                # Odmítni NaN / inf / záporné hodnoty z embedding modelu
+                if not _math.isfinite(sem_score) or sem_score <= 0.0:
                     continue
+                sem_score = min(1.0, sem_score)
+                score = 0.5 * sem_score + 0.3 * importance + 0.2 * recency
             else:
                 c_words = set(row["content"].lower().split())
                 overlap = len(q_words & c_words)
                 if overlap == 0:
                     continue
-                score = (0.5 * overlap / max(len(q_words), 1)
-                         + 0.3 * row["importance"]
-                         + 0.2 * recency)
+                sem_score = overlap / max(len(q_words), 1)
+                score = 0.5 * sem_score + 0.3 * importance + 0.2 * recency
             results.append({
                 "id": row["id"], "content": row["content"],
                 "importance": row["importance"],

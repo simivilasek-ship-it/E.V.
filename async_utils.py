@@ -396,15 +396,19 @@ class AsyncEngine:
                 task._future.cancel()
 
     def _cleanup_task(self, task_id: str):
-        """Vyčistí staré úlohy z paměti"""
+        """Vyčistí dokončenou úlohu a udržuje max 100 úloh v paměti."""
         with self._lock:
-            if task_id in self._tasks:
-                # Udržuj jen posledních 100 úloh
-                if len(self._tasks) > 100:
-                    oldest = min(self._tasks.keys(), key=lambda k: self._tasks[k].created_at)
-                    del self._tasks[oldest]
-                else:
-                    del self._tasks[task_id]
+            # Vždy smaž dokončenou úlohu
+            self._tasks.pop(task_id, None)
+            # Pokud stále přesahujeme limit, smaž nejdéle dokončenou
+            if len(self._tasks) > 100:
+                oldest = min(
+                    self._tasks.keys(),
+                    key=lambda k: (
+                        self._tasks[k]._completed_at or self._tasks[k].created_at
+                    ),
+                )
+                del self._tasks[oldest]
 
     # ── SPRÁVA ÚLOH ──────────────────────────────────
 
