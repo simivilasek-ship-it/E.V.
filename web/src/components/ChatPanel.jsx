@@ -3,11 +3,11 @@ import { useJarvis } from '../store/jarvis'
 
 function TypingDots() {
   return (
-    <span style={{ display:'inline-flex', gap:3, alignItems:'center', marginLeft:4 }}>
+    <div className="typing-indicator">
       {[0,1,2].map(i => (
         <span key={i} className="typing-dot" style={{ animationDelay:`${i*0.18}s` }} />
       ))}
-    </span>
+    </div>
   )
 }
 
@@ -19,23 +19,17 @@ function renderContent(text) {
       const lang = p.match(/^```(\w+)/)?.[1] || ''
       const code = p.replace(/^```\w*\n?/, '').replace(/\n?```$/, '')
       return (
-        <pre key={i} style={{ marginTop: 8, padding: '10px 12px', background: '#050a15',
-          border: '1px solid rgba(0,212,255,.15)', borderRadius: 8,
-          fontSize: 12, color: '#60c8f8', overflowX: 'auto', whiteSpace: 'pre' }}>
-          {lang && <span style={{ color:'#3a5a78', fontSize:10, float:'right' }}>{lang}</span>}
+        <pre key={i}>
+          {lang && <span style={{ float:'right', fontSize:9, color:'var(--text2)', fontFamily:'var(--font-mono)' }}>{lang}</span>}
           {code}
         </pre>
       )
     }
-    // Wrap inline chunks in a single <span> — prevents block-level stacking
     const chunks = p.split(/(`[^`]+`)/g)
     return (
       <span key={i}>
-        {chunks.map((chunk, j) =>
-          chunk.startsWith('`')
-            ? <code key={j} style={{ background:'rgba(0,212,255,.08)', padding:'1px 5px',
-                borderRadius:4, fontSize:12, color:'#60c8f8' }}>{chunk.slice(1,-1)}</code>
-            : chunk
+        {chunks.map((c, j) =>
+          c.startsWith('`') ? <code key={j}>{c.slice(1,-1)}</code> : c
         )}
       </span>
     )
@@ -44,18 +38,23 @@ function renderContent(text) {
 
 function Message({ msg }) {
   const isUser = msg.sender === 'user'
-  const t = new Date(msg.ts).toLocaleTimeString('cs', { hour:'2-digit', minute:'2-digit' })
+  const t = new Date(msg.ts).toLocaleTimeString('cs', { hour:'2-digit', minute:'2-digit', second:'2-digit' })
 
   return (
-    <div className={`msg ${isUser?'user':''}`}>
-      <div className={`avatar ${isUser?'u':'j'}`}>{isUser ? 'U' : 'J'}</div>
-      <div>
-        <div style={{ fontSize:10, color:'#3a5a78', marginBottom:4, textAlign: isUser?'right':'left' }}>
-          {isUser?'ty':'jarvis'} · {t}
+    <div className={`msg-group ${isUser?'user':''} fade-up`}>
+      <div className={`avatar-hud ${isUser?'u':'j'}`}>{isUser ? 'U' : 'J'}</div>
+      <div className="msg-content">
+        <div className="msg-meta">
+          {isUser ? 'USER' : 'JARVIS'} · {t}
         </div>
         <div className={`bubble ${isUser?'u':'j'}`}>
           {renderContent(msg.text)}
-          {msg.streaming && <TypingDots />}
+          {msg.streaming && !msg.text && <TypingDots />}
+          {msg.streaming && msg.text && (
+            <span style={{ display:'inline-block', width:8, height:13, background:'var(--cyan)',
+              marginLeft:2, verticalAlign:'middle', animation:'pulse 0.8s ease-in-out infinite',
+              borderRadius:1, boxShadow:'0 0 6px var(--cyan)' }} />
+          )}
         </div>
       </div>
     </div>
@@ -63,24 +62,30 @@ function Message({ msg }) {
 }
 
 function ConnBadge() {
-  const { connStatus, connect } = useJarvis(s => ({ connStatus: s.connStatus, connect: s.connect }))
+  const connStatus = useJarvis(s => s.connStatus)
+  const retry      = useJarvis(s => s.retry)
   const map = {
-    connected:    { color:'#00e676', label:'● live' },
-    connecting:   { color:'#fbbf24', label:'◎ connecting...' },
-    disconnected: { color:'#ef4444', label:'○ offline' },
-    error:        { color:'#ef4444', label:'✕ error' },
+    connected:    { color:'var(--green)',  label:'CONNECTED' },
+    connecting:   { color:'var(--amber)',  label:'CONNECTING' },
+    disconnected: { color:'var(--red)',    label:'OFFLINE' },
+    error:        { color:'var(--red)',    label:'ERROR' },
+    failed:       { color:'var(--red)',    label:'FAILED' },
   }
   const { color, label } = map[connStatus] || map.disconnected
   return (
-    <button onClick={connect} style={{
-      fontSize:10, padding:'2px 8px', borderRadius:20,
-      color, border:`1px solid ${color}33`, background:'transparent', cursor:'pointer',
-    }}>{label}</button>
+    <button onClick={retry} className="conn-badge" style={{
+      color, borderColor:`${color}33`, background:`${color}0a`,
+    }}>
+      <span style={{ width:5, height:5, borderRadius:'50%', background:color,
+        boxShadow:`0 0 6px ${color}`,
+        animation: connStatus==='connecting' ? 'pulse 1s ease-in-out infinite' : 'none' }} />
+      {label}
+    </button>
   )
 }
 
 export default function ChatPanel() {
-  const [input, setInput]     = useState('')
+  const [input, setInput]   = useState('')
   const messages  = useJarvis(s => s.messages)
   const sendCmd   = useJarvis(s => s.sendCommand)
   const clearMsgs = useJarvis(s => s.clearMessages)
@@ -98,7 +103,7 @@ export default function ChatPanel() {
     setHist(h => [t, ...h.slice(0,49)])
     setHidx(-1)
     setInput('')
-    taRef.current.style.height = 'auto'
+    if (taRef.current) taRef.current.style.height = 'auto'
     sendCmd(t)
     taRef.current?.focus()
   }, [input, orbState, sendCmd])
@@ -121,31 +126,32 @@ export default function ChatPanel() {
 
   return (
     <>
-      {/* Header */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-        padding:'10px 16px', borderBottom:'1px solid rgba(0,212,255,.08)', flexShrink:0 }}>
-        <span style={{ fontSize:10, letterSpacing:'.12em', color:'#3a5a78' }}>KOMUNIKACE</span>
+      <div className="panel-header">
+        <span className="panel-title">COMMUNICATION</span>
         <div style={{ display:'flex', gap:8 }}>
           <ConnBadge />
-          <button onClick={clearMsgs} style={{ fontSize:11, color:'#3a5a78', background:'none', border:'none', cursor:'pointer' }}>🗑</button>
+          <button onClick={clearMsgs} style={{
+            fontFamily:'var(--font-hud)', fontSize:8, letterSpacing:'.1em',
+            color:'var(--text2)', background:'none', border:'none', cursor:'pointer', padding:'2px 6px',
+          }}>CLEAR</button>
         </div>
       </div>
 
-      {/* Messages */}
       <div className="messages">
-        {messages.length === 0 && (
-          <div style={{ display:'flex', flexDirection:'column', alignItems:'center',
-            justifyContent:'center', height:'100%', color:'#3a5a78', textAlign:'center' }}>
-            <div style={{ fontSize:40, opacity:.1, marginBottom:12 }}>J</div>
-            <div style={{ fontSize:12 }}>JARVIS čeká na příkaz</div>
-            <div style={{ fontSize:11, opacity:.5, marginTop:4 }}>Enter = odeslat · ↑↓ = historie</div>
+        {messages.length === 0 ? (
+          <div className="chat-empty">
+            <div className="chat-empty-logo">J</div>
+            <div className="chat-empty-sub" style={{ letterSpacing:'.2em' }}>JARVIS ONLINE</div>
+            <div style={{ fontFamily:'var(--font-mono)', fontSize:10, opacity:.4, marginTop:4 }}>
+              ENTER COMMAND ↵
+            </div>
           </div>
+        ) : (
+          messages.map(m => <Message key={m.id} msg={m} />)
         )}
-        {messages.map(m => <Message key={m.id} msg={m} />)}
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="input-area">
         <textarea
           ref={taRef}
@@ -153,10 +159,10 @@ export default function ChatPanel() {
           onChange={e => {
             setInput(e.target.value)
             e.target.style.height = 'auto'
-            e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
+            e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'
           }}
           onKeyDown={onKey}
-          placeholder="Napiš příkaz... (Enter = odeslat, Shift+Enter = nový řádek)"
+          placeholder="ENTER COMMAND..."
           rows={1}
           className="chat-input"
           disabled={busy}

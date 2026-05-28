@@ -5,68 +5,93 @@ import ChatPanel from './components/ChatPanel'
 import SystemPanel from './components/SystemPanel'
 import PluginStore from './components/PluginStore'
 
-const TABS = ['CHAT', 'PLUGINY', 'SYSTÉM']
+// Lucide-style inline SVG icons
+const Icons = {
+  chat:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>,
+  plugin:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><path d="M20.24 12.24a6 6 0 00-8.49-8.49L5 10.5V19h8.5l6.74-6.76z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>,
+  system:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
+}
 
-const STATE_COLORS = {
-  idle:'#3a5a78', listening:'#00d4ff', thinking:'#8b5cf6', speaking:'#00e676',
+const TABS = [
+  { id: 'CHAT',    label: 'CHAT',    icon: Icons.chat },
+  { id: 'PLUGINY', label: 'PLUGINS', icon: Icons.plugin },
+  { id: 'SYSTÉM',  label: 'SYSTEM',  icon: Icons.system },
+]
+
+const STATE_GLOW = {
+  idle:      'rgba(0,212,255,.15)',
+  listening: 'rgba(0,212,255,.5)',
+  thinking:  'rgba(139,92,246,.4)',
+  speaking:  'rgba(0,229,160,.4)',
 }
 
 export default function App() {
-  const connect  = useJarvis(s => s.connect)
-  const connError   = useJarvis(s => s.connError)
-  const retry       = useJarvis(s => s.retry)
-  const isConn   = useJarvis(s => s.isConnected)
-  const connStatus = useJarvis(s => s.connStatus)
-  const orbState = useJarvis(s => s.orbState)
-  const [tab, setTab] = useState('CHAT')
-
+  const connect        = useJarvis(s => s.connect)
   const connectMetrics = useJarvis(s => s.connectMetrics)
+  const isConn         = useJarvis(s => s.isConnected)
+  const connStatus     = useJarvis(s => s.connStatus)
+  const connError      = useJarvis(s => s.connError)
+  const retry          = useJarvis(s => s.retry)
+  const orbState       = useJarvis(s => s.orbState)
+  const [tab, setTab]  = useState('CHAT')
+
   useEffect(() => { connect(); connectMetrics() }, [])
 
-  const connColor = { connected:'#00e676', connecting:'#fbbf24', disconnected:'#ef4444', error:'#ef4444', failed:'#ef4444' }[connStatus] || '#3a5a78'
+  const connColor = { connected:'#00e5a0', connecting:'#ffb300', disconnected:'#ff3366', error:'#ff3366', failed:'#ff3366' }[connStatus] || '#4a6a8a'
 
   return (
     <div className="app">
-      {/* Top bar */}
+      {/* ── Top Bar ── */}
       <header className="topbar">
-        {/* Logo */}
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginRight:24 }}>
           <div style={{
-            width:32, height:32, borderRadius:'50%',
+            width:34, height:34, borderRadius:8,
             border:`1.5px solid rgba(0,212,255,.5)`,
             display:'flex', alignItems:'center', justifyContent:'center',
-            fontSize:13, color:'#00d4ff',
-            boxShadow:'0 0 16px rgba(0,212,255,.25)',
-            flexShrink: 0,
-          }}>J</div>
-          <span style={{ color:'#00d4ff', letterSpacing:'.22em', fontSize:14,
-                         textShadow:'0 0 20px rgba(0,212,255,.7)' }}>JARVIS</span>
-          <span style={{ fontSize:10, color:'#3a5a78', padding:'2px 8px',
-                         border:'1px solid #1a3050', borderRadius:20 }}>v4.3</span>
+            background:'rgba(0,212,255,.05)',
+            boxShadow:'0 0 20px rgba(0,212,255,.2)',
+            flexShrink:0,
+          }}>
+            <span style={{ fontFamily:'var(--font-hud)', fontSize:14, fontWeight:900, color:'var(--cyan)' }}>J</span>
+          </div>
+          <span className="logo-text">JARVIS</span>
+          <span className="version-badge">v4.3</span>
         </div>
 
-        {/* Tabs */}
-        <nav style={{ display:'flex', gap:4, marginLeft:16 }}>
+        <nav style={{ display:'flex', height:'100%', marginLeft:8 }}>
           {TABS.map(t => (
-            <button key={t} className={`nav-tab ${tab===t?'active':''}`} onClick={() => setTab(t)}>
-              {t}
+            <button key={t.id} className={`nav-tab ${tab===t.id?'active':''}`} onClick={() => setTab(t.id)}>
+              {t.icon}
+              {t.label}
             </button>
           ))}
         </nav>
 
-        {/* Right status */}
-        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:12 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:11 }}>
-            <div style={{
+        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:16 }}>
+          {/* Connection */}
+          <button onClick={retry} className="conn-badge" style={{
+            color: connColor,
+            borderColor: `${connColor}33`,
+            background: `${connColor}0a`,
+          }}>
+            <span style={{
               width:6, height:6, borderRadius:'50%',
               background: connColor,
               boxShadow: isConn ? `0 0 8px ${connColor}` : 'none',
-              transition:'all .5s',
+              display:'block', flexShrink:0,
+              animation: connStatus==='connecting' ? 'pulse 1s ease-in-out infinite' : 'none',
             }} />
-            <span style={{ color:'#3a5a78' }}>{connStatus}</span>
-          </div>
-          <div style={{ fontSize:11, color: STATE_COLORS[orbState], transition:'color .5s' }}>
-            {{ idle:'○ idle', listening:'◉ listening', thinking:'◎ thinking', speaking:'● speaking' }[orbState]}
+            {connStatus.toUpperCase()}
+          </button>
+
+          {/* Orb state */}
+          <div style={{
+            fontFamily:'var(--font-hud)', fontSize:9, letterSpacing:'.15em',
+            color: { idle:'var(--text2)', listening:'var(--cyan)', thinking:'var(--purple)', speaking:'var(--green)' }[orbState],
+            textShadow: orbState!=='idle' ? `0 0 10px currentColor` : 'none',
+            transition:'all .5s',
+          }}>
+            {{ idle:'○ IDLE', listening:'◉ LISTENING', thinking:'◎ PROCESSING', speaking:'● SPEAKING' }[orbState]}
           </div>
         </div>
       </header>
@@ -74,48 +99,54 @@ export default function App() {
       {/* Error banner */}
       {connError && (
         <div style={{
-          background:'rgba(239,68,68,.08)', borderBottom:'1px solid rgba(239,68,68,.2)',
-          padding:'8px 24px', display:'flex', alignItems:'center', gap:12, fontSize:12,
+          background:'rgba(255,51,102,.06)', borderBottom:'1px solid rgba(255,51,102,.2)',
+          padding:'7px 24px', display:'flex', alignItems:'center', gap:12, fontSize:11,
+          fontFamily:'var(--font-mono)',
         }}>
-          <span style={{ color:'#ef4444' }}>⚠</span>
-          <span style={{ color:'#ef9090', flex:1 }}>{connError}</span>
+          <span style={{ color:'var(--red)', fontSize:14 }}>⚠</span>
+          <span style={{ color:'rgba(255,100,130,.9)', flex:1 }}>{connError}</span>
           <button onClick={retry} style={{
-            padding:'3px 12px', borderRadius:6, fontSize:11, cursor:'pointer',
-            background:'rgba(239,68,68,.15)', color:'#ef4444',
-            border:'1px solid rgba(239,68,68,.3)',
-          }}>Zkusit znovu</button>
+            padding:'3px 14px', borderRadius:4, fontSize:10, cursor:'pointer',
+            background:'rgba(255,51,102,.12)', color:'var(--red)',
+            border:'1px solid rgba(255,51,102,.3)',
+            fontFamily:'var(--font-hud)', letterSpacing:'.1em',
+          }}>RETRY</button>
         </div>
       )}
 
-      {/* Main */}
+      {/* ── Main ── */}
       <main style={{ overflow:'hidden', height:'100%' }}>
         {tab === 'CHAT' && (
           <div className="main-grid">
-            {/* Chat */}
-            <div className="panel chat-panel" style={{ overflow:'hidden' }}>
+            <div className="panel chat-panel">
               <ChatPanel />
             </div>
 
-            {/* Orb column */}
             <div className="orb-col">
-              <div className="panel orb-panel glow-cyan" style={{
-                border: `1px solid rgba(0,212,255,.18)`,
-                boxShadow: `0 0 40px rgba(0,212,255,.07), 0 0 80px rgba(0,212,255,.03)`,
+              <div className="panel orb-panel glow-pulse" style={{
+                borderColor:'rgba(0,212,255,.2)',
               }}>
-                <AIOrb size={280} />
-                <div style={{ width:'100%', marginTop:16, borderTop:'1px solid rgba(0,212,255,.08)', paddingTop:12 }}>
-                  <div style={{ fontSize:10, color:'#3a5a78', letterSpacing:'.1em', marginBottom:8 }}>ZKRATKY</div>
-                  {[['Enter','odeslat'],['Shift+Enter','nový řádek'],['↑ ↓','historie']].map(([k,v]) => (
-                    <div key={k} style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:5 }}>
-                      <span style={{ color:'#3a5a78' }}>{k}</span>
-                      <span style={{ color:'#6080a0' }}>{v}</span>
-                    </div>
-                  ))}
+                <div style={{
+                  borderRadius:'50%',
+                  boxShadow:`0 0 40px ${STATE_GLOW[orbState]}, 0 0 80px ${STATE_GLOW[orbState]}`,
+                  transition:'box-shadow 1s ease',
+                }}>
+                  <AIOrb size={270} />
                 </div>
+              </div>
+
+              {/* Shortcuts */}
+              <div className="panel" style={{ padding:'12px 14px', flexShrink:0 }}>
+                <div className="panel-title" style={{ marginBottom:10 }}>SHORTCUTS</div>
+                {[['ENTER','Send'],['SHIFT+ENTER','New line'],['↑ ↓','History']].map(([k,v]) => (
+                  <div key={k} style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:7 }}>
+                    <span style={{ fontFamily:'var(--font-mono)', color:'var(--text2)', fontSize:10 }}>{k}</span>
+                    <span style={{ color:'#4a6a8a' }}>{v}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* System */}
             <div className="sys-col">
               <SystemPanel />
             </div>
@@ -123,7 +154,7 @@ export default function App() {
         )}
 
         {tab === 'PLUGINY' && (
-          <div style={{ padding:16, maxWidth:680 }}>
+          <div style={{ padding:12, maxWidth:680 }}>
             <div className="panel" style={{ padding:20 }}>
               <PluginStore />
             </div>
@@ -131,8 +162,10 @@ export default function App() {
         )}
 
         {tab === 'SYSTÉM' && (
-          <div style={{ padding:16, maxWidth:480 }}>
-            <SystemPanel />
+          <div style={{ padding:12, maxWidth:500, height:'100%' }}>
+            <div className="sys-col" style={{ height:'100%' }}>
+              <SystemPanel fullMode />
+            </div>
           </div>
         )}
       </main>
