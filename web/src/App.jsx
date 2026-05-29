@@ -4,6 +4,7 @@ import AIOrb from './components/AIOrb'
 import ChatPanel from './components/ChatPanel'
 import SystemPanel from './components/SystemPanel'
 import PluginStore from './components/PluginStore'
+import ParticleBackground from './components/ParticleBackground'
 
 // Lucide-style inline SVG icons
 const Icons = {
@@ -42,6 +43,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <ParticleBackground />
       {/* ── Top Bar ── */}
       <header className="topbar">
         <div style={{ display:'flex', alignItems:'center', gap:10, marginRight:24 }}>

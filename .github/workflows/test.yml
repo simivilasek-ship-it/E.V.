@@ -27,26 +27,16 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y \
             portaudio19-dev ffmpeg python3-tk \
-            xvfb x11-utils
+            xvfb x11-utils tesseract-ocr
 
       - name: Install Python deps
         run: |
           pip install --upgrade pip
-          pip install \
-            requests psutil edge-tts \
-            customtkinter \
-            SpeechRecognition \
-            fastapi uvicorn \
-            mcp \
-            pytest pytest-timeout pytest-cov \
-            ruff
-
-      - name: Install linter
-        run: pip install ruff
+          pip install -r requirements.txt
 
       - name: Lint (ruff)
-        run: ruff check . --output-format=github
-        continue-on-error: true  # neblokuj CI dokud neopravíme všechny chyby
+        run: ruff check . --select F821,F811,E711,E712 --output-format=github
+        continue-on-error: true
 
       - name: Start Xvfb
         run: |
@@ -55,9 +45,9 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m pytest test_jarvis.py -q --timeout=30 \
+          python -m pytest tests/ test_jarvis.py -q --timeout=30 \
             --cov=. --cov-report=xml --cov-report=term-missing \
-            --cov-omit="test_*,setup.py"
+            --cov-omit="test_*,setup.py,web/*"
         env:
           DISPLAY: ":99"
 

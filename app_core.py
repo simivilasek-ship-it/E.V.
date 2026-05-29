@@ -202,8 +202,9 @@ class JarvisApp:
             self.llm.clear_history()
             self._gui(lambda: self.gui._add_sys("Paměť vymazána."))
         except Exception as e:
-            logger.error(f"Chyba při mazání paměti: {e}")
-            self._gui(lambda: self.gui._add_sys(f"Chyba při mazání paměti: {e}"))
+            msg = str(e)
+            logger.error(f"Chyba při mazání paměti: {msg}")
+            self._gui(lambda: self.gui._add_sys(f"Chyba při mazání paměti: {msg}"))
 
     # ── ERROR HANDLING CALLBACKS ─────────────────────
 

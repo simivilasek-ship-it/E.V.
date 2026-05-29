@@ -20,7 +20,7 @@ import logging
 import re
 import requests
 import threading
-from typing import TYPE_CHECKING, List, Optional
+from typing import Callable,  TYPE_CHECKING, List, Optional
 
 from commands.utils import normalize_text as _norm
 from llm import OllamaClient
@@ -131,7 +131,7 @@ Pravidla:
             tools=registry.schema_block(),
         )
 
-    def run(self, user_text: str, on_step: Optional[callable] = None) -> str:
+    def run(self, user_text: str, on_step: Optional[Callable] = None) -> str:
         """
         Spustí ReAct smyčku a vrátí finální odpověď.
         on_step(step_text) je voláno po každém Observation pro live feedback.

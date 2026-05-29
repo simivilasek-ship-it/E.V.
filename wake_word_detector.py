@@ -10,7 +10,7 @@ import re
 import time
 import logging
 import threading
-from typing import Optional
+from typing import Callable,  Optional
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class WakeWordDetector:
     def __init__(
         self,
         wake_word: str = "jarvis",
-        on_wake: callable = None,
+        on_wake: Callable = None,
         sensitivity: float = 0.5,
     ):
         self.wake_word = wake_word.lower()
