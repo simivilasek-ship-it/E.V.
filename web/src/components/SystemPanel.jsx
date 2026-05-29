@@ -152,6 +152,57 @@ function Sparkline({ data, color, height = 36, width = '100%' }) {
   )
 }
 
+function AdvancedMetrics({ system }) {
+  const hasCpuTemp = system.cpu_temp != null
+  const hasNet     = system.net != null
+  const hasGpu     = system.gpu?.usage != null
+
+  if (!hasCpuTemp && !hasNet && !hasGpu) return null
+
+  return (
+    <div className="panel" style={{ padding:'10px 14px' }}>
+      <div className="panel-title" style={{ marginBottom:10 }}>ADVANCED</div>
+
+      {hasCpuTemp && (
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+          <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text2)' }}>CPU TEMP</span>
+          <span style={{ fontFamily:'var(--font-mono)', fontSize:12,
+            color: system.cpu_temp > 80 ? 'var(--red)' : system.cpu_temp > 70 ? 'var(--amber)' : 'var(--cyan)' }}>
+            {system.cpu_temp}°C
+          </span>
+        </div>
+      )}
+
+      {hasNet && (
+        <div style={{ marginBottom:8 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
+            <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text2)' }}>NETWORK</span>
+          </div>
+          <div style={{ display:'flex', gap:12 }}>
+            <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--green)' }}>
+              ↓ {system.net.recv} KB/s
+            </span>
+            <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--cyan)' }}>
+              ↑ {system.net.sent} KB/s
+            </span>
+          </div>
+        </div>
+      )}
+
+      {hasGpu && (
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+          <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text2)' }}>
+            GPU {system.gpu.name ? `(${system.gpu.name.slice(0,12)})` : ''}
+          </span>
+          <span style={{ fontFamily:'var(--font-mono)', fontSize:12, color:'var(--purple)' }}>
+            {system.gpu.usage}%
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const MAX_HISTORY = 60
 
 const LOG_PATTERNS = [
@@ -237,6 +288,9 @@ export default function SystemPanel() {
           <Sparkline data={diskHist} color="#8b5cf6" height={24} />
         </div>
       </div>
+
+      {/* Advanced metrics */}
+      <AdvancedMetrics system={system} />
 
       {/* Agents */}
       {Array.isArray(agents) && agents.length > 0 && (

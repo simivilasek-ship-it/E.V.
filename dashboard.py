@@ -340,11 +340,66 @@ if HAS_FASTAPI:
 
     @app.get("/api/system")
     async def system_metrics():
-        cpu  = psutil.cpu_percent(interval=0.3)
+        import psutil, asyncio
+        cpu  = psutil.cpu_percent(interval=0.1)
         ram  = psutil.virtual_memory()
         disk = psutil.disk_usage("/")
-        return {"cpu": round(cpu, 1), "ram": round(ram.percent, 1),
-                "disk": round(disk.percent, 1)}
+
+        # CPU teplota
+        cpu_temp = None
+        try:
+            temps = psutil.sensors_temperatures()
+            if temps:
+                for name in ("coretemp", "k10temp", "cpu_thermal", "acpitz"):
+                    if name in temps:
+                        cpu_temp = round(temps[name][0].current, 1)
+                        break
+        except Exception:
+            pass
+
+        # Síťová aktivita (bytes/s za poslední sekundu)
+        net = {"sent": 0, "recv": 0}
+        try:
+            n1 = psutil.net_io_counters()
+            await asyncio.sleep(0.1)
+            n2 = psutil.net_io_counters()
+            net = {
+                "sent": round((n2.bytes_sent - n1.bytes_sent) / 0.1 / 1024, 1),  # KB/s
+                "recv": round((n2.bytes_recv - n1.bytes_recv) / 0.1 / 1024, 1),
+            }
+        except Exception:
+            pass
+
+        # GPU usage (nvidia-smi nebo AMD)
+        gpu = {"usage": None, "vram": None, "name": None}
+        try:
+            import subprocess
+            r = subprocess.run(
+                ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total,name",
+                 "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=2
+            )
+            if r.returncode == 0:
+                parts = r.stdout.strip().split(", ")
+                if len(parts) >= 3:
+                    gpu["usage"] = int(parts[0])
+                    used = int(parts[1])
+                    total = int(parts[2])
+                    gpu["vram"] = round(used / total * 100, 1) if total > 0 else None
+                    gpu["name"] = parts[3].strip()[:30] if len(parts) > 3 else "NVIDIA GPU"
+        except Exception:
+            pass
+
+        return {
+            "cpu":      round(cpu, 1),
+            "ram":      round(ram.percent, 1),
+            "disk":     round(disk.percent, 1),
+            "cpu_temp": cpu_temp,
+            "net":      net,
+            "gpu":      gpu,
+            "ram_gb":   round(ram.used / 1024**3, 1),
+            "ram_total": round(ram.total / 1024**3, 1),
+        }
 
     @app.get("/api/status")
     async def status():
@@ -427,14 +482,32 @@ if HAS_FASTAPI:
 
     @app.get("/api/plugins")
     async def list_plugins():
-        """Seznam načtených pluginů."""
+        """Seznam načtených pluginů s health statusem."""
         try:
             from plugin_system import create_plugin_manager
             from config import CONFIG
             pm = create_plugin_manager(CONFIG)
-            skills = pm.discover_skills()
-            return {"plugins": [{"name": s.name, "version": getattr(s, 'version', '1.0'),
-                                  "description": getattr(s, 'description', '')} for s in skills]}
+            pm.load_all_plugins()
+            health   = pm.health_check()
+            hmap     = {h["name"]: h for h in health}
+            plugins  = pm.list_plugins()
+            enriched = []
+            for p in plugins:
+                h = hmap.get(p["name"], {})
+                enriched.append({
+                    "name":        p["name"],
+                    "version":     p.get("version", "1.0"),
+                    "description": p.get("description", ""),
+                    "status":      h.get("status", "unknown"),
+                    "routes":      h.get("routes", 0),
+                    "actions":     h.get("actions", 0),
+                    "error":       h.get("error"),
+                })
+            return {
+                "plugins": enriched,
+                "total":   len(enriched),
+                "healthy": sum(1 for h in health if h["status"] == "ok"),
+            }
         except Exception as e:
             return {"plugins": [], "error": str(e)}
 
@@ -565,6 +638,38 @@ if HAS_FASTAPI:
         except Exception:
             _graph_clients.discard(ws)
 
+    @app.get("/api/models")
+    async def list_models():
+        """Vrátí dostupné Ollama modely."""
+        try:
+            import requests as _r
+            from config import CONFIG
+            base = CONFIG.get("ollama_url", "http://localhost:11434/api/chat")
+            r = _r.get(base.replace("/api/chat", "/api/tags"), timeout=4)
+            if r.status_code == 200:
+                return {"models": [m["name"] for m in r.json().get("models", [])]}
+        except Exception:
+            pass
+        return {"models": []}
+
+    @app.post("/api/vision")
+    async def vision_query(body: dict):
+        """Popis obrázku pomocí multimodálního LLM (llava)."""
+        from pathlib import Path as _Path
+        prompt     = body.get("prompt", "Popiš obrázek.")
+        image_path = body.get("image_path", "")
+        model      = body.get("model", "llava:7b")
+        if not _Path(image_path).exists():
+            return {"error": f"Soubor nenalezen: {image_path}"}
+        try:
+            from llm import ask_vision
+            from config import CONFIG
+            url    = CONFIG.get("ollama_url", "http://localhost:11434/api/chat")
+            answer = ask_vision(prompt, image_path, model, url)
+            return {"answer": answer}
+        except Exception as e:
+            return {"error": str(e)}
+
     @app.get("/api/graph/state")
     async def graph_state():
         """Vrátí aktuální stav graf agenta."""
@@ -590,11 +695,39 @@ if HAS_FASTAPI:
                 cpu  = psutil.cpu_percent(interval=0.1)
                 ram  = psutil.virtual_memory()
                 disk = psutil.disk_usage("/")
+
+                # CPU teplota
+                cpu_temp = None
+                try:
+                    temps = psutil.sensors_temperatures()
+                    if temps:
+                        for tname in ("coretemp", "k10temp", "cpu_thermal", "acpitz"):
+                            if tname in temps:
+                                cpu_temp = round(temps[tname][0].current, 1)
+                                break
+                except Exception:
+                    pass
+
+                # Síťová aktivita
+                net_recv = 0
+                net_sent = 0
+                try:
+                    n1 = psutil.net_io_counters()
+                    await asyncio.sleep(0.1)
+                    n2 = psutil.net_io_counters()
+                    net_recv = round((n2.bytes_recv - n1.bytes_recv) / 0.1 / 1024, 1)
+                    net_sent = round((n2.bytes_sent - n1.bytes_sent) / 0.1 / 1024, 1)
+                except Exception:
+                    pass
+
                 payload = {
                     "type": "metrics",
                     "cpu":  round(cpu, 1),
                     "ram":  round(ram.percent, 1),
                     "disk": round(disk.percent, 1),
+                    "cpu_temp": cpu_temp,
+                    "net_recv": net_recv,
+                    "net_sent": net_sent,
                     "ts":   int(time.time() * 1000),
                 }
                 await ws.send_text(json.dumps(payload))

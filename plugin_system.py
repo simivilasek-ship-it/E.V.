@@ -61,7 +61,7 @@ MANIFEST_SCHEMA = {
         "permissions": list,
         "triggers":    list,
     },
-    "valid_permissions": {"answer", "system", "media", "files", "mcp", "internal"},
+    "valid_permissions": {"answer", "system", "media", "files", "mcp", "internal", "safe_eval"},
 }
 
 
@@ -209,11 +209,16 @@ def _collect_imports(source: str) -> Set[str]:
     return roots
 
 
-_DANGEROUS_BUILTINS = {"exec", "eval", "compile", "__import__", "breakpoint"}
+# eval je zakázáno jen jako nekontrolovaný builtin.
+# Pokud plugin explicitně deklaruje permission "safe_eval", povolí se.
+_DANGEROUS_BUILTINS = {"exec", "__import__", "breakpoint"}
+_CONDITIONAL_BUILTINS = {"eval", "compile"}  # povoleno s "safe_eval" permission
 
 
-def _check_dangerous_calls(source: str) -> Optional[str]:
-    """Detekuje přímá volání exec/eval/compile i bez importu modulu."""
+def _check_dangerous_calls(source: str, allow_eval: bool = False) -> Optional[str]:
+    """Detekuje přímá volání exec/eval/compile jako BUILTINY (ne jako metody).
+    re.compile() nebo pattern.compile() jsou povoleny — pouze compile() bez prefixu je zakázáno.
+    """
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -222,13 +227,15 @@ def _check_dangerous_calls(source: str) -> Optional[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             func = node.func
-            name = None
             if isinstance(func, ast.Name):
                 name = func.id
-            elif isinstance(func, ast.Attribute):
-                name = func.attr
-            if name and name in _DANGEROUS_BUILTINS:
-                found.append(name)
+                # exec/__import__/breakpoint — vždy zakázáno
+                if name in _DANGEROUS_BUILTINS:
+                    found.append(name)
+                # eval/compile — zakázáno pokud plugin nemá safe_eval permission
+                elif name in _CONDITIONAL_BUILTINS and not allow_eval:
+                    found.append(name)
+            # Attribute volání (re.compile, obj.eval…) jsou POVOLENA
     if found:
         return f"Zakázaná volání: {', '.join(sorted(set(found)))}"
     return None
@@ -237,7 +244,8 @@ def _check_dangerous_calls(source: str) -> Optional[str]:
 def _check_imports(source: str, permissions: List[str], plugin_name: str) -> Optional[str]:
     """Zkontroluje importy a nebezpečná volání pluginu. Vrátí chybový řetězec nebo None."""
     # 1. Kontrola nebezpečných builtinů (exec/eval bez importu)
-    danger = _check_dangerous_calls(source)
+    allow_eval = "safe_eval" in permissions
+    danger = _check_dangerous_calls(source, allow_eval=allow_eval)
     if danger:
         return danger
 
@@ -590,6 +598,31 @@ class PluginManager:
             }
             for p in self.plugins.values()
         ]
+
+    def health_check(self) -> List[Dict]:
+        """Zkontroluje zdraví všech načtených pluginů."""
+        results = []
+        for plugin in self.plugins.values():
+            info = {
+                "name":    plugin.name,
+                "status":  "ok",
+                "routes":  0,
+                "actions": 0,
+                "error":   None,
+            }
+            try:
+                routes  = plugin.get_routes()
+                actions = plugin.get_actions()
+                info["routes"]  = len(routes) if routes else 0
+                info["actions"] = len(actions) if actions else 0
+                for r in (routes or []):
+                    if not callable(r.get("handler")):
+                        raise ValueError(f"handler není callable: {r.get('handler')}")
+            except Exception as e:
+                info["status"] = "error"
+                info["error"]  = str(e)[:100]
+            results.append(info)
+        return results
 
     def get_plugin_info(self, name: str) -> Optional[Dict[str, Any]]:
         p = self.plugins.get(name)

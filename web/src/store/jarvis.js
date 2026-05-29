@@ -14,7 +14,7 @@ export const useJarvis = create((set, get) => ({
   messages:    [],
   logs:        [],
   toasts:      [],
-  system:      { cpu: 0, ram: 0, disk: 0 },
+  system:      { cpu: 0, ram: 0, disk: 0, cpu_temp: null, net: null, gpu: null },
   agents:      [],
   plugins:     [],
   isConnected: false,
@@ -151,7 +151,14 @@ export const useJarvis = create((set, get) => ({
     ws.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data)
-        if (d.type === 'metrics') get().setSystem({ cpu: d.cpu, ram: d.ram, disk: d.disk })
+        if (d.type === 'metrics') get().setSystem({
+              cpu: d.cpu, ram: d.ram, disk: d.disk,
+              cpu_temp: d.cpu_temp ?? null,
+              net: (d.net_recv !== undefined || d.net_sent !== undefined)
+                ? { recv: d.net_recv ?? 0, sent: d.net_sent ?? 0 }
+                : get().system.net,
+              gpu: d.gpu ?? get().system.gpu,
+            })
       } catch {}
     }
     ws.onclose = () => {

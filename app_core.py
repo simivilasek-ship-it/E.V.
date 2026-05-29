@@ -188,6 +188,16 @@ class JarvisApp:
             self.graph_agent = None
             logger.warning(f"GraphAgent init selhal: {e}")
 
+        try:
+            from agent_roles import MultiAgentOrchestrator
+            self.multi_agent = MultiAgentOrchestrator(
+                ollama_url=url, model=model,
+                executor=self.cmds, mcp_bridge=mcp)
+            logger.info("MultiAgentOrchestrator připraven")
+        except Exception as e:
+            self.multi_agent = None
+            logger.warning(f"MultiAgent init selhal: {e}")
+
     def _wire_skill_callbacks(self):
         """Naváže callbacks do skill modulů po jejich načtení."""
         import sys as _sys

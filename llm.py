@@ -138,6 +138,15 @@ class LLMEngine:
         if context:
             system += f"\n\nRelevantní kontext z paměti:\n{context}"
 
+        # Přidej kontext prostředí do system promptu
+        try:
+            from context_orchestrator import get_context_orchestrator
+            ctx = get_context_orchestrator().get_context()
+            if ctx:
+                system += f"\n\nKontext prostředí:\n{ctx}"
+        except Exception:
+            pass
+
         task = self._llm_router.detect_task(user_text)
         routed_model, temperature, max_tokens = self._llm_router.get_model_for_task(task)
 

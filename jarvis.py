@@ -16,6 +16,8 @@ def main():
                         help="Spustit průvodce prvního spuštění")
     parser.add_argument("--dashboard", action="store_true",
                         help="Spustit pouze web dashboard (localhost:8002)")
+    parser.add_argument("--desktop", action="store_true",
+                        help="Spustit desktop shell (pywebview/browser)")
     parser.add_argument("--version", action="version",
                         version=f"JARVIS {__version__}")
     args = parser.parse_args()
@@ -28,6 +30,11 @@ def main():
     if args.dashboard:
         import dashboard
         dashboard.run()
+        return
+
+    if args.desktop:
+        from desktop.launcher import main as desktop_main
+        desktop_main()
         return
 
     from app_core import JarvisApp

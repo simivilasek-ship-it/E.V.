@@ -3,6 +3,17 @@
   "version": "1.0.0",
   "description": "Rychlé výpočty bez LLM — 'kolik je 15% z 200', '2^10', 'sqrt(144)'.",
   "author": "JARVIS",
-  "permissions": ["answer"],
-  "triggers": ["kolik je", "vypocitej", "calculate", "%", "plus", "krat", "deleno"]
+  "permissions": [
+    "answer",
+    "safe_eval"
+  ],
+  "triggers": [
+    "kolik je",
+    "vypocitej",
+    "calculate",
+    "%",
+    "plus",
+    "krat",
+    "deleno"
+  ]
 }
