@@ -1,6 +1,46 @@
 import { useEffect, useRef, useState } from 'react'
 import { useJarvis } from '../store/jarvis'
 
+// Ollama status widget
+function OllamaStatus() {
+  const [status, setStatus] = useState({ ollama: false, model: '—' })
+
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const r = await fetch('http://localhost:8002/api/status')
+        const d = await r.json()
+        setStatus(d)
+      } catch {}
+    }
+    check()
+    const t = setInterval(check, 10000)
+    return () => clearInterval(t)
+  }, [])
+
+  return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+      padding:'8px 14px', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+      <span style={{ fontFamily:'var(--font-hud)', fontSize:8, letterSpacing:'.15em', color:'var(--text2)' }}>
+        OLLAMA
+      </span>
+      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+        <span style={{ fontFamily:'var(--font-mono)', fontSize:10,
+          color: status.ollama ? 'var(--green)' : 'var(--red)' }}>
+          {status.ollama ? '● ONLINE' : '○ OFFLINE'}
+        </span>
+        {status.model && (
+          <span style={{ fontFamily:'var(--font-mono)', fontSize:9,
+            color:'var(--text2)', padding:'1px 6px',
+            border:'1px solid var(--border)', borderRadius:3 }}>
+            {status.model}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // SVG Arc Progress Ring
 function ArcRing({ value, color, label, size = 72 }) {
   const r    = 28
@@ -57,6 +97,8 @@ function ArcRing({ value, color, label, size = 72 }) {
         </text>
       </svg>
       <div className="arc-label">{label}</div>
+      {value >= 90 && <div style={{fontFamily:'var(--font-hud)',fontSize:7,color:'var(--red)',letterSpacing:'.1em',textAlign:'center'}}>HIGH</div>}
+      {value >= 70 && value < 90 && <div style={{fontFamily:'var(--font-hud)',fontSize:7,color:'var(--amber)',letterSpacing:'.1em',textAlign:'center'}}>WARN</div>}
     </div>
   )
 }
@@ -112,6 +154,19 @@ function Sparkline({ data, color, height = 36, width = '100%' }) {
 
 const MAX_HISTORY = 60
 
+const LOG_PATTERNS = [
+  { re: /ERROR|CRITICAL/i, color: 'var(--red)' },
+  { re: /WARN/i,           color: 'var(--amber)' },
+  { re: /✓|OK|SUCCESS/i,  color: 'var(--green)' },
+  { re: /INFO/i,           color: 'var(--text2)' },
+]
+function logColor(text) {
+  for (const {re, color} of LOG_PATTERNS) {
+    if (re.test(text)) return color
+  }
+  return 'var(--text2)'
+}
+
 export default function SystemPanel() {
   const system   = useJarvis(s => s.system)
   const agents   = useJarvis(s => s.agents)
@@ -120,8 +175,9 @@ export default function SystemPanel() {
   const fetchAge = useJarvis(s => s.fetchAgents)
   const clearLogs= useJarvis(s => s.clearLogs)
 
-  const [cpuHist, setCpuHist]   = useState([])
-  const [ramHist, setRamHist]   = useState([])
+  const [cpuHist,  setCpuHist]  = useState([])
+  const [ramHist,  setRamHist]  = useState([])
+  const [diskHist, setDiskHist] = useState([])
 
   useEffect(() => {
     fetchAge()
@@ -130,9 +186,10 @@ export default function SystemPanel() {
   }, [])
 
   useEffect(() => {
-    setCpuHist(h => [...h.slice(-(MAX_HISTORY-1)), Math.round(system.cpu||0)])
-    setRamHist(h => [...h.slice(-(MAX_HISTORY-1)), Math.round(system.ram||0)])
-  }, [system.cpu, system.ram])
+    setCpuHist(h  => [...h.slice(-(MAX_HISTORY-1)),  Math.round(system.cpu  || 0)])
+    setRamHist(h  => [...h.slice(-(MAX_HISTORY-1)),  Math.round(system.ram  || 0)])
+    setDiskHist(h => [...h.slice(-(MAX_HISTORY-1)),  Math.round(system.disk || 0)])
+  }, [system.cpu, system.ram, system.disk])
 
   const cpu  = Math.round(system.cpu  || 0)
   const ram  = Math.round(system.ram  || 0)
@@ -148,6 +205,7 @@ export default function SystemPanel() {
             {isConn ? '● LIVE' : '○ OFFLINE'}
           </span>
         </div>
+        <OllamaStatus />
         <div className="arc-row" style={{ padding:'16px 12px 12px' }}>
           <ArcRing value={cpu}  color="#00d4ff" label="CPU"  />
           <ArcRing value={ram}  color="#0066ff" label="RAM"  />
@@ -164,12 +222,19 @@ export default function SystemPanel() {
           </div>
           <Sparkline data={cpuHist} color="#00d4ff" height={32} />
         </div>
-        <div>
+        <div style={{ marginBottom:12 }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
             <span className="arc-label">RAM HISTORY (60s)</span>
             <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'#0066ff' }}>{ram}%</span>
           </div>
           <Sparkline data={ramHist} color="#0066ff" height={32} />
+        </div>
+        <div style={{ marginTop:10 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+            <span className="arc-label">DISK USAGE</span>
+            <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--purple)' }}>{disk}%</span>
+          </div>
+          <Sparkline data={diskHist} color="#8b5cf6" height={24} />
         </div>
       </div>
 
@@ -205,9 +270,11 @@ export default function SystemPanel() {
         <div className="log-box">
           {logs.slice(-80).map((l, i) => {
             const t = l.text || ''
-            const cls = t.includes('ERROR') ? 'log-error' : t.includes('WARN') ? 'log-warn'
-              : t.includes('OK') || t.includes('INFO') ? '' : ''
-            return <div key={i} className={`log-line ${cls}`}>{t.slice(0, 110)}</div>
+            return (
+              <div key={i} className="log-line" style={{ color: logColor(t) }}>
+                {t.slice(0, 110)}
+              </div>
+            )
           })}
           {logs.length === 0 && (
             <div style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text2)', opacity:.5 }}>

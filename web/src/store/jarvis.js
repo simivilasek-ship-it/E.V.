@@ -13,6 +13,7 @@ export const useJarvis = create((set, get) => ({
   orbState:    'idle',
   messages:    [],
   logs:        [],
+  toasts:      [],
   system:      { cpu: 0, ram: 0, disk: 0 },
   agents:      [],
   plugins:     [],
@@ -91,6 +92,7 @@ export const useJarvis = create((set, get) => ({
     ws.onopen = () => {
       clearTimeout(timeout)
       set({ isConnected: true, connStatus: 'connected', _ws: ws, _attempt: 0, connError: null })
+      get().addToast('WebSocket připojen', 'success', 2000)
       // Spusť metriky WebSocket
       get().connectMetrics()
     }
@@ -98,6 +100,7 @@ export const useJarvis = create((set, get) => ({
     ws.onclose = (ev) => {
       clearTimeout(timeout)
       set({ isConnected: false, connStatus: 'disconnected', _ws: null })
+      get().addToast('WebSocket odpojen', 'warning', 3000)
       if (ev.code !== 1000) get()._scheduleReconnect()
     }
 
@@ -179,6 +182,16 @@ export const useJarvis = create((set, get) => ({
     })
   },
 
+  addToast(message, type = 'info', duration = 4000) {
+    const id = Date.now()
+    set(s => ({ toasts: [...s.toasts, { id, message, type, duration }] }))
+    setTimeout(() => get().removeToast(id), duration)
+  },
+
+  removeToast(id) {
+    set(s => ({ toasts: s.toasts.filter(t => t.id !== id) }))
+  },
+
   setOrbState(s)  { set({ orbState: s }) },
   setSystem(data) { set({ system: data }) },
   setAgents(data) { set({ agents: data }) },
@@ -239,6 +252,7 @@ export const useJarvis = create((set, get) => ({
     }
 
     // REST fallback pokud WS není dostupný
+    get().addToast('Chyba odpovědi — zkouším REST fallback', 'warning')
     try {
       const r = await fetch(`${API}/api/command`, {
         method: 'POST',

@@ -65,6 +65,10 @@ class JarvisApp:
         self._wire_skill_callbacks()
         self._init_mcp()
 
+        # Routing pipeline (vyčleněno do routing.py)
+        from routing import CommandRouter
+        self._router = CommandRouter(self)
+
         # GUI
         self.gui = JarvisGUI()
         self.gui.on_mic_click    = self._on_mic_click
@@ -378,117 +382,19 @@ class JarvisApp:
             self._gui(lambda: self.gui.set_status("Nerozuměl jsem."))
 
     def _process_command(self, text: str):
+        """Deleguje na CommandRouter (routing.py)."""
         logger.info(f"Příkaz: {text}")
-        self._gui(lambda: self.gui.add_message(text, "user"))
-        self._gui(lambda: self.gui.set_state("thinking"))
-        self._gui(lambda: self.gui.set_status("Zpracovávám..."))
+        self._router.process(text)
 
-        try:
-            if self._try_fast_path(text):
-                return
-            self._run_llm_path(text)
-        except Exception as e:
-            logger.error(f"Chyba: {e}", exc_info=True)
-            self.error_handler.log_error(
-                severity=ErrorSeverity.ERROR,
-                category=ErrorCategory.SYSTEM,
-                source="_process_command",
-                message=f"Zpracování příkazu selhalo: {e}",
-                exception=e,
-            )
-            self._gui(lambda: self.gui.add_message("Chyba. Zkus to znovu.", "jarvis"))
-        finally:
-            self._gui(lambda: self.gui.set_state("idle"))
-            self._gui(lambda: self.gui.set_status(""))
-
+    # Zpětná kompatibilita — delegace na router
     def _try_fast_path(self, text: str) -> bool:
-        """Zkusí rychlé cesty (plugin → lokální router → agenti). Vrátí True pokud obslouženo."""
-        # 1. Plugin routes
-        if self.plugin_manager:
-            plugin_result = self._try_plugin_routes(text)
-            if plugin_result:
-                msg, action_data = plugin_result
-                self._execute_result(msg, action_data)
-                return True
-
-        # 2. Lokální router (bez LLM)
-        msg, action_data = self.llm.quick_match(text)
-        if action_data is not None:
-            self._execute_result(msg, action_data)
-            return True
-
-        # 3. Grafový agent (Planner+Router+Executor+Critic) pro složité úkoly
-        from agent_graph import should_handle as _graph_should
-        if getattr(self, "graph_agent", None) and _graph_should(text):
-            self._gui(lambda: self.gui.set_status("Plánovač přemýšlí…"))
-            answer = self.graph_agent.run(
-                text, on_step=lambda s: self._gui(lambda m=s: self.gui.set_status(m)))
-            self._execute_result(answer, {"action": "answer", "params": {}})
-            return True
-
-        # 4. ReAct agent (fallback pro vícesvůlové úkoly)
-        from agent_react import should_handle as _react_should
-        if getattr(self, "react_agent", None) and _react_should(text):
-            self._gui(lambda: self.gui.set_status("Agent přemýšlí…"))
-            answer = self.react_agent.run(
-                text, on_step=lambda s: self._gui(lambda m=s: self.gui.set_status(m)))
-            self._execute_result(answer, {"action": "answer", "params": {}})
-            return True
-
-        return False
+        return self._router._fast_path(text)
 
     def _run_llm_path(self, text: str):
-        """Zpracuje příkaz přes LLM (streaming)."""
-        if not self._ollama_reachable():
-            self._execute_result(
-                "Ollama není dostupná. Lokální příkazy fungují normálně — "
-                "zkus např. 'kolik je hodin', 'otevři chrome' nebo 'hlasitost na 50'.",
-                {"action": "answer", "params": {}},
-            )
-            return
-
-        full_response = ""
-        is_command    = False
-
-        def _collecting_generator():
-            nonlocal full_response, is_command
-            for chunk in self.llm.stream_ask(text):
-                full_response += chunk
-                if "COMMAND:" in full_response:
-                    is_command = True
-                    return
-                yield chunk
-
-        self.tts.speak_streaming(_collecting_generator())
-
-        if is_command:
-            for chunk in self.llm.drain_stream():
-                full_response += chunk
-
-        full_text = full_response.strip()
-        if full_text:
-            self._execute_result(full_text, {"action": "answer", "params": {}}, speak=False)
+        self._router._llm_path(text)
 
     def _try_plugin_routes(self, text: str) -> Optional[Tuple[str, dict]]:
-        """Zkusí routovat příkaz přes pluginy"""
-        if not self.plugin_manager:
-            return None
-
-        for route in self.plugin_manager.get_routes():
-            try:
-                pattern = route.get("pattern")
-                handler = route.get("handler")
-                plugin_name = route.get("plugin", "?")
-                if pattern and handler and pattern.search(text):
-                    result = self.plugin_manager.call_route(
-                        handler, text, plugin_name=plugin_name)
-                    if result and result[0] is not None:
-                        return result
-            except Exception as e:
-                logger.debug(f"Plugin route selhala: {e}")
-                continue
-
-        return None
+        return self._router._plugin_routes(text)
 
     def _execute_result(self, message: str, action_data: dict, speak: bool = True):
         """Zobrazí odpověď a vykoná akci. speak=False přeskočí TTS (pokud bylo mluveno při streamování)."""

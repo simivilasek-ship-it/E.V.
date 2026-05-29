@@ -6,6 +6,7 @@ import SystemPanel from './components/SystemPanel'
 import PluginStore from './components/PluginStore'
 import ParticleBackground from './components/ParticleBackground'
 import AgentGraph from './components/AgentGraph'
+import ToastContainer from './components/Toast'
 
 // Lucide-style inline SVG icons
 const Icons = {
@@ -128,16 +129,25 @@ export default function App() {
               <ChatPanel />
             </div>
 
-            <div className="orb-col">
-              <div className="panel orb-panel glow-pulse" style={{
-                borderColor:'rgba(0,212,255,.2)',
+            <div className="orb-col" style={{ alignItems:'center' }}>
+              <div className="panel orb-panel" style={{
+                borderColor:'rgba(0,212,255,.18)',
+                width:'100%',
+                boxShadow:`0 0 30px ${STATE_GLOW[orbState]}, inset 0 0 30px rgba(0,212,255,.03)`,
+                transition:'box-shadow 1.2s ease',
               }}>
+                <style>{`
+                  @keyframes orbGlow {
+                    0%,100% { box-shadow: 0 0 30px ${STATE_GLOW[orbState]}, 0 0 60px ${STATE_GLOW[orbState]}55; }
+                    50%     { box-shadow: 0 0 60px ${STATE_GLOW[orbState]}, 0 0 120px ${STATE_GLOW[orbState]}88; }
+                  }
+                `}</style>
                 <div style={{
                   borderRadius:'50%',
-                  boxShadow:`0 0 40px ${STATE_GLOW[orbState]}, 0 0 80px ${STATE_GLOW[orbState]}`,
-                  transition:'box-shadow 1s ease',
+                  animation: orbState !== 'idle' ? 'orbGlow 1.5s ease-in-out infinite' : 'none',
+                  transition:'all 1s ease',
                 }}>
-                  <AIOrb size={270} />
+                  <AIOrb size={280} />
                 </div>
               </div>
 
@@ -183,6 +193,7 @@ export default function App() {
           </div>
         )}
       </main>
+      <ToastContainer />
     </div>
   )
 }
