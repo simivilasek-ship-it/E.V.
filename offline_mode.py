@@ -1,5 +1,5 @@
 """
-JARVIS v4.2 — Offline Mode System
+JARVIS v4.4 — Offline Mode System
 Umožňuje fungovat offline s fallback LLM a queued commands
 """
 

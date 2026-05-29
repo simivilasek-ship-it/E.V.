@@ -1,5 +1,5 @@
 """
-JARVIS v3.0 — Async Operations
+JARVIS v4.4 — Async Operations
 Unified async/threading layer for JARVIS operations.
 Provides consistent async execution with proper error handling and lifecycle management.
 """

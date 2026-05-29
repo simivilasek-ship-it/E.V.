@@ -1,5 +1,5 @@
 """
-JARVIS v4.2 — Health Check System
+JARVIS v4.4 — Health Check System
 Monitorování zdraví a dostupnosti komponent
 """
 

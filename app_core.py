@@ -38,7 +38,7 @@ class JarvisApp:
 
     def __init__(self):
         setup_logging()
-        logger.info("Spouštím JARVIS v4.2...")
+        logger.info("Spouštím JARVIS v4.4...")
 
         # Inicializace nových systémů (async, error handling, plugins)
         self._init_new_systems()
@@ -130,7 +130,7 @@ class JarvisApp:
         if CONFIG.get("wake_word_enabled", True):
             self.wake_word.start()
 
-        logger.info("Systémy v2.0 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord)")
+        logger.info("Systémy v4.4 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord)")
 
     def _load_plugins(self):
         """Načte plugin systém a pluginy"""

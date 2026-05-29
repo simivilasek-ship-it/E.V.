@@ -1,5 +1,5 @@
 """
-JARVIS v4.2 — Plugin / Skill System
+JARVIS v4.4 — Plugin / Skill System
 Podporuje dva formáty:
   1. Složka se skill.py + manifest.json  (Leon-style)
   2. Jednoduchý .py soubor s get_routes() / get_actions()

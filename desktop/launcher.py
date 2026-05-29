@@ -42,7 +42,7 @@ def _port_busy(port: int) -> bool:
 def start_backend() -> None:
     if _port_busy(BACKEND_PORT):
         logger.info("Backend už běží na portu %d", BACKEND_PORT)
-        return
+        return  # Používáme existující instanci — OK
     try:
         import uvicorn
         sys.path.insert(0, str(ROOT))
@@ -173,7 +173,20 @@ def run_webview(url: str) -> bool:
 
 def run_browser(url: str) -> None:
     print(f"  Otevírám prohlížeč → {url}")
-    webbrowser.open(url)
+    # xdg-open funguje spolehlivě z .desktop souboru i terminálu
+    opened = False
+    for cmd in (["xdg-open", url], ["chromium", url], ["firefox", url],
+                ["google-chrome", url], ["sensible-browser", url]):
+        try:
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+            opened = True
+            break
+        except FileNotFoundError:
+            continue
+    if not opened:
+        webbrowser.open(url)
+    print(f"  JARVIS běží → {url}")
     print("  Stiskni Ctrl+C pro ukončení backendu.")
     try:
         while True:

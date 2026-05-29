@@ -1,5 +1,5 @@
 """
-JARVIS v4.2 — MCP Bridge
+JARVIS v4.4 — MCP Bridge
 Správce připojení k MCP serverům (filesystem, brave-search, …).
 Každý server se spouští jako subprocess přes stdio.
 Volání jsou synchronní (asyncio.run) pro kompatibilitu s ostatními moduly.

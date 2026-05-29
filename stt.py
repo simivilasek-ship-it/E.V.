@@ -1,5 +1,5 @@
 """
-JARVIS v4.2 — Speech-to-Text (STT)
+JARVIS v4.4 — Speech-to-Text (STT)
 Rozpoznávání řeči: Google STT primárně, Vosk offline fallback.
 """
 

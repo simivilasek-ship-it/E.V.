@@ -1,5 +1,5 @@
 """
-JARVIS v4.2 — LLM Engine (Ollama HTTP klient)
+JARVIS v4.4 — LLM Engine (Ollama HTTP klient)
 Lokální router je v local_router.py.
 
 OllamaClient — sdílený HTTP klient pro agenty (agent_graph, agent_react).
