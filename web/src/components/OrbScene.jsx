@@ -1,6 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { useAppStore } from '../store/appStore'
+import { useJarvis } from '../store/jarvis'
 import * as THREE from 'three'
 
 function Orb({ thinking }) {
@@ -77,7 +77,8 @@ function Particles() {
 }
 
 export default function OrbScene() {
-  const thinking = useAppStore(s => s.thinking)
+  const orbState = useJarvis(s => s.orbState)
+  const thinking = orbState === 'thinking' || orbState === 'speaking'
 
   return (
     <div style={{ width: '100%', height: '100%', minHeight: 400 }}>

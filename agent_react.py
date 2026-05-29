@@ -23,6 +23,7 @@ import threading
 from typing import TYPE_CHECKING, List, Optional
 
 from commands.utils import normalize_text as _norm
+from llm import OllamaClient
 
 if TYPE_CHECKING:
     from agent_tools import ToolRegistry
@@ -124,6 +125,7 @@ Pravidla:
         self.registry    = registry
         self.ollama_url  = ollama_url
         self.model       = model
+        self._client     = OllamaClient(ollama_url, model)
         self._system     = self.SYSTEM_PROMPT.format(
             max_steps=MAX_STEPS,
             tools=registry.schema_block(),
@@ -190,20 +192,7 @@ Pravidla:
         )
 
     def _llm(self, messages: list) -> str:
-        """Zavolá Ollama a vrátí text odpovědi."""
-        payload = {
-            "model":    self.model,
-            "messages": messages,
-            "stream":   False,
-            "options":  {"temperature": 0.2, "num_predict": MAX_TOKENS},
-        }
-        try:
-            r = requests.post(self.ollama_url, json=payload, timeout=60)
-            r.raise_for_status()
-            return r.json().get("message", {}).get("content", "").strip()
-        except Exception as e:
-            logger.error(f"ReactAgent LLM chyba: {e}")
-            return ""
+        return self._client.call(messages, temperature=0.2, max_tokens=MAX_TOKENS)
 
 
 # ── Singleton factory ─────────────────────────────────────────────

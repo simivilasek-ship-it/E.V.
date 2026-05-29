@@ -25,6 +25,7 @@ export const useJarvis = create((set, get) => ({
   _attempt:  0,
   _retryId:  null,
   _metricsWs: null,
+  _chatWs:   null,   // persistent chat WebSocket
 
   // ── Health check před WebSocket ──────────────────────
 
@@ -187,48 +188,67 @@ export const useJarvis = create((set, get) => ({
 
   // ── Příkazy ──────────────────────────────────────────
 
+  // Otevře persistent chat WebSocket (voláme jednou při startu)
+  connectChat() {
+    const existing = get()._chatWs
+    if (existing && existing.readyState <= WebSocket.OPEN) return
+    const ws = new WebSocket(`${WS_URL}/ws/chat`)
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data)
+        if (msg.type === 'chunk') {
+          get().setOrbState('speaking')
+          set(s => {
+            const msgs = [...s.messages]
+            const last = msgs[msgs.length - 1]
+            if (last?.streaming) msgs[msgs.length - 1] = { ...last, text: last.text + (msg.text || msg.data || '') }
+            return { messages: msgs }
+          })
+        } else if (msg.type === 'done') {
+          set(s => {
+            const msgs = [...s.messages]
+            const last = msgs[msgs.length - 1]
+            if (last?.streaming) msgs[msgs.length - 1] = { ...last, streaming: false }
+            return { messages: msgs }
+          })
+          get().setOrbState('idle')
+        } else if (msg.type === 'error') {
+          get().updateLastMessage({ text: `⚠ ${msg.text || msg.data}`, streaming: false, error: true })
+          get().setOrbState('idle')
+        }
+      } catch {}
+    }
+    ws.onclose = () => {
+      set({ _chatWs: null })
+      // Reconnect po 2s pokud nebyla záměrně zavřena
+      setTimeout(() => get().connectChat(), 2000)
+    }
+    set({ _chatWs: ws })
+  },
+
   async sendCommand(text) {
     if (!text?.trim()) return
     get().addMessage(text, 'user')
     get().addMessage('', 'jarvis', { streaming: true })
     get().setOrbState('thinking')
 
+    const chatWs = get()._chatWs
+    if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+      chatWs.send(JSON.stringify({ command: text, text }))
+      return
+    }
+
+    // REST fallback pokud WS není dostupný
     try {
-      const chatWs = new WebSocket(`${WS_URL}/ws/chat`)
-      await new Promise((resolve, reject) => {
-        const t = setTimeout(() => { chatWs.close(); reject(new Error('timeout')) }, 20000)
-        chatWs.onopen  = () => chatWs.send(JSON.stringify({ command: text }))
-        chatWs.onerror = () => { clearTimeout(t); reject(new Error('ws error')) }
-        chatWs.onclose = () => { clearTimeout(t); resolve() }
-        chatWs.onmessage = (e) => {
-          try {
-            const msg = JSON.parse(e.data)
-            if (msg.type === 'chunk') {
-              get().setOrbState('speaking')
-              set(s => {
-                const msgs = [...s.messages]
-                const last = msgs[msgs.length - 1]
-                if (last?.streaming) msgs[msgs.length - 1] = { ...last, text: last.text + msg.data }
-                return { messages: msgs }
-              })
-            } else if (msg.type === 'done') { clearTimeout(t); chatWs.close(); resolve() }
-            else if (msg.type === 'error')  { clearTimeout(t); reject(new Error(msg.data)) }
-          } catch {}
-        }
+      const r = await fetch(`${API}/api/command`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: text }),
       })
-    } catch {
-      // REST fallback
-      try {
-        const r = await fetch(`${API}/api/command`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ command: text }),
-        })
-        const data = await r.json()
-        get().updateLastMessage({ text: data.response || 'OK', streaming: false })
-      } catch (e) {
-        get().updateLastMessage({ text: `Chyba: ${e.message}`, streaming: false, error: true })
-      }
+      const data = await r.json()
+      get().updateLastMessage({ text: data.response || 'OK', streaming: false })
+    } catch (e) {
+      get().updateLastMessage({ text: `Chyba: ${e.message}`, streaming: false, error: true })
     } finally {
       set(s => {
         const msgs = [...s.messages]

@@ -24,6 +24,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from commands.utils import normalize_text as _norm
+from llm import OllamaClient
 
 if TYPE_CHECKING:
     from agent_tools import ToolRegistry
@@ -143,6 +144,7 @@ class AgentGraph:
         self.registry   = registry
         self.ollama_url = ollama_url
         self.model      = model
+        self._client    = OllamaClient(ollama_url, model)
 
     # ── Veřejné API ──────────────────────────────────────────────
 
@@ -314,19 +316,7 @@ class AgentGraph:
     # ── LLM helper ───────────────────────────────────────────────
 
     def _llm(self, messages: list) -> str:
-        payload = {
-            "model":    self.model,
-            "messages": messages,
-            "stream":   False,
-            "options":  {"temperature": 0.1, "num_predict": LLM_TOKENS},
-        }
-        try:
-            r = requests.post(self.ollama_url, json=payload, timeout=60)
-            r.raise_for_status()
-            return r.json().get("message", {}).get("content", "").strip()
-        except Exception as e:
-            logger.error(f"GraphAgent LLM chyba: {e}")
-            return ""
+        return self._client.call(messages, temperature=0.1, max_tokens=LLM_TOKENS)
 
     # ── JSON parsery ─────────────────────────────────────────────
 

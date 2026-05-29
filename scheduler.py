@@ -111,12 +111,26 @@ class Scheduler:
                     cancelled += 1
         return cancelled
 
+    @staticmethod
+    def _fmt_repeat(repeat: Optional[float]) -> str:
+        if repeat is None:
+            return "—"
+        r = int(repeat)
+        if r >= 86400 and r % 86400 == 0:
+            return f"{r // 86400}d"
+        if r >= 3600 and r % 3600 == 0:
+            return f"{r // 3600}h"
+        if r >= 60 and r % 60 == 0:
+            return f"{r // 60}m"
+        return f"{r}s"
+
     def get_pending(self) -> List[Dict[str, Any]]:
         with self._lock:
             return [
                 {"id": t.id, "name": t.name,
                  "fire_at": datetime.fromtimestamp(t.fire_at).strftime("%H:%M:%S"),
-                 "repeat": t.repeat, "run_count": t.run_count}
+                 "repeat": self._fmt_repeat(t.repeat),
+                 "run_count": t.run_count}
                 for t in self._tasks.values()
                 if t.status == TaskStatus.PENDING
             ]

@@ -16,18 +16,11 @@ import json
 import logging
 import threading
 import time
-import unicodedata
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List, Optional
 
-
-def _norm(text: str) -> str:
-    """Odstraní diakritiku — stejná funkce jako v llm.py."""
-    return "".join(
-        c for c in unicodedata.normalize("NFD", text.lower())
-        if unicodedata.category(c) != "Mn"
-    )
+from commands.utils import normalize_text as _norm
 
 logger = logging.getLogger(__name__)
 

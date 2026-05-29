@@ -84,16 +84,21 @@ except ImportError:
 
 # Fuzzy aliasy: (fráze, normalizovaný trigger, akce, params_fn)
 _FUZZY_COMMANDS = [
-    ("otevri chrome",    "open_app",   lambda: {"app": "chrome"}),
-    ("otevri firefox",   "open_app",   lambda: {"app": "firefox"}),
-    ("otevri spotify",   "open_app",   lambda: {"app": "spotify"}),
-    ("otevri discord",   "open_app",   lambda: {"app": "discord"}),
-    ("kolik je hodin",   "get_time",   lambda: {}),
-    ("jake je datum",    "get_date",   lambda: {}),
-    ("screenshot",       "screenshot", lambda: {}),
-    ("info o systemu",   "system_info",lambda: {}),
-    ("vypni pocitac",    "shutdown",   lambda: {"delay": 0}),
-    ("restartuj pocitac","restart",    lambda: {"delay": 0}),
+    ("otevri chrome",    "open_app",        lambda: {"app": "chrome"}),
+    ("otevri firefox",   "open_app",        lambda: {"app": "firefox"}),
+    ("otevri spotify",   "open_app",        lambda: {"app": "spotify"}),
+    ("otevri discord",   "open_app",        lambda: {"app": "discord"}),
+    ("kolik je hodin",   "get_time",        lambda: {}),
+    ("jake je datum",    "get_date",        lambda: {}),
+    ("screenshot",       "screenshot",      lambda: {}),
+    ("info o systemu",   "system_info",     lambda: {}),
+    ("vypni pocitac",    "shutdown",        lambda: {"delay": 0}),
+    ("restartuj pocitac","restart",         lambda: {"delay": 0}),
+    # Vision — překlepy jako "popíš obrazovku", "co vidis na obrazovce"
+    ("co vidis",         "screen_describe", lambda: {}),
+    ("popis obrazovku",  "screen_describe", lambda: {}),
+    ("precti obrazovku", "screen_ocr",      lambda: {}),
+    ("zapni kameru",     "webcam_describe", lambda: {}),
 ]
 _FUZZY_THRESHOLD = 82  # 0–100, 82 = toleruje 1–2 překlepy
 
@@ -522,9 +527,11 @@ class LocalRouter:
                     "action": "wiki_search", "params": {"query": query}}
 
         # ── MĚNA ─────────────────────────────────────
-        if re.search(r"\b(převeď\s+měnu|convert\s+currency)\b", t):
-            curr = re.sub(r"\b(převeď\s+měnu|convert\s+currency)\b\s*", "", text,
-                          flags=re.IGNORECASE).strip()
+        # Trigger hledá v normalizovaném textu (bez diakritiky)
+        if re.search(r"\b(prevod|prevest|zmen|konvertuj|convert)\b.{0,20}\b(meny|mena|currency|usd|eur|czk|gbp)\b", t) \
+                or re.search(r"\b\d+\s*(usd|eur|czk|gbp|jpy|pln|chf)\b.{0,20}\b(na|to|in)\b", t):
+            curr = re.sub(r"\b(prevod|prevest|zmen|konvertuj|convert)\s*(meny|mena|currency)?\s*",
+                          "", t, flags=re.IGNORECASE).strip()
             if curr:
                 return f"Převádím měnu: {curr}", {
                     "action": "currency_convert", "params": _parse_currency(curr)}

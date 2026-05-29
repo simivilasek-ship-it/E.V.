@@ -1,6 +1,8 @@
 """
 JARVIS v4.2 — LLM Engine (Ollama HTTP klient)
 Lokální router je v local_router.py.
+
+OllamaClient — sdílený HTTP klient pro agenty (agent_graph, agent_react).
 """
 
 import os
@@ -33,42 +35,52 @@ _USER = os.environ.get("USER", os.path.basename(_HOME))
 #  SYSTÉMOVÝ PROMPT — pouze pro AI konverzaci
 # ══════════════════════════════════════════════════════
 
-SYSTEM_PROMPT = f"""Jsi JARVIS, inteligentní osobní AI asistent. Komunikuješ česky.
+SYSTEM_PROMPT = f"""Jsi JARVIS — lokální AI asistent uživatele {_USER}. Komunikuješ česky.
 
-O sobě: Jsi lokální AI asistent běžící na počítači uživatele {_USER}.
-Ovládáš počítač, odpovídáš na otázky, píšeš kód, vysvětluješ věci.
+TVOJE ROLE:
+Odpovídáš na otázky, píšeš kód, vysvětluješ pojmy, překládáš, počítáš, pomáháš s analýzou.
+Systémové příkazy (otevři aplikaci, změň hlasitost, udělej screenshot…) zpracovává lokální router — ty se jimi nezabývej.
 
-Styl odpovědí:
-- Buď stručný a přesný
-- Pro kód použij markdown (```python ... ```)
-- Pro faktické otázky odpověz přímo
-- Pro systémové příkazy (otevřít, zavřít, nastavit) odpoví lokální systém automaticky
+FORMÁT:
+- Stručné a přesné odpovědi
+- Kód vždy v markdown: ```python ... ```
+- Pokud je otázka nejasná, zeptej se na upřesnění
 
-Umíš:
-- Psát kód v Pythonu, JavaScriptu, C++, Bashi a dalších jazycích
-- Vysvětlovat technické i obecné pojmy
-- Pomáhat s matematikou a logikou
-- Překládat texty (angličtina → čeština)
-- Provádět matematické výpočty
-- Ukládat a zobrazovat poznámky
-- Nastavovat připomínky
-- Hledat informace na Wikipedii
-- Převádět měny
-- Ovládat systém (aplikace, soubory, hlasitost, jas)
-- Hledat na webu, přehrávat hudbu
-- Získávat počasí, čas, systémové informace
-- Používat neural memory pro dlouhodobé učení a kontext
+PAMĚŤ:
+Máš přístup k relevantnímu kontextu z předchozích konverzací (viz sekce "Relevantní kontext" níže).
+Využij ho pro osobnější a přesnější odpovědi."""
 
-Mám brain-inspired paměť, která:
-- Dynamicky ukládá a vybavuje informace
-- Hodnotí důležitost a časovost
-- Automaticky zapomíná nepodstatné věci
-- Poskytuje kontext pro lepší odpovědi
 
-Pokud nevíš co uživatel chce (nejasný příkaz), VŽDY se zeptej upřesňující otázkou místo hádání.
-Příklad: "Chceš otevřít web, spustit aplikaci, nebo něco jiného?"
+# ══════════════════════════════════════════════════════
+#  OLLAMA CLIENT — sdílený HTTP klient pro agenty
+# ══════════════════════════════════════════════════════
 
-Neodpovídej žádným COMMAND formátem — to zpracovává lokální systém automaticky."""
+class OllamaClient:
+    """Jednoduchý synchronní HTTP klient pro Ollama /api/chat.
+
+    Používají ho agent_graph.py a agent_react.py místo duplicitní _llm() metody.
+    Při chybě vrátí prázdný string (agenti musí ošetřit sami).
+    """
+
+    def __init__(self, url: str, model: str):
+        self.url   = url
+        self.model = model
+
+    def call(self, messages: list, temperature: float = 0.1,
+             max_tokens: int = 500, timeout: int = 60) -> str:
+        payload = {
+            "model":    self.model,
+            "messages": messages,
+            "stream":   False,
+            "options":  {"temperature": temperature, "num_predict": max_tokens},
+        }
+        try:
+            r = requests.post(self.url, json=payload, timeout=timeout)
+            r.raise_for_status()
+            return r.json().get("message", {}).get("content", "").strip()
+        except Exception as e:
+            logger.error(f"OllamaClient chyba: {e}")
+            return ""
 
 
 # ══════════════════════════════════════════════════════
@@ -180,14 +192,13 @@ class LLMEngine:
     def stream_ask(self, user_text: str):
         msg, action = self.quick_match(user_text)
         if action is not None:
-            # Do LLM history ukládáme jen informační odpovědi, ne akce (otevři, zavři…)
             action_name = action.get("action", "")
             if action_name == "answer" and msg:
                 self.history.append({"role": "user",     "content": user_text})
                 self.history.append({"role": "assistant", "content": msg})
                 self.memory.store_conversation(user_text, msg, importance=0.4)
-            if msg:
-                yield msg
+            # Vždy yield string — nikdy nekončit generátor bez yield (frontend by dostal prázdný stream)
+            yield msg or ""
             return
 
         self.history.append({"role": "user", "content": user_text})

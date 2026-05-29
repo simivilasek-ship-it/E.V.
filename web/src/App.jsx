@@ -28,6 +28,7 @@ const STATE_GLOW = {
 export default function App() {
   const connect        = useJarvis(s => s.connect)
   const connectMetrics = useJarvis(s => s.connectMetrics)
+  const connectChat    = useJarvis(s => s.connectChat)
   const isConn         = useJarvis(s => s.isConnected)
   const connStatus     = useJarvis(s => s.connStatus)
   const connError      = useJarvis(s => s.connError)
@@ -35,7 +36,7 @@ export default function App() {
   const orbState       = useJarvis(s => s.orbState)
   const [tab, setTab]  = useState('CHAT')
 
-  useEffect(() => { connect(); connectMetrics() }, [])
+  useEffect(() => { connect(); connectMetrics(); connectChat() }, [])
 
   const connColor = { connected:'#00e5a0', connecting:'#ffb300', disconnected:'#ff3366', error:'#ff3366', failed:'#ff3366' }[connStatus] || '#4a6a8a'
 
