@@ -12,6 +12,9 @@ Pillow>=10.0.0
 
 # ── Desktop wrapper ────────────────────────────────────
 pywebview>=4.4.0
+PyQt6>=6.6.0
+PyQt6-WebEngine>=6.6.0
+qtpy>=2.4.0
 
 # ── Web dashboard / API ────────────────────────────────
 fastapi>=0.111.0
