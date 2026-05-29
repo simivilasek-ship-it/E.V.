@@ -1,4 +1,7 @@
-# JARVIS v4.3 — Docker Compose
+# JARVIS v4.4 — Docker Compose
+# Spuštění: docker compose up -d
+# Web UI: http://localhost:8002/app
+
 services:
   ollama:
     image: ollama/ollama:latest
@@ -21,26 +24,19 @@ services:
     ports:
       - "8002:8002"
     environment:
-      - OLLAMA_URL=http://ollama:11434/api/chat
-      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
+      - OLLAMA_HOST=http://ollama:11434
+      - JARVIS_HEADLESS=1
+    env_file:
+      - .env          # BRAVE_API_KEY atd.
     volumes:
       - jarvis_memory:/app/memory_data
-      - jarvis_config:/app/config.json
     restart: unless-stopped
-
-  # Desktop mód — přidej GUI přes X11 (Linux only)
-  # jarvis-desktop:
-  #   build: .
-  #   command: python jarvis.py
-  #   environment:
-  #     - DISPLAY=${DISPLAY}
-  #   volumes:
-  #     - /tmp/.X11-unix:/tmp/.X11-unix:rw
-  #   devices:
-  #     - /dev/snd:/dev/snd
-  #   network_mode: host
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   ollama_data:
   jarvis_memory:
-  jarvis_config:

@@ -576,6 +576,83 @@ if HAS_FASTAPI:
         except Exception:
             return {}
 
+    # ── Agent Timeline ────────────────────────────────
+    _agent_timeline: list = []   # in-memory buffer posledních runů
+
+    @app.get("/api/agent/timeline")
+    async def agent_timeline():
+        return {"runs": _agent_timeline[-20:]}
+
+    # ── Skill Generator ───────────────────────────────
+
+    @app.post("/api/skill/generate")
+    async def skill_generate(body: dict):
+        """Vygeneruje plugin skeleton z přirozeného popisu."""
+        prompt = body.get("prompt", "").strip()
+        if not prompt:
+            return {"error": "Prázdný prompt"}
+        try:
+            from llm import OllamaClient
+            from config import CONFIG
+            client = OllamaClient(CONFIG["ollama_url"], CONFIG["ollama_model"])
+
+            system = """\
+Jsi expert na tvorbu JARVIS pluginů. Vygeneruj funkční plugin pro zadaný účel.
+
+Plugin se skládá ze dvou souborů:
+1. skill.py — Python kód
+2. manifest.json — metadata
+
+FORMÁT ODPOVĚDI (jen JSON, nic jiného):
+{
+  "name": "nazev_pluginu",
+  "description": "Co plugin dělá",
+  "triggers": ["klíčové slovo 1", "klíčové slovo 2"],
+  "permissions": ["answer"],
+  "skill_py": "import re\\n...celý kód skill.py...",
+  "manifest": {"name":"...","version":"1.0.0","description":"...","permissions":["answer"],"triggers":["..."]}
+}
+
+Pravidla pro skill.py:
+- Importuj jen povolené moduly (requests, json, re, datetime, math, collections…)
+- Definuj _PATTERN = re.compile(r"\\b(trigger)\\b", re.IGNORECASE)
+- Definuj _handle(text: str) -> tuple[str, dict]
+- Vrať (zpráva, {"action": "answer", "params": {}})
+- def get_routes(): return [{"pattern": _PATTERN, "handler": _handle}]
+- def get_actions(): return {}
+"""
+            result = client.call_json(
+                [{"role": "system", "content": system},
+                 {"role": "user", "content": f"Vytvoř plugin: {prompt}"}],
+                temperature=0.3, max_tokens=1200,
+            )
+            if not result or "skill_py" not in result:
+                return {"error": "LLM nevrátil validní JSON — zkus znovu nebo uprosti prompt"}
+            return result
+        except Exception as e:
+            return {"error": str(e)}
+
+    @app.post("/api/skill/save")
+    async def skill_save(body: dict):
+        """Uloží vygenerovaný plugin do plugins/custom/."""
+        name       = body.get("name", "").strip().replace(" ", "_").lower()
+        skill_code = body.get("skill_code", "")
+        manifest   = body.get("manifest", {})
+        if not name or not skill_code:
+            return {"error": "Chybí name nebo skill_code"}
+        try:
+            from pathlib import Path as _Path
+            dest = _Path(__file__).parent / "plugins" / "custom" / name
+            dest.mkdir(parents=True, exist_ok=True)
+            (dest / "skill.py").write_text(skill_code, encoding="utf-8")
+            import json as _json
+            if manifest:
+                (dest / "manifest.json").write_text(
+                    _json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            return {"saved": str(dest), "name": name}
+        except Exception as e:
+            return {"error": str(e)}
+
     @app.post("/api/chat")
     async def chat_rest(body: dict):
         """REST fallback pro chat — vrátí celou odpověď najednou."""

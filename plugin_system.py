@@ -61,7 +61,31 @@ MANIFEST_SCHEMA = {
         "permissions": list,
         "triggers":    list,
     },
-    "valid_permissions": {"answer", "system", "media", "files", "mcp", "internal", "safe_eval"},
+    "valid_permissions": {
+        # Základní
+        "answer",          # jen stdlib — text odpovědi
+        "safe_eval",       # eval v sandboxu (kalkulátor)
+        # Filesystem
+        "files.read",      # čtení souborů (os.path, pathlib, open read)
+        "files.write",     # zápis souborů (open write, shutil)
+        # Síť
+        "network.fetch",   # requests.get (žádný POST s tajnými daty)
+        "network.full",    # plný síťový přístup
+        # Systém
+        "system.exec",     # subprocess, os.system
+        "system.info",     # psutil, platform (jen čtení)
+        # MCP
+        "mcp",             # mcp_bridge přístup
+        "internal",        # interní JARVIS moduly
+        # Vision
+        "vision.capture",  # screenshot, kamera
+        # Keyboard/Mouse
+        "keyboard.input",  # pyautogui, pyperclip
+        # Zpětná kompatibilita — staré permissions
+        "system",
+        "media",
+        "files",
+    },
 }
 
 
@@ -82,26 +106,33 @@ class ManifestValidator:
 
 
 _PERMISSION_MODULES: Dict[str, Set[str]] = {
-    # Základní permissions definované v MANIFEST_SCHEMA
-    "answer":     set(),  # jen stdlib — žádné extra moduly
-    "system":     {"os", "os.path", "subprocess", "shutil", "glob",
-                   "tempfile", "psutil", "platform", "pyautogui", "pyperclip"},
-    "media":      {"os", "os.path", "subprocess", "webbrowser", "yt_dlp",
-                   "pyautogui", "pyperclip"},
-    "files":      {"os", "os.path", "shutil", "glob", "tempfile",
-                   "fnmatch", "pathlib", "mcp_bridge"},
-    "mcp":        {"mcp_bridge", "mcp", "os", "os.path", "config",
-                   "memory", "from __future__"},
-    # Rozšířené permissions pro interní použití
-    "os":         {"os", "os.path"},
-    "subprocess": {"subprocess"},
-    "socket":     {"socket", "ssl", "asyncio"},
-    "filesystem": {"shutil", "glob", "tempfile", "fnmatch"},
-    "database":   {"sqlite3", "sqlalchemy"},
-    "crypto":     {"cryptography", "hmac", "secrets"},
-    # Speciální: povolí import interních JARVIS modulů
-    "internal":   {"mcp_bridge", "config", "memory", "llm", "commands",
-                   "plugin_marketplace", "vision", "stt", "tts"},
+    # Základní
+    "answer":         set(),   # jen stdlib — žádné extra moduly
+    "safe_eval":      set(),   # eval povoleno přes _check_dangerous_calls
+    # Filesystem
+    "files.read":     {"os", "os.path", "pathlib", "glob", "fnmatch"},
+    "files.write":    {"os", "os.path", "pathlib", "shutil", "glob", "tempfile"},
+    # Síť
+    "network.fetch":  {"requests", "urllib", "urllib.parse", "urllib.request"},
+    "network.full":   {"requests", "aiohttp", "httpx", "socket", "ssl", "asyncio"},
+    # Systém
+    "system.exec":    {"subprocess", "os", "platform"},
+    "system.info":    {"psutil", "platform", "os", "os.path"},
+    # MCP
+    "mcp":            {"mcp_bridge", "mcp", "os", "os.path", "config", "memory"},
+    "internal":       {"mcp_bridge", "config", "memory", "llm", "commands",
+                       "plugin_marketplace", "vision", "stt", "tts"},
+    # Vision
+    "vision.capture": {"cv2", "PIL", "pyautogui", "subprocess"},
+    # Keyboard
+    "keyboard.input": {"pyautogui", "pyperclip", "subprocess"},
+    # Zpětná kompatibilita — staré permissions
+    "system":         {"os", "os.path", "subprocess", "shutil", "glob",
+                       "tempfile", "psutil", "platform", "pyautogui", "pyperclip"},
+    "media":          {"os", "os.path", "subprocess", "webbrowser", "yt_dlp",
+                       "pyautogui", "pyperclip"},
+    "files":          {"os", "os.path", "shutil", "glob", "tempfile",
+                       "fnmatch", "pathlib", "mcp_bridge"},
 }
 
 

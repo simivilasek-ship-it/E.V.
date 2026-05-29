@@ -25,6 +25,12 @@ class TaskType(Enum):
     MATH        = "math"        # matematika
     CREATIVE    = "creative"    # kreativní psaní
     COMMAND     = "command"     # systémový příkaz (rychlé)
+    # --- v2 typy ---
+    FAST        = "fast"        # Qwen 1.5B nebo nejmenší dostupný
+    STANDARD    = "standard"    # Qwen 3B (default)
+    REASONING   = "reasoning"   # Llama 8B nebo Qwen 7B
+    VISION      = "vision"      # LLaVA
+    AGENT       = "agent"       # Llama 8B pro multi-step
 
 
 @dataclass
@@ -54,6 +60,15 @@ class LLMRouter:
     - Sleduje statistiky a latenci
     """
 
+    # aliases pro zpětnou kompatibilitu s kódem volajícím router.url / router.default_model
+    @property
+    def url(self) -> str:
+        return self._url
+
+    @property
+    def default_model(self) -> str:
+        return self._default
+
     def __init__(self, ollama_url: str, default_model: str):
         self._url     = ollama_url
         self._default = default_model
@@ -62,6 +77,10 @@ class LLMRouter:
         self._stats:  Dict[str, Dict]         = {}
         self._available_cache: Optional[List[str]] = None
         self._cache_ts: float = 0
+
+        # v2 — cache pro _get_available_models()
+        self._models_cache: set = set()
+        self._models_cache_ts: float = 0.0
 
         self._setup_default_rules()
 
@@ -108,18 +127,70 @@ class LLMRouter:
     # ── Routing ───────────────────────────────────────
 
     def detect_task(self, text: str) -> TaskType:
-        """Detekuje typ úkolu z textu."""
+        """Detekuje typ úkolu z textu (v2 — rozšířená detekce)."""
         t = text.lower()
+
+        # Vision — obrázky, screenshoty, kamera
+        if any(w in t for w in ["obrazovk", "screenshot", "kamera", "webcam",
+                                 "vidís", "co vidíš"]):
+            return TaskType.VISION
+
+        # Kód — programování
+        if any(w in t for w in ["kód", "funkci", "class", "python", "javascript",
+                                 "def ", "import", "napiš kód", "oprav bug"]):
+            return TaskType.CODE
+
+        # Math — výpočty, vzorce
+        if any(w in t for w in ["vypočítej", "integral", "derivace", "matici",
+                                 "rovnici", "pravděpodobnost"]):
+            return TaskType.MATH
+
+        # Reasoning — analýza, plánování, porovnání
+        if any(w in t for w in ["analyzuj", "porovnej", "vysvětli proč",
+                                 "jaký je rozdíl", "plánuj", "strategii",
+                                 "výhody nevýhody"]):
+            return TaskType.REASONING
+
+        # Agent — multi-step úkoly
+        if any(w in t for w in ["najdi a ulož", "zkontroluj a",
+                                 "vyhledej a", "stáhni a"]):
+            return TaskType.AGENT
+
+        # Rychlá odpověď — krátká fráze, překlad, čas, počasí
+        if len(text) < 50 and any(w in t for w in ["přelož", "přepiš",
+                                                     "kolik je", "jaké je"]):
+            return TaskType.FAST
+
+        # Starý routing přes RoutingRule patterny (zpětná kompatibilita)
         for rule in self._rules:
             for pattern in rule.patterns:
                 if re.search(pattern, t, re.IGNORECASE):
                     return rule.task_type
-        return TaskType.CHAT
+
+        return TaskType.STANDARD
 
     def get_model_for_task(self, task: TaskType) -> Tuple[str, float, int]:
-        """Vrátí (model, temperature, max_tokens) pro daný úkol."""
+        """Vrátí (model, temperature, max_tokens) pro daný úkol (v2)."""
         available = self._get_available_models()
 
+        model_prefs: Dict = {
+            TaskType.FAST:      (["qwen2.5:1.5b", "phi3:mini", self._default], 0.3, 300),
+            TaskType.STANDARD:  ([self._default], 0.7, 800),
+            TaskType.CODE:      (["deepseek-coder:latest", "qwen2.5:7b", self._default], 0.1, 1500),
+            TaskType.MATH:      (["qwen2.5:7b", self._default], 0.1, 600),
+            TaskType.REASONING: (["llama3.1:8b", "qwen2.5:7b", self._default], 0.5, 1200),
+            TaskType.VISION:    (["llava:7b", self._default], 0.7, 800),
+            TaskType.AGENT:     (["llama3.1:8b", "qwen2.5:7b", self._default], 0.3, 1000),
+        }
+
+        if task in model_prefs:
+            candidates, temp, max_tok = model_prefs[task]
+            for m in candidates:
+                if m in available or m == self._default:
+                    return m, temp, max_tok
+            return self._default, 0.7, 800
+
+        # Zpětná kompatibilita — starý routing přes RoutingRule
         for rule in self._rules:
             if rule.task_type == task:
                 for model_name in rule.model_names:
@@ -203,18 +274,26 @@ class LLMRouter:
             result[model] = {**s, "avg_latency_ms": round(avg_ms, 1)}
         return result
 
-    def _get_available_models(self) -> List[str]:
-        """Vrátí seznam dostupných modelů (cachováno na 60s)."""
-        if time.time() - self._cache_ts < 60 and self._available_cache is not None:
-            return self._available_cache
+    def _get_available_models(self) -> set:
+        """Vrátí set dostupných modelů z Ollama (cachováno na 60s, timeout 2s)."""
+        now = time.time()
+        # v2 cache (set-based)
+        if now - self._models_cache_ts < 60 and self._models_cache:
+            return self._models_cache
+        # starý list-based cache (zpětná kompatibilita)
+        if now - self._cache_ts < 60 and self._available_cache is not None:
+            return set(self._available_cache)
         try:
             r = requests.get(
-                self._url.replace("/api/chat", "/api/tags"), timeout=3)
+                self._url.replace("/api/chat", "/api/tags"), timeout=2)
             if r.status_code == 200:
-                models = [m["name"] for m in r.json().get("models", [])]
-                self._available_cache = models
-                self._cache_ts = time.time()
+                models = {m["name"] for m in r.json().get("models", [])}
+                self._models_cache = models
+                self._models_cache_ts = now
+                # zachovej i starý cache
+                self._available_cache = list(models)
+                self._cache_ts = now
                 return models
         except Exception:
             pass
-        return []
+        return {self._default}

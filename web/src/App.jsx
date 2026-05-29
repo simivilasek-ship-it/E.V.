@@ -11,6 +11,7 @@ import DashboardPanel from './components/DashboardPanel'
 import MemoryGraph from './components/MemoryGraph'
 import AgentTimeline from './components/AgentTimeline'
 import SkillGenerator from './components/SkillGenerator'
+import CommandPalette from './components/CommandPalette'
 
 // Lucide-style inline SVG icons
 const Icons = {
@@ -51,9 +52,22 @@ export default function App() {
   const connError      = useJarvis(s => s.connError)
   const retry          = useJarvis(s => s.retry)
   const orbState       = useJarvis(s => s.orbState)
-  const [tab, setTab]  = useState('CHAT')
+  const [tab, setTab]          = useState('CHAT')
+  const [paletteOpen, setPaletteOpen] = useState(false)
 
   useEffect(() => { connect(); connectMetrics(); connectChat() }, [])
+
+  // Klávesová zkratka Ctrl+K
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setPaletteOpen(p => !p)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const connColor = { connected:'#00e5a0', connecting:'#ffb300', disconnected:'#ff3366', error:'#ff3366', failed:'#ff3366' }[connStatus] || '#4a6a8a'
 
@@ -87,6 +101,15 @@ export default function App() {
         </nav>
 
         <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:16 }}>
+          {/* Command Palette hint */}
+          <button onClick={() => setPaletteOpen(true)}
+            style={{ fontFamily:'var(--font-mono)', fontSize:10, padding:'3px 10px',
+              background:'rgba(0,212,255,.06)', border:'1px solid var(--border)',
+              borderRadius:4, color:'var(--text2)', cursor:'pointer',
+              display:'flex', alignItems:'center', gap:6 }}>
+            <span>⌘K</span>
+          </button>
+
           {/* Connection */}
           <button onClick={retry} className="conn-badge" style={{
             color: connColor,
@@ -230,6 +253,12 @@ export default function App() {
         )}
       </main>
       <ToastContainer />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onNavigate={setTab}
+        onModelChange={(model) => { /* TODO: dispatch to store */ }}
+      />
     </div>
   )
 }
