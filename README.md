@@ -1,4 +1,4 @@
-# JARVIS v4.3 — Lokální AI asistent pro Linux
+# JARVIS v4.4 — Lokální AI asistent pro Linux
 
 > Ovládej celý počítač hlasem nebo textem. Běží 100 % lokálně, žádný cloud, žádný API klíč.
 
@@ -6,7 +6,20 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-420%20passing-brightgreen)]()
-[![Version](https://img.shields.io/badge/version-4.3.0-orange)]()
+[![Version](https://img.shields.io/badge/version-4.4.0-orange)]()
+
+---
+## Co je nového v v4.4
+
+| Změna | Detail |
+|---|---|
+| **Canvas 2D AI Orb** | Nový animovaný orb bez WebGL — funguje spolehlivě v Qt WebEngine i bez GPU. Simplex-like noise přes trigonometrii, pulsující glow, rotující ring, highlight. |
+| **Python 3.13** | Přidána podpora Python 3.13 v `pyproject.toml` |
+| **Modulární optional deps** | Nové skupiny: `desktop`, `web`, `memory`, `voice`, `vision`, `mcp` — instaluj jen co potřebuješ |
+| **CLI entry pointy** | `jarvis-desktop`, `jarvis-setup`, `jarvis-dash` — spusť libovolné rozhraní jedním příkazem |
+| **rapidfuzz v base** | `rapidfuzz` přesunut do základních závislostí (nutný pro router) |
+| **mypy v dev** | Přidán `mypy>=1.8.0` do dev závislostí pro statickou typovou kontrolu |
+| **Changelog odkaz** | `pyproject.toml` → `[project.urls]` obsahuje odkaz na `CHANGELOG.md` |
 
 ---
 ## Co je nového v v4.3
@@ -51,11 +64,35 @@
 git clone https://github.com/simivilasek-ship-it/Jarvis.git && cd Jarvis
 chmod +x install.sh && ./install.sh
 bash start_desktop.sh
+# nebo po instalaci balíčku:
+jarvis-desktop
 ```
 
 ### Klasická Tkinter GUI
 ```bash
 bash start_jarvis.sh
+# nebo:
+jarvis
+```
+
+### Modulární instalace (jen co potřebuješ)
+```bash
+pip install jarvis-assistant                  # základ
+pip install "jarvis-assistant[desktop]"       # + pywebview / Qt okno
+pip install "jarvis-assistant[web]"           # + FastAPI dashboard
+pip install "jarvis-assistant[voice]"         # + Vosk offline STT
+pip install "jarvis-assistant[vision]"        # + OCR / kamera
+pip install "jarvis-assistant[memory]"        # + sentence-transformers
+pip install "jarvis-assistant[mcp]"           # + MCP protokol
+pip install "jarvis-assistant[full]"          # všechno najednou
+```
+
+### CLI entry pointy
+```bash
+jarvis            # Tkinter GUI
+jarvis-desktop    # Desktop app (pywebview + React HUD)
+jarvis-dash       # Web dashboard (localhost:8002)
+jarvis-setup      # Průvodce nastavením
 ```
 
 ---

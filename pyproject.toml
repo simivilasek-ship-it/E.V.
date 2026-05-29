@@ -9,16 +9,18 @@ description = "Lokální AI asistent — ovládej celý PC hlasem nebo textem, 1
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-authors = [{ name = "simivilasek-ship-it" }]
-keywords = ["ai", "assistant", "voice", "ollama", "local", "jarvis"]
+authors = [{ name = "simivilasek-ship-it", email = "simi.vilasek@gmail.com" }]
+keywords = ["ai", "assistant", "voice", "ollama", "local", "jarvis", "llm"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Sound/Audio :: Speech",
     "Environment :: X11 Applications",
+    "Natural Language :: Czech",
 ]
 
 dependencies = [
@@ -29,10 +31,35 @@ dependencies = [
     "Pillow>=10.0.0",
     "edge-tts>=7.0.0",
     "SpeechRecognition>=3.10.0",
+    "rapidfuzz>=3.0.0",
 ]
 
 [project.optional-dependencies]
+desktop = [
+    "pywebview>=4.4.0",
+    "PyQt6>=6.6.0",
+    "PyQt6-WebEngine>=6.6.0",
+    "qtpy>=2.4.0",
+]
+web = [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+]
+memory = [
+    "sentence-transformers>=2.2.0",
+]
+voice = [
+    "vosk>=0.3.45",
+]
+vision = [
+    "pytesseract>=0.3.10",
+    "opencv-python>=4.8.0",
+]
+mcp = [
+    "mcp>=1.0.0",
+]
 full = [
+    "jarvis-assistant[desktop,web,memory,voice,vision,mcp]",
     "sentence-transformers>=2.2.0",
     "rapidfuzz>=3.0.0",
     "vosk>=0.3.45",
@@ -41,20 +68,29 @@ full = [
     "mcp>=1.0.0",
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
+    "pywebview>=4.4.0",
+    "PyQt6>=6.6.0",
+    "PyQt6-WebEngine>=6.6.0",
+    "qtpy>=2.4.0",
 ]
 dev = [
     "pytest>=7.4.0",
     "pytest-mock>=3.12.0",
     "ruff>=0.1.0",
+    "mypy>=1.8.0",
 ]
 
 [project.scripts]
-jarvis = "jarvis:main"
+jarvis         = "jarvis:main"
+jarvis-desktop = "app_desktop:main"
+jarvis-setup   = "setup_wizard:run"
+jarvis-dash    = "dashboard:run_dashboard"
 
 [project.urls]
-Homepage = "https://github.com/simivilasek-ship-it/Jarvis"
-Repository = "https://github.com/simivilasek-ship-it/Jarvis"
-"Bug Tracker" = "https://github.com/simivilasek-ship-it/Jarvis/issues"
+Homepage     = "https://github.com/simivilasek-ship-it/Jarvis"
+Repository   = "https://github.com/simivilasek-ship-it/Jarvis"
+"Bug Tracker"= "https://github.com/simivilasek-ship-it/Jarvis/issues"
+Changelog    = "https://github.com/simivilasek-ship-it/Jarvis/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -3,59 +3,125 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { useJarvis } from '../store/jarvis'
 import * as THREE from 'three'
 
-// ── CSS fallback orb (bez WebGL) ─────────────────────────────
-const CSS_COLORS = {
-  idle: '#0085cc', listening: '#00d4ff', thinking: '#8b5cf6', speaking: '#00e676',
+// ── Canvas 2D orb — fallback bez WebGL ───────────────────────
+// Funguje v Qt WebEngine i bez GPU. Simplex-like noise přes trig.
+
+const C2D_STATE = {
+  idle:      { r: 0,   g: 133, b: 204, speed: 0.4,  amp: 6  },
+  listening: { r: 0,   g: 212, b: 255, speed: 1.8,  amp: 12 },
+  thinking:  { r: 139, g: 92,  b: 246, speed: 1.2,  amp: 9  },
+  speaking:  { r: 0,   g: 230, b: 118, speed: 2.4,  amp: 16 },
 }
 
-function CSSOrb({ size = 290, orbState = 'idle' }) {
-  const col = CSS_COLORS[orbState] || CSS_COLORS.idle
-  const isActive = orbState !== 'idle'
+function Canvas2DOrb({ size = 290, orbState = 'idle' }) {
+  const canvasRef = useRef()
+  const stateRef  = useRef(orbState)
+  stateRef.current = orbState
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx    = canvas.getContext('2d')
+    const cx     = size / 2
+    const cy     = size / 2
+    const radius = size * 0.36
+    let   raf    = 0
+    let   t      = 0
+
+    function draw() {
+      const s   = C2D_STATE[stateRef.current] || C2D_STATE.idle
+      const col = `${s.r},${s.g},${s.b}`
+      t += 0.016 * s.speed
+
+      ctx.clearRect(0, 0, size, size)
+
+      // Outer glow
+      const glow = ctx.createRadialGradient(cx, cy, radius * 0.3, cx, cy, radius * 1.5)
+      glow.addColorStop(0, `rgba(${col},0.15)`)
+      glow.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = glow
+      ctx.fillRect(0, 0, size, size)
+
+      // Noise-distorted sphere outline
+      const pts = 120
+      ctx.beginPath()
+      for (let i = 0; i <= pts; i++) {
+        const angle = (i / pts) * Math.PI * 2
+        const noise = (
+          Math.sin(angle * 3 + t)         * 0.4 +
+          Math.sin(angle * 5 - t * 1.3)   * 0.3 +
+          Math.sin(angle * 7 + t * 0.7)   * 0.2 +
+          Math.sin(angle * 2 + t * 2.1)   * 0.1
+        )
+        const r = radius + noise * s.amp
+        const x = cx + Math.cos(angle) * r
+        const y = cy + Math.sin(angle) * r
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+      }
+      ctx.closePath()
+
+      // Sphere fill gradient
+      const grad = ctx.createRadialGradient(cx - radius * 0.3, cy - radius * 0.3, 0, cx, cy, radius * 1.1)
+      grad.addColorStop(0,   `rgba(${col},0.95)`)
+      grad.addColorStop(0.5, `rgba(${col},0.7)`)
+      grad.addColorStop(1,   `rgba(${Math.round(s.r*0.2)},${Math.round(s.g*0.15)},${Math.round(s.b*0.15)},0.9)`)
+      ctx.fillStyle = grad
+      ctx.fill()
+
+      // Edge glow stroke
+      ctx.strokeStyle = `rgba(${col},0.6)`
+      ctx.lineWidth   = 1.5
+      ctx.shadowColor = `rgb(${col})`
+      ctx.shadowBlur  = 20
+      ctx.stroke()
+      ctx.shadowBlur  = 0
+
+      // Highlight
+      const hl = ctx.createRadialGradient(
+        cx - radius * 0.3, cy - radius * 0.35, 0,
+        cx - radius * 0.1, cy - radius * 0.1, radius * 0.45)
+      hl.addColorStop(0, 'rgba(255,255,255,0.22)')
+      hl.addColorStop(1, 'rgba(255,255,255,0)')
+      ctx.fillStyle = hl
+      ctx.beginPath()
+      ctx.ellipse(cx - radius * 0.22, cy - radius * 0.28, radius * 0.3, radius * 0.18, -0.4, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Rotating ring
+      ctx.save()
+      ctx.translate(cx, cy)
+      ctx.rotate(t * 0.5)
+      ctx.strokeStyle = `rgba(${col},0.35)`
+      ctx.lineWidth   = 1
+      ctx.beginPath()
+      ctx.ellipse(0, 0, radius * 1.22, radius * 0.28, 0, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.restore()
+
+      raf = requestAnimationFrame(draw)
+    }
+
+    draw()
+    return () => cancelAnimationFrame(raf)
+  }, [size])
+
   return (
-    <div style={{ width: size, height: size, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <style>{`
-        @keyframes orbPulse { 0%,100%{transform:scale(1);opacity:.9} 50%{transform:scale(1.08);opacity:1} }
-        @keyframes orbGlow  { 0%,100%{box-shadow:0 0 40px ${col}44,0 0 80px ${col}22} 50%{box-shadow:0 0 60px ${col}88,0 0 120px ${col}44} }
-        @keyframes orbRing  { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-      `}</style>
-      {/* Glow background */}
-      <div style={{ position:'absolute', inset:0, borderRadius:'50%',
-        background:`radial-gradient(circle at 35% 35%, ${col}55 0%, ${col}22 40%, transparent 70%)`,
-        animation: isActive ? 'orbPulse .8s ease-in-out infinite' : 'orbPulse 3s ease-in-out infinite',
-        transition: 'all 1s ease',
-      }} />
-      {/* Main sphere */}
-      <div style={{ width: size * .78, height: size * .78, borderRadius:'50%', position:'relative',
-        background: `radial-gradient(circle at 35% 30%, ${col}ee 0%, ${col}99 40%, #030810 100%)`,
-        boxShadow: `0 0 40px ${col}66, inset 0 0 30px #00000044`,
-        animation: `orbGlow ${isActive ? 1.5 : 3}s ease-in-out infinite`,
-        transition: 'all 1s ease',
-      }}>
-        {/* Highlight */}
-        <div style={{ position:'absolute', top:'18%', left:'22%', width:'28%', height:'18%',
-          borderRadius:'50%', background:'rgba(255,255,255,.18)', filter:'blur(4px)' }} />
-      </div>
-      {/* Rotating ring */}
-      <div style={{ position:'absolute', inset: size * .05,
-        border: `1px solid ${col}44`, borderTopColor: col, borderRadius:'50%',
-        animation: `orbRing ${isActive ? 1.5 : 4}s linear infinite`,
-        transition: 'animation-duration .5s',
-      }} />
-      <div style={{ position:'absolute', inset: size * .1,
-        border: `1px solid ${col}22`, borderBottomColor: `${col}88`, borderRadius:'50%',
-        animation: `orbRing ${isActive ? 2.5 : 7}s linear infinite reverse`,
-      }} />
-    </div>
+    <canvas
+      ref={canvasRef}
+      width={size}
+      height={size}
+      style={{ display: 'block' }}
+    />
   )
 }
 
-// ErrorBoundary — zachytí WebGL chybu a zobrazí CSS orb
+// ErrorBoundary — zachytí WebGL chybu a zobrazí Canvas 2D orb
 class OrbErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { failed: false } }
   static getDerivedStateFromError() { return { failed: true } }
   render() {
     if (this.state.failed) {
-      return <CSSOrb size={this.props.size} orbState={this.props.orbState} />
+      return <Canvas2DOrb size={this.props.size} orbState={this.props.orbState} />
     }
     return this.props.children
   }
