@@ -160,7 +160,10 @@ class LLMEngine:
             if action.get("action") == "answer" and msg:
                 self.history.append({"role": "user",     "content": user_text})
                 self.history.append({"role": "assistant", "content": msg})
-                self.memory.store_conversation(user_text, msg, importance=0.4)
+                try:
+                    self.memory.store_conversation(user_text, msg, importance=0.4)
+                except Exception as _mem_err:
+                    logger.warning(f"Memory store selhalo (ignorováno): {_mem_err}")
             return msg or "", action
 
         self.history.append({"role": "user", "content": user_text})
@@ -176,7 +179,10 @@ class LLMEngine:
             resp.raise_for_status()
             raw  = resp.json().get("message", {}).get("content", "").strip()
             self.history.append({"role": "assistant", "content": raw})
-            self.memory.store_conversation(user_text, raw, importance=0.6)
+            try:
+                self.memory.store_conversation(user_text, raw, importance=0.6)
+            except Exception as _me:
+                logger.warning(f"Memory store chyba (ignorováno): {_me}")
             return raw, {"action": "answer", "params": {}}
         except requests.Timeout:
             self.history.pop()
@@ -193,7 +199,10 @@ class LLMEngine:
             if action.get("action") == "answer" and msg:
                 self.history.append({"role": "user",     "content": user_text})
                 self.history.append({"role": "assistant", "content": msg})
-                self.memory.store_conversation(user_text, msg, importance=0.4)
+                try:
+                    self.memory.store_conversation(user_text, msg, importance=0.4)
+                except Exception as _mem_err:
+                    logger.warning(f"Memory store selhalo (ignorováno): {_mem_err}")
             # Vždy yield string — nikdy nekončit generátor bez yield (frontend by dostal prázdný stream)
             yield msg or ""
             return
@@ -227,7 +236,10 @@ class LLMEngine:
                     continue
 
             if full_response.strip():
-                self.memory.store_conversation(user_text, full_response.strip(), importance=0.6)
+                try:
+                    self.memory.store_conversation(user_text, full_response.strip(), importance=0.6)
+                except Exception as _me:
+                    logger.warning(f"Memory store chyba (ignorováno): {_me}")
 
         except Exception as e:
             logger.error(f"Stream chyba: {e}")
