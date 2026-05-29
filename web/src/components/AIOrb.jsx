@@ -1,7 +1,65 @@
-import { useRef, useMemo, useEffect } from 'react'
+import { useRef, useMemo, useEffect, Component } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useJarvis } from '../store/jarvis'
 import * as THREE from 'three'
+
+// ── CSS fallback orb (bez WebGL) ─────────────────────────────
+const CSS_COLORS = {
+  idle: '#0085cc', listening: '#00d4ff', thinking: '#8b5cf6', speaking: '#00e676',
+}
+
+function CSSOrb({ size = 290, orbState = 'idle' }) {
+  const col = CSS_COLORS[orbState] || CSS_COLORS.idle
+  const isActive = orbState !== 'idle'
+  return (
+    <div style={{ width: size, height: size, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <style>{`
+        @keyframes orbPulse { 0%,100%{transform:scale(1);opacity:.9} 50%{transform:scale(1.08);opacity:1} }
+        @keyframes orbGlow  { 0%,100%{box-shadow:0 0 40px ${col}44,0 0 80px ${col}22} 50%{box-shadow:0 0 60px ${col}88,0 0 120px ${col}44} }
+        @keyframes orbRing  { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+      `}</style>
+      {/* Glow background */}
+      <div style={{ position:'absolute', inset:0, borderRadius:'50%',
+        background:`radial-gradient(circle at 35% 35%, ${col}55 0%, ${col}22 40%, transparent 70%)`,
+        animation: isActive ? 'orbPulse .8s ease-in-out infinite' : 'orbPulse 3s ease-in-out infinite',
+        transition: 'all 1s ease',
+      }} />
+      {/* Main sphere */}
+      <div style={{ width: size * .78, height: size * .78, borderRadius:'50%', position:'relative',
+        background: `radial-gradient(circle at 35% 30%, ${col}ee 0%, ${col}99 40%, #030810 100%)`,
+        boxShadow: `0 0 40px ${col}66, inset 0 0 30px #00000044`,
+        animation: `orbGlow ${isActive ? 1.5 : 3}s ease-in-out infinite`,
+        transition: 'all 1s ease',
+      }}>
+        {/* Highlight */}
+        <div style={{ position:'absolute', top:'18%', left:'22%', width:'28%', height:'18%',
+          borderRadius:'50%', background:'rgba(255,255,255,.18)', filter:'blur(4px)' }} />
+      </div>
+      {/* Rotating ring */}
+      <div style={{ position:'absolute', inset: size * .05,
+        border: `1px solid ${col}44`, borderTopColor: col, borderRadius:'50%',
+        animation: `orbRing ${isActive ? 1.5 : 4}s linear infinite`,
+        transition: 'animation-duration .5s',
+      }} />
+      <div style={{ position:'absolute', inset: size * .1,
+        border: `1px solid ${col}22`, borderBottomColor: `${col}88`, borderRadius:'50%',
+        animation: `orbRing ${isActive ? 2.5 : 7}s linear infinite reverse`,
+      }} />
+    </div>
+  )
+}
+
+// ErrorBoundary — zachytí WebGL chybu a zobrazí CSS orb
+class OrbErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { failed: false } }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() {
+    if (this.state.failed) {
+      return <CSSOrb size={this.props.size} orbState={this.props.orbState} />
+    }
+    return this.props.children
+  }
+}
 
 const STATE = {
   idle:      { color: [0.0, 0.52, 0.92], amp: 0.12, speed: 0.5,  bloom: 0.3 },
@@ -231,15 +289,17 @@ export default function AIOrb({ size = 290 }) {
       }} />
 
       <div style={{ width: size, height: size, position: 'relative', zIndex: 1 }}>
-        <Canvas camera={{ position: [0, 0, 5], fov: 42 }} gl={{ antialias: true, alpha: true }}>
-          <ambientLight intensity={0.15} />
-          <pointLight position={[4, 6, 4]} intensity={1.4} color={`rgb(${STATE[orbState]?.color.map(v=>Math.round(v*255)).join(',')})`} />
-          <pointLight position={[-4,-4,-6]} intensity={0.5} color="#8b5cf6" />
-          <GlowSphere stateKey={orbState} />
-          <OrbMesh     stateKey={orbState} />
-          <Ring        stateKey={orbState} />
-          <Particles   stateKey={orbState} />
-        </Canvas>
+        <OrbErrorBoundary size={size} orbState={orbState}>
+          <Canvas camera={{ position: [0, 0, 5], fov: 42 }} gl={{ antialias: true, alpha: true }}>
+            <ambientLight intensity={0.15} />
+            <pointLight position={[4, 6, 4]} intensity={1.4} color={`rgb(${STATE[orbState]?.color.map(v=>Math.round(v*255)).join(',')})`} />
+            <pointLight position={[-4,-4,-6]} intensity={0.5} color="#8b5cf6" />
+            <GlowSphere stateKey={orbState} />
+            <OrbMesh     stateKey={orbState} />
+            <Ring        stateKey={orbState} />
+            <Particles   stateKey={orbState} />
+          </Canvas>
+        </OrbErrorBoundary>
       </div>
 
       {/* State label */}
