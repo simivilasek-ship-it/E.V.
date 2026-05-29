@@ -79,6 +79,42 @@ class OllamaClient:
             logger.error(f"OllamaClient chyba: {e}")
             return ""
 
+    def call_json(self, messages: list, schema: dict = None,
+                  temperature: float = 0.0, max_tokens: int = 500,
+                  timeout: int = 60) -> dict:
+        """Vynutí JSON výstup přes Ollama format:'json'. Vrátí dict nebo {} při chybě.
+
+        schema — volitelný příklad/popis struktury přidaný do system promptu.
+        """
+        if schema:
+            hint = f"\n\nOdpověz VÝHRADNĚ platným JSON objektem se strukturou: {json.dumps(schema, ensure_ascii=False)}"
+            msgs = list(messages)
+            if msgs and msgs[0]["role"] == "system":
+                msgs[0] = {**msgs[0], "content": msgs[0]["content"] + hint}
+            else:
+                msgs.insert(0, {"role": "system", "content": hint.lstrip()})
+        else:
+            msgs = messages
+
+        payload = {
+            "model":    self.model,
+            "messages": msgs,
+            "stream":   False,
+            "format":   "json",
+            "options":  {"temperature": temperature, "num_predict": max_tokens},
+        }
+        try:
+            r = requests.post(self.url, json=payload, timeout=timeout)
+            r.raise_for_status()
+            raw = r.json().get("message", {}).get("content", "").strip()
+            return json.loads(raw)
+        except json.JSONDecodeError as e:
+            logger.warning(f"OllamaClient.call_json: JSON parse error: {e} — raw: {raw[:120]}")
+            return {}
+        except Exception as e:
+            logger.error(f"OllamaClient.call_json chyba: {e}")
+            return {}
+
 
 # ══════════════════════════════════════════════════════
 #  LLM ENGINE

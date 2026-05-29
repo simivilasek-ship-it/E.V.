@@ -161,12 +161,11 @@ class OfflineManager:
         return "Offline: Nemohu odpovědět. Připoj se k internetu pro úplnější odpovědi."
     
     def _load_knowledge_base(self) -> Dict[str, Any]:
-        """Načti offline knowledge base"""
+        """Načti offline knowledge base a obohať ji živými záznamy z JarvisMemory SQLite."""
         kb_file = Path(__file__).parent / ".offline_kb.json"
-        
+
         if not kb_file.exists():
-            # Vytvoř výchozí knowledge base
-            kb = {
+            kb: Dict[str, Any] = {
                 "Python": "Python je programovací jazyk zaměřený na čitelnost a jednoduchost.",
                 "JARVIS": "JARVIS je hlasový AI asistent poháněný Ollama.",
                 "Offline": "Offline režim umožňuje fungovat bez internetu s omezenou funkčností.",
@@ -176,14 +175,31 @@ class OfflineManager:
                     json.dump(kb, f, ensure_ascii=False, indent=2)
             except Exception as e:
                 logger.error(f"Chyba při vytváření KB: {e}")
-            return kb
-        
+        else:
+            try:
+                with open(kb_file, 'r', encoding='utf-8') as f:
+                    kb = json.load(f)
+            except Exception as e:
+                logger.error(f"Chyba při načítání KB: {e}")
+                kb = {}
+
+        # Obohať KB živými záznamy z JarvisMemory SQLite (klíč = query text, hodnota = content)
         try:
-            with open(kb_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            from memory import JarvisMemory
+            from config import CONFIG
+            mem = JarvisMemory(CONFIG)
+            rows = mem.recall("", top_k=50)  # recall bez filtru = posledních N záznamů
+            for row in rows:
+                key = (row.get("query") or row.get("text") or "")[:60].strip()
+                val = row.get("content") or row.get("response") or ""
+                if key and val and key not in kb:
+                    kb[key] = val
+            if rows:
+                logger.info(f"OfflineKB: načteno {len(rows)} živých záznamů z JarvisMemory")
         except Exception as e:
-            logger.error(f"Chyba při načítání KB: {e}")
-            return {}
+            logger.debug(f"OfflineKB: live sync přeskočen ({e})")
+
+        return kb
     
     def _persist_queue(self) -> None:
         """Ulož frontu do souboru"""

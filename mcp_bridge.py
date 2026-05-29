@@ -328,7 +328,25 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
         enabled=config.get("mcp_computer_control_enabled", True),
     ))
 
+    _warn_missing_commands(bridge)
     return bridge
+
+
+def _warn_missing_commands(bridge: "MCPBridge") -> None:
+    """Upozorní na volitelné MCP servery, jejichž příkaz není na PATH."""
+    import shutil
+    optional = {"puppeteer", "playwright", "computer-control", "sequential-thinking"}
+    for name, cfg in bridge._servers.items():
+        if not cfg.enabled:
+            continue
+        if shutil.which(cfg.command) is None:
+            severity = "warning" if name in optional else "error"
+            msg = (
+                f"MCP '{name}': příkaz '{cfg.command}' nenalezen na PATH — "
+                f"server bude nedostupný. Nainstaluj: "
+                + ("npm i -g npx" if cfg.command == "npx" else f"pip install {cfg.command}")
+            )
+            getattr(logger, severity)(msg)
 
 
 # ── Singleton ─────────────────────────────────────────

@@ -3,14 +3,35 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { useJarvis } from '../store/jarvis'
 import * as THREE from 'three'
 
-// ── Canvas 2D orb — fallback bez WebGL ───────────────────────
-// Funguje v Qt WebEngine i bez GPU. Simplex-like noise přes trig.
+// ── Canvas 2D orb — 3D fallback bez WebGL ────────────────────
+// Phong shading, latitude čáry, spekulár, rim light, perspektivní prsteny.
+// Funguje v Qt WebEngine i bez GPU.
 
 const C2D_STATE = {
-  idle:      { r: 0,   g: 133, b: 204, speed: 0.4,  amp: 6  },
-  listening: { r: 0,   g: 212, b: 255, speed: 1.8,  amp: 12 },
-  thinking:  { r: 139, g: 92,  b: 246, speed: 1.2,  amp: 9  },
-  speaking:  { r: 0,   g: 230, b: 118, speed: 2.4,  amp: 16 },
+  idle:      { r: 0,   g: 133, b: 204, speed: 0.4,  amp: 5  },
+  listening: { r: 0,   g: 212, b: 255, speed: 1.8,  amp: 11 },
+  thinking:  { r: 139, g: 92,  b: 246, speed: 1.2,  amp: 8  },
+  speaking:  { r: 0,   g: 230, b: 118, speed: 2.4,  amp: 14 },
+}
+
+// Vygeneruje body noise-distorted sphere silhouette
+function spherePath(ctx, cx, cy, R, amp, t) {
+  const pts = 200
+  ctx.beginPath()
+  for (let i = 0; i <= pts; i++) {
+    const θ = (i / pts) * Math.PI * 2
+    const n =
+      Math.sin(θ * 2 + t * 0.7)  * 0.35 +
+      Math.sin(θ * 3 - t * 1.1)  * 0.28 +
+      Math.sin(θ * 5 + t * 0.55) * 0.20 +
+      Math.sin(θ * 7 - t * 0.9)  * 0.12 +
+      Math.sin(θ * 11 + t * 1.4) * 0.05
+    const r = R + n * amp
+    const x = cx + Math.cos(θ) * r
+    const y = cy + Math.sin(θ) * r
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+  }
+  ctx.closePath()
 }
 
 function Canvas2DOrb({ size = 290, orbState = 'idle' }) {
@@ -21,81 +42,127 @@ function Canvas2DOrb({ size = 290, orbState = 'idle' }) {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx    = canvas.getContext('2d')
-    const cx     = size / 2
-    const cy     = size / 2
-    const radius = size * 0.36
-    let   raf    = 0
-    let   t      = 0
+    const ctx = canvas.getContext('2d')
+    const cx  = size / 2
+    const cy  = size / 2
+    const R   = size * 0.36
+    let raf   = 0
+    let t     = 0
 
     function draw() {
       const s   = C2D_STATE[stateRef.current] || C2D_STATE.idle
       const col = `${s.r},${s.g},${s.b}`
-      t += 0.016 * s.speed
+      const { r, g, b, amp, speed } = s
+      t += 0.016 * speed
 
       ctx.clearRect(0, 0, size, size)
 
-      // Outer glow
-      const glow = ctx.createRadialGradient(cx, cy, radius * 0.3, cx, cy, radius * 1.5)
-      glow.addColorStop(0, `rgba(${col},0.15)`)
-      glow.addColorStop(1, 'rgba(0,0,0,0)')
-      ctx.fillStyle = glow
+      // ── 1. Atmosférická záře ──────────────────────────────────
+      const atmo = ctx.createRadialGradient(cx, cy, R * 0.6, cx, cy, R * 2.0)
+      atmo.addColorStop(0, `rgba(${col},0.18)`)
+      atmo.addColorStop(0.6, `rgba(${col},0.06)`)
+      atmo.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = atmo
       ctx.fillRect(0, 0, size, size)
 
-      // Noise-distorted sphere outline
-      const pts = 120
-      ctx.beginPath()
-      for (let i = 0; i <= pts; i++) {
-        const angle = (i / pts) * Math.PI * 2
-        const noise = (
-          Math.sin(angle * 3 + t)         * 0.4 +
-          Math.sin(angle * 5 - t * 1.3)   * 0.3 +
-          Math.sin(angle * 7 + t * 0.7)   * 0.2 +
-          Math.sin(angle * 2 + t * 2.1)   * 0.1
-        )
-        const r = radius + noise * s.amp
-        const x = cx + Math.cos(angle) * r
-        const y = cy + Math.sin(angle) * r
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
-      }
-      ctx.closePath()
+      // ── 2. Sphere silhouette (noise displaced) ───────────────
+      spherePath(ctx, cx, cy, R, amp, t)
 
-      // Sphere fill gradient
-      const grad = ctx.createRadialGradient(cx - radius * 0.3, cy - radius * 0.3, 0, cx, cy, radius * 1.1)
-      grad.addColorStop(0,   `rgba(${col},0.95)`)
-      grad.addColorStop(0.5, `rgba(${col},0.7)`)
-      grad.addColorStop(1,   `rgba(${Math.round(s.r*0.2)},${Math.round(s.g*0.15)},${Math.round(s.b*0.15)},0.9)`)
-      ctx.fillStyle = grad
+      // Phong diffuse fill: světlo z top-left → tmavé v bottom-right
+      const lx = cx - R * 0.32
+      const ly = cy - R * 0.38
+      const diff = ctx.createRadialGradient(lx, ly, 0, cx, cy, R * 1.15)
+      diff.addColorStop(0.00, `rgba(${Math.min(255,r+110)},${Math.min(255,g+75)},${Math.min(255,b+55)},1.0)`)
+      diff.addColorStop(0.28, `rgba(${r},${g},${b},0.97)`)
+      diff.addColorStop(0.65, `rgba(${Math.round(r*0.38)},${Math.round(g*0.32)},${Math.round(b*0.28)},0.95)`)
+      diff.addColorStop(1.00, `rgba(${Math.round(r*0.08)},${Math.round(g*0.06)},${Math.round(b*0.06)},0.92)`)
+      ctx.fillStyle = diff
       ctx.fill()
 
-      // Edge glow stroke
-      ctx.strokeStyle = `rgba(${col},0.6)`
-      ctx.lineWidth   = 1.5
+      // ── 3. Rim light (Fresnel — záře na okrajích) ────────────
+      spherePath(ctx, cx, cy, R, amp, t)
+      ctx.strokeStyle = `rgba(${col},0.75)`
+      ctx.lineWidth   = 3.5
       ctx.shadowColor = `rgb(${col})`
-      ctx.shadowBlur  = 20
+      ctx.shadowBlur  = 28
       ctx.stroke()
       ctx.shadowBlur  = 0
 
-      // Highlight
-      const hl = ctx.createRadialGradient(
-        cx - radius * 0.3, cy - radius * 0.35, 0,
-        cx - radius * 0.1, cy - radius * 0.1, radius * 0.45)
-      hl.addColorStop(0, 'rgba(255,255,255,0.22)')
-      hl.addColorStop(1, 'rgba(255,255,255,0)')
-      ctx.fillStyle = hl
+      // ── 4. Latitude čáry uvnitř sphere (3D mřížka) ──────────
+      ctx.save()
+      spherePath(ctx, cx, cy, R, amp, t)
+      ctx.clip()
+
+      // Rotující osa sklonu pro pocit rotace
+      const tilt = Math.sin(t * 0.25) * 0.18  // osa se mírně kývá
+
+      ctx.strokeStyle = `rgba(${col},0.18)`
+      ctx.lineWidth   = 0.8
+      ctx.shadowBlur  = 0
+      // 5 horizontálních kruhů = 5 zeměpisných šířek
+      for (let li = -2; li <= 2; li++) {
+        const yOff  = (li / 2.8) * R
+        const halfW = Math.sqrt(Math.max(0, R * R - yOff * yOff))
+        const scaleY = 0.22 + Math.abs(Math.cos(t * 0.5 + li))  * 0.12
+        ctx.beginPath()
+        ctx.ellipse(cx, cy + yOff, halfW, halfW * scaleY, tilt, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+
+      // 3 poledníky (vertikální oblouky jako meridians)
+      for (let mi = 0; mi < 3; mi++) {
+        const angle = t * 0.3 + (mi / 3) * Math.PI
+        ctx.beginPath()
+        ctx.ellipse(cx, cy, R * Math.abs(Math.cos(angle)), R, Math.sin(angle) * 0.5, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+      ctx.restore()
+
+      // ── 5. Spekulární odraz — Phong ──────────────────────────
+      // Primární highlight (rozmazaná elipsa)
+      const hs = ctx.createRadialGradient(lx, ly, 0, lx + R * 0.12, ly + R * 0.1, R * 0.3)
+      hs.addColorStop(0,   'rgba(255,255,255,0.60)')
+      hs.addColorStop(0.4, 'rgba(255,255,255,0.18)')
+      hs.addColorStop(1,   'rgba(255,255,255,0)')
+      ctx.fillStyle = hs
       ctx.beginPath()
-      ctx.ellipse(cx - radius * 0.22, cy - radius * 0.28, radius * 0.3, radius * 0.18, -0.4, 0, Math.PI * 2)
+      ctx.ellipse(lx + R * 0.06, ly + R * 0.05, R * 0.24, R * 0.15, -0.4, 0, Math.PI * 2)
       ctx.fill()
 
-      // Rotating ring
+      // Sekundární miniaturní odlesk
+      const hs2 = ctx.createRadialGradient(lx - R * 0.04, ly - R * 0.06, 0, lx, ly, R * 0.09)
+      hs2.addColorStop(0, 'rgba(255,255,255,0.50)')
+      hs2.addColorStop(1, 'rgba(255,255,255,0)')
+      ctx.fillStyle = hs2
+      ctx.beginPath()
+      ctx.arc(lx, ly, R * 0.08, 0, Math.PI * 2)
+      ctx.fill()
+
+      // ── 6. Orbitální prsteny s perspektivou ─────────────────
       ctx.save()
       ctx.translate(cx, cy)
-      ctx.rotate(t * 0.5)
-      ctx.strokeStyle = `rgba(${col},0.35)`
-      ctx.lineWidth   = 1
+
+      // Prsten 1 — nakloněný a rotující
+      const r1angle = t * 0.45
+      const r1tilt  = 0.25 + Math.sin(t * 0.3) * 0.15
+      ctx.strokeStyle = `rgba(${col},0.45)`
+      ctx.lineWidth   = 1.2
+      ctx.shadowColor = `rgb(${col})`
+      ctx.shadowBlur  = 10
       ctx.beginPath()
-      ctx.ellipse(0, 0, radius * 1.22, radius * 0.28, 0, 0, Math.PI * 2)
+      ctx.ellipse(0, 0, R * 1.30, R * 1.30 * r1tilt, r1angle, 0, Math.PI * 2)
       ctx.stroke()
+
+      // Prsten 2 — opačný směr, jiný sklon
+      const r2angle = -t * 0.28
+      const r2tilt  = 0.18 + Math.cos(t * 0.4) * 0.10
+      ctx.strokeStyle = `rgba(${col},0.25)`
+      ctx.lineWidth   = 0.8
+      ctx.shadowBlur  = 6
+      ctx.beginPath()
+      ctx.ellipse(0, 0, R * 1.45, R * 1.45 * r2tilt, r2angle, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.shadowBlur = 0
       ctx.restore()
 
       raf = requestAnimationFrame(draw)

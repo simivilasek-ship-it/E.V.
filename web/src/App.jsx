@@ -8,14 +8,20 @@ import ParticleBackground from './components/ParticleBackground'
 import AgentGraph from './components/AgentGraph'
 import ToastContainer from './components/Toast'
 import DashboardPanel from './components/DashboardPanel'
+import MemoryGraph from './components/MemoryGraph'
+import AgentTimeline from './components/AgentTimeline'
+import SkillGenerator from './components/SkillGenerator'
 
 // Lucide-style inline SVG icons
 const Icons = {
-  chat:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>,
-  plugin:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><path d="M20.24 12.24a6 6 0 00-8.49-8.49L5 10.5V19h8.5l6.74-6.76z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>,
-  system:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
-  agent:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>,
-  dash:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
+  chat:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>,
+  plugin:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><path d="M20.24 12.24a6 6 0 00-8.49-8.49L5 10.5V19h8.5l6.74-6.76z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>,
+  system:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
+  agent:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>,
+  dash:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
+  memory:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+  timeline: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
+  skill:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
 }
 
 const TABS = [
@@ -23,6 +29,9 @@ const TABS = [
   { id: 'PLUGINY',   label: 'PLUGINS',   icon: Icons.plugin },
   { id: 'SYSTÉM',    label: 'SYSTEM',    icon: Icons.system },
   { id: 'AGENT',     label: 'AGENT',     icon: Icons.agent },
+  { id: 'TIMELINE',  label: 'TIMELINE',  icon: Icons.timeline },
+  { id: 'MEMORY',    label: 'MEMORY',    icon: Icons.memory },
+  { id: 'SKILL',     label: 'SKILL GEN', icon: Icons.skill },
   { id: 'DASHBOARD', label: 'DASHBOARD', icon: Icons.dash },
 ]
 
@@ -193,6 +202,24 @@ export default function App() {
             <div className="panel" style={{ padding:0 }}>
               <AgentGraph active={tab === 'AGENT'} />
             </div>
+          </div>
+        )}
+
+        {tab === 'TIMELINE' && (
+          <div style={{ height:'100%', overflowY:'auto', maxWidth:960, margin:'0 auto', padding:12 }}>
+            <AgentTimeline />
+          </div>
+        )}
+
+        {tab === 'MEMORY' && (
+          <div style={{ height:'100%', overflowY:'auto', maxWidth:800, margin:'0 auto', padding:12 }}>
+            <MemoryGraph />
+          </div>
+        )}
+
+        {tab === 'SKILL' && (
+          <div style={{ height:'100%', overflowY:'auto', maxWidth:860, margin:'0 auto', padding:12 }}>
+            <SkillGenerator />
           </div>
         )}
 

@@ -125,28 +125,68 @@ Dostaneš jeden konkrétní krok z plánu a musíš ho provést."""
 
 
 class CriticAgent:
-    """Hodnotí výsledky a navrhuje vylepšení."""
+    """Hodnotí výsledky a navrhuje vylepšení.
+
+    Dvoufázová validace:
+      1. Rychlá heuristická plausibility check (bez LLM) — chytí halucinované ceny/čísla
+      2. LLM hodnocení SUCCESS/RETRY
+    """
 
     SYSTEM = """Jsi Critic. Tvůj úkol: zhodnotit výsledek akce.
 Rozhodni: SUCCESS (výsledek je dostatečný) nebo RETRY (s důvodem proč).
 Formát: SUCCESS: [shrnutí] nebo RETRY: [co je špatně]."""
 
+    # (popis, regex pro detekci tématu, min_hodnota, max_hodnota)
+    _PLAUSIBILITY_RULES = [
+        ("cena GPU v USD",   r"(rtx|gtx|radeon|gpu|grafick)",   100,   5_000),
+        ("cena CPU v USD",   r"(ryzen|intel|core\s*i\d|cpu)",    50,   2_000),
+        ("cena RAM v USD",   r"(ram|ddr\d|paměť)",                5,     500),
+        ("teplota CPU °C",   r"(teplota|temp|°c|stupeň)",         0,     110),
+        ("rok",              r"\b(rok|year|ročník)\b",          1970,   2_030),
+        ("procento",         r"(procent|%|percent)",               0,     100),
+        ("latence ms",       r"(latenc|ping|ms\b|milisekund)",    0,  60_000),
+    ]
+
     def __init__(self, ollama_url: str, model: str):
         self.url = ollama_url
         self.model = model
 
+    def _plausibility_check(self, action: str, result: str) -> tuple[bool, str]:
+        """Heuristická kontrola čísel v výsledku — bez LLM, okamžitá."""
+        import re
+        ctx = (action + " " + result).lower()
+        numbers = [float(n.replace(",", "."))
+                   for n in re.findall(r"\b\d{1,9}(?:[.,]\d+)?\b", result)]
+        if not numbers:
+            return True, ""
+        for desc, pattern, lo, hi in self._PLAUSIBILITY_RULES:
+            if re.search(pattern, ctx, re.I):
+                for n in numbers:
+                    if not (lo <= n <= hi):
+                        return False, (
+                            f"Podezřelé číslo {n} pro '{desc}' "
+                            f"(očekáváno {lo}–{hi}). Pravděpodobná halucinace."
+                        )
+        return True, ""
+
     def evaluate(self, action: str, result: str) -> tuple[bool, str]:
         """Vrátí (success: bool, feedback: str)."""
+        # Fáze 1 — rychlá heuristika (bez LLM)
+        ok, reason = self._plausibility_check(action, result)
+        if not ok:
+            logger.warning(f"CriticAgent plausibility: {reason}")
+            return False, reason
+
+        # Fáze 2 — LLM hodnocení
         try:
             import requests
-            prompt = f"Akce: {action}\nVýsledek: {result}"
             resp = requests.post(
                 self.url,
                 json={
                     "model": self.model,
                     "messages": [
                         {"role": "system", "content": self.SYSTEM},
-                        {"role": "user", "content": prompt},
+                        {"role": "user",   "content": f"Akce: {action}\nVýsledek: {result}"},
                     ],
                     "stream": False,
                 },
@@ -155,16 +195,12 @@ Formát: SUCCESS: [shrnutí] nebo RETRY: [co je špatně]."""
             resp.raise_for_status()
             content = resp.json()["message"]["content"].strip()
             if content.upper().startswith("SUCCESS"):
-                feedback = content[len("SUCCESS"):].lstrip(": ").strip()
-                return True, feedback
+                return True, content[len("SUCCESS"):].lstrip(": ").strip()
             elif content.upper().startswith("RETRY"):
-                feedback = content[len("RETRY"):].lstrip(": ").strip()
-                return False, feedback
-            else:
-                # Pokud odpověď neodpovídá formátu, považujeme za SUCCESS
-                return True, content
+                return False, content[len("RETRY"):].lstrip(": ").strip()
+            return True, content
         except Exception as e:
-            logger.warning(f"CriticAgent chyba: {e}")
+            logger.warning(f"CriticAgent LLM chyba: {e}")
             return True, ""
 
 

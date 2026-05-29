@@ -43,7 +43,11 @@ class EmbeddingEngine:
             self._available = True
             logger.info("EmbeddingEngine: sentence-transformers OK")
         except ImportError:
-            logger.info("EmbeddingEngine: sentence-transformers není — používám keyword fallback")
+            logger.warning(
+                "EmbeddingEngine: sentence-transformers není nainstalováno — "
+                "paměť používá keyword fallback (horší recall). "
+                "Pro sémantické vyhledávání: pip install sentence-transformers"
+            )
 
     def encode(self, text: str) -> list:
         if self._available and self._model:
@@ -293,6 +297,15 @@ class _SQLiteMemoryStore:
 _JSONMemoryStore = _SQLiteMemoryStore
 
 
+def _similarity_score(a: str, b: str) -> float:
+    """Jednoduchá word-overlap podobnost 0–1. Bez závislostí."""
+    wa = set(a.lower().split())
+    wb = set(b.lower().split())
+    if not wa or not wb:
+        return 0.0
+    return len(wa & wb) / len(wa | wb)
+
+
 # ══════════════════════════════════════════════════════
 #  JARVIS MEMORY (unifikovaná fasáda)
 # ══════════════════════════════════════════════════════
@@ -332,6 +345,77 @@ class JarvisMemory:
         self.system = None
         self._store = _SQLiteMemoryStore(mem_dir)
         logger.info(f"SQLite memory inicializován v: {mem_dir}")
+
+    # ── Conflict resolution ────────────────────────────
+
+    # Vzory naznačující fakta, která se mohou měnit (jméno, preferovaný jazyk…)
+    _CONFLICT_PATTERNS = [
+        (r"\bjmenuji\s+se\b|\bjmeno\s+je\b|\bjsem\s+\w+\b", "jméno"),
+        (r"\bpracuji\s+(s|v|na)\b|\bprogramuji\s+v\b|\bpouzivaml?\b", "technologie"),
+        (r"\bbydlim\s+v\b|\bmestu\b|\badresa\b",              "lokalita"),
+        (r"\bpracuji\s+pro\b|\bzamestnani\b|\bfirma\b",       "zaměstnání"),
+    ]
+
+    def check_conflict(self, new_content: str, top_k: int = 5) -> Optional[dict]:
+        """Zjistí, zda nový záznam odporuje existujícím vzpomínkám.
+
+        Vrátí {"old": str, "new": str, "topic": str} nebo None.
+        Algoritmus: pro každý vzor kategorie zkontroluj, zda staré vzpomínky
+        obsahují stejné klíčové slovo ale jiný kontext.
+        """
+        import re
+        for pattern, topic in self._CONFLICT_PATTERNS:
+            if not re.search(pattern, new_content, re.I):
+                continue
+            existing = self.recall(topic, top_k=top_k, min_importance=0.1)
+            for mem in existing:
+                old = mem.get("content", "")
+                if not old or old == new_content:
+                    continue
+                # Jednoduchá heuristika: oba záznamy matchují stejný vzor
+                if re.search(pattern, old, re.I):
+                    # Pokud jsou různé → konflikt
+                    if _similarity_score(old, new_content) < 0.85:
+                        return {"old": old, "new": new_content, "topic": topic}
+        return None
+
+    def store_with_conflict_check(
+        self,
+        content: str,
+        importance: float = 0.5,
+        on_conflict=None,
+        **kwargs,
+    ) -> Optional[str]:
+        """Uloží vzpomínku, ale nejdříve zkontroluje konflikty.
+
+        on_conflict(old, new, topic) → pokud vrátí False, uložení se přeskočí.
+        Pokud on_conflict není zadán, stará vzpomínka se označí jako neaktivní
+        (importance → 0.05) a nová se uloží.
+        """
+        conflict = self.check_conflict(content)
+        if conflict:
+            if on_conflict:
+                should_store = on_conflict(conflict["old"], conflict["new"], conflict["topic"])
+                if not should_store:
+                    return None
+            else:
+                # Automaticky: degraduj starou vzpomínku
+                logger.info(
+                    f"Memory conflict [{conflict['topic']}]: "
+                    f"'{conflict['old'][:60]}' → '{conflict['new'][:60]}'"
+                )
+                old_results = self.recall(conflict["old"][:40], top_k=3)
+                for r in old_results:
+                    mid = r.get("id") or r.get("memory_id")
+                    if mid:
+                        try:
+                            self._store._conn().execute(
+                                "UPDATE memories SET importance=0.05 WHERE id=?", (mid,))
+                            self._store._conn().commit()
+                        except Exception:
+                            pass
+
+        return self.store(content, importance=importance, **kwargs)
 
     # ── Store ──────────────────────────────────────────
 

@@ -219,9 +219,12 @@ class IdleDetectorAgent(BaseAgent):
 class AgentManager:
     """Spravuje všechny background agenty."""
 
+    _instance: Optional["AgentManager"] = None
+
     def __init__(self, bus: Optional[EventBus] = None):
         self._bus    = bus or get_event_bus()
         self._agents: Dict[str, BaseAgent] = {}
+        AgentManager._instance = self
 
     def register(self, agent: BaseAgent) -> "AgentManager":
         self._agents[agent.name] = agent
@@ -241,6 +244,15 @@ class AgentManager:
             name: {"running": a._running, "interval": a._interval}
             for name, a in self._agents.items()
         }
+
+    @classmethod
+    def get_instance(cls) -> Optional["AgentManager"]:
+        """Vrátí poslední vytvořenou instanci (singleton pro dashboard)."""
+        return cls._instance
+
+    def status(self) -> Dict[str, Any]:
+        """Alias pro get_status() — zpětná kompatibilita s dashboard.py."""
+        return self.get_status()
 
     @classmethod
     def create_default(cls, bus: Optional[EventBus] = None) -> "AgentManager":

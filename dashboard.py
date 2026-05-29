@@ -524,6 +524,47 @@ if HAS_FASTAPI:
         except Exception as e:
             return {"results": [], "error": str(e)}
 
+    @app.get("/api/memory/graph")
+    async def memory_graph():
+        """Vrátí paměť jako force-directed graf (nodes + links)."""
+        try:
+            from memory import JarvisMemory
+            from config import CONFIG
+            import json as _json
+            mem   = JarvisMemory(CONFIG)
+            items = mem.recall("", top_k=60, min_importance=0.0)
+
+            nodes, links = [], []
+            seen_ids = set()
+
+            for item in items:
+                nid  = str(item["id"])
+                text = item["content"][:60] + ("…" if len(item["content"]) > 60 else "")
+                imp  = item.get("importance", 0.5)
+                tags = item.get("tags", [])
+                nodes.append({
+                    "id": nid, "label": text,
+                    "importance": round(imp, 2), "tags": tags,
+                    "group": tags[0] if tags else "memory",
+                })
+                seen_ids.add(nid)
+
+                # Hrany mezi uzly se stejným tagem
+                for other in items:
+                    other_id = str(other["id"])
+                    if other_id == nid or other_id not in seen_ids:
+                        continue
+                    common = set(tags) & set(other.get("tags", []))
+                    if common:
+                        links.append({
+                            "source": nid, "target": other_id,
+                            "label": list(common)[0],
+                        })
+
+            return {"nodes": nodes[:50], "links": links[:80]}
+        except Exception as e:
+            return {"nodes": [], "links": [], "error": str(e)}
+
     @app.get("/api/config")
     async def get_config():
         """Vrátí aktuální konfiguraci (bez secrets)."""

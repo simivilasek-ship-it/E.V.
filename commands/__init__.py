@@ -4,7 +4,10 @@ CommandExecutor deleguje na podmoduly: system, apps, media, files, utils.
 """
 
 import logging
-from typing import Any, Dict, Optional
+import os
+import shutil
+from collections import deque
+from typing import Any, Dict, List, Optional
 
 from .apps   import (APP_MAP, find_app, cmd_open_app, cmd_kill_process,
                      cmd_install_app, cmd_uninstall_app, cmd_run_script,
@@ -18,7 +21,9 @@ from .media  import (cmd_screenshot, cmd_type_key, cmd_write_text, cmd_media,
                      cmd_screen_describe, cmd_screen_ocr, cmd_webcam_describe)
 from .system import (cmd_get_time, cmd_get_date, cmd_system_info,
                      cmd_shutdown, cmd_restart, cmd_sleep_pc,
-                     cmd_update_system, cmd_volume, cmd_set_brightness)
+                     cmd_update_system, cmd_volume, cmd_set_brightness,
+                     cmd_hardware_info, cmd_disk_space,
+                     cmd_list_directory, cmd_file_info)
 from .utils  import (cmd_calculate, cmd_translate, cmd_note_add, cmd_note_list,
                      cmd_reminder_set, cmd_weather, cmd_wiki_search,
                      cmd_currency_convert, cmd_write_email,
@@ -30,11 +35,28 @@ logger = logging.getLogger(__name__)
 __all__ = ["CommandExecutor", "APP_MAP"]
 
 
+# Akce, pro které ukládáme snapshot před provedením
+_UNDOABLE = {"create_folder", "create_file", "delete_file", "move_file", "clipboard_set"}
+
+
+class UndoEntry:
+    __slots__ = ("action", "params", "snapshot")
+    def __init__(self, action: str, params: dict, snapshot: dict):
+        self.action = action; self.params = params; self.snapshot = snapshot
+
+
 class CommandExecutor:
-    """Facade — deleguje volání na podmoduly."""
+    """Facade — deleguje volání na podmoduly.
+
+    Udržuje undo stack (max 20 kroků) pro souborové a schránkové operace.
+    executor.undo() nebo příkaz „vrať poslední akci".
+    """
+
+    _UNDO_LIMIT = 20
 
     def __init__(self, config: Dict[str, Any]) -> None:
-        self.config = config
+        self.config      = config
+        self._undo_stack: deque = deque(maxlen=self._UNDO_LIMIT)
 
     def execute(self, action: str, params: Dict[str, Any]) -> str:
         try:
@@ -42,10 +64,83 @@ class CommandExecutor:
             if method is None:
                 logger.warning(f"Neznámá akce: {action}")
                 return f"Neznámá akce: {action}"
-            return method(**params)
+            snap   = self._snapshot_before(action, params) if action in _UNDOABLE else None
+            result = method(**params)
+            if snap is not None:
+                self._undo_stack.append(UndoEntry(action, params, snap))
+            return result
         except Exception as e:
             logger.exception(f"Chyba při vykonávání {action}")
             return f"Chyba: {e}"
+
+    def undo(self) -> str:
+        if not self._undo_stack:
+            return "Nic k vrácení."
+        try:
+            return self._apply_undo(self._undo_stack.pop())
+        except Exception as e:
+            return f"Undo selhalo: {e}"
+
+    def undo_history(self) -> List[str]:
+        return [f"{e.action}({e.params})" for e in reversed(self._undo_stack)]
+
+    def _snapshot_before(self, action: str, params: dict) -> dict:
+        snap: dict = {}
+        try:
+            if action == "create_folder":
+                p = params.get("path", "")
+                snap = {"path": p, "existed": os.path.isdir(p)}
+            elif action == "create_file":
+                p = params.get("path", "")
+                snap = {"path": p, "existed": os.path.isfile(p)}
+                if snap["existed"]:
+                    snap["content"] = open(p, "rb").read()
+            elif action == "delete_file":
+                p = params.get("path", "")
+                snap = {"path": p}
+                if os.path.isfile(p):
+                    snap["content"] = open(p, "rb").read()
+                elif os.path.isdir(p):
+                    snap["is_dir"] = True
+            elif action == "move_file":
+                snap = {"src": params.get("src", ""), "dst": params.get("dst", "")}
+            elif action == "clipboard_set":
+                try:
+                    import pyperclip
+                    snap["previous"] = pyperclip.paste()
+                except Exception:
+                    snap["previous"] = ""
+        except Exception as e:
+            logger.debug(f"Snapshot chyba: {e}")
+        return snap
+
+    def _apply_undo(self, entry: UndoEntry) -> str:
+        a, snap = entry.action, entry.snapshot
+        if a == "create_folder":
+            p = snap.get("path", "")
+            if not snap.get("existed") and os.path.isdir(p):
+                shutil.rmtree(p); return f"Undo: složka {p} smazána."
+        elif a == "create_file":
+            p = snap.get("path", "")
+            if not snap.get("existed") and os.path.isfile(p):
+                os.remove(p); return f"Undo: soubor {p} smazán."
+            elif "content" in snap:
+                open(p, "wb").write(snap["content"]); return f"Undo: soubor {p} obnoven."
+        elif a == "delete_file":
+            p = snap.get("path", "")
+            if "content" in snap and not os.path.exists(p):
+                open(p, "wb").write(snap["content"]); return f"Undo: {p} obnoven."
+        elif a == "move_file":
+            src, dst = snap.get("src", ""), snap.get("dst", "")
+            if dst and os.path.exists(dst):
+                shutil.move(dst, src); return f"Undo: {dst} → {src}."
+        elif a == "clipboard_set":
+            try:
+                import pyperclip; pyperclip.copy(snap.get("previous", ""))
+                return "Undo: schránka obnovena."
+            except Exception:
+                pass
+        return f"Undo {a}: nelze vrátit (stav se změnil)."
 
     # ── system ───────────────────────────────────────
     def _cmd_get_time(self, **_):             return cmd_get_time()
@@ -58,6 +153,10 @@ class CommandExecutor:
     def _cmd_volume(self, level=None, action=None, **_):
         return cmd_volume(level=level, action=action)
     def _cmd_set_brightness(self, level=50, **_): return cmd_set_brightness(level)
+    def _cmd_hardware_info(self, **_):            return cmd_hardware_info()
+    def _cmd_disk_space(self, path="/", **_):     return cmd_disk_space(path)
+    def _cmd_list_directory(self, path="~", **_): return cmd_list_directory(path)
+    def _cmd_file_info(self, path="", **_):       return cmd_file_info(path)
 
     # ── apps ─────────────────────────────────────────
     def _cmd_open_app(self, app="", args=None, **_): return cmd_open_app(app, args)
@@ -122,6 +221,11 @@ class CommandExecutor:
     def _cmd_screen_ocr(self, **_):                return cmd_screen_ocr()
     def _cmd_webcam_describe(self, **_):           return cmd_webcam_describe()
 
+    # ── undo ─────────────────────────────────────────
+    def _cmd_undo(self, **_):                        return self.undo()
+    def _cmd_undo_history(self, **_):                return "\n".join(self.undo_history()) or "Prázdná historie."
+
     # ── no-ops ───────────────────────────────────────
     def _cmd_answer(self, **_):                     return "ok"
     def _cmd_clear_history(self, **_):              return "ok"
+

@@ -92,6 +92,18 @@ _FUZZY_COMMANDS = [
     ("jake je datum",    "get_date",        lambda: {}),
     ("screenshot",       "screenshot",      lambda: {}),
     ("info o systemu",   "system_info",     lambda: {}),
+    ("rekni komponenty", "hardware_info",   lambda: {}),
+    ("jaky mas hardware","hardware_info",   lambda: {}),
+    ("moje pc komponenty","hardware_info",  lambda: {}),
+    ("kolik mam mista",  "disk_space",      lambda: {"path": "/"}),
+    ("kolik je mista",   "disk_space",      lambda: {"path": "/"}),
+    ("misto na disku",   "disk_space",      lambda: {"path": "/"}),
+    ("volne misto",      "disk_space",      lambda: {"path": "/"}),
+    ("co mam na plose",  "list_directory",  lambda: {"path": "~/Plocha"}),
+    ("co je na plose",   "list_directory",  lambda: {"path": "~/Plocha"}),
+    ("co mam v dokumentech", "list_directory", lambda: {"path": "~/Dokumenty"}),
+    ("co mam ve stazene","list_directory",  lambda: {"path": "~/Stažené"}),
+    ("obsah domovske slozky","list_directory",lambda: {"path": "~"}),
     ("vypni pocitac",    "shutdown",        lambda: {"delay": 0}),
     ("restartuj pocitac","restart",         lambda: {"delay": 0}),
     # Vision — překlepy jako "popíš obrazovku", "co vidis na obrazovce"
@@ -297,6 +309,16 @@ class LocalRouter:
                 return f"Ukončuji {app_name}.", {
                     "action": "kill_process", "params": {"name": proc}}
 
+        # ── PŘESNÁ SHODA (substring) — vyšší priorita než fuzzy ────────
+        for phrase, action, params_fn in _FUZZY_COMMANDS:
+            if phrase in t:
+                params = params_fn()
+                if action == "get_time":
+                    return f"Je {dt.strftime('%H:%M:%S')}.", {"action": action, "params": params}
+                if action == "get_date":
+                    return f"Dnes je {dt.strftime('%-d. %-m. %Y')}.", {"action": action, "params": params}
+                return None, {"action": action, "params": params}
+
         # ── FUZZY PRE-PASS (překlepy a alternativní formulace) ───────
         if _HAS_FUZZY and len(t) < 40:
             for phrase, action, params_fn in _FUZZY_COMMANDS:
@@ -334,6 +356,68 @@ class LocalRouter:
         # ── SCREENSHOT ────────────────────────────────
         if re.search(r"\b(screenshot|sniiek\s+obrazovky|printscreen|screenshoot|snimek)\b", t):
             return "Pořizuji screenshot.", {"action": "screenshot", "params": {}}
+
+        # ── UNDO ──────────────────────────────────────
+        if re.search(r"\b(vrat|undo|zpet\s+akci|zrus\s+posledni|obnov\s+posledni)\b", t):
+            return "Vracím poslední akci.", {"action": "undo", "params": {}}
+        if re.search(r"\b(undo\s+history|historie\s+akci|co\s+mohu\s+vratit)\b", t):
+            return "Historie vrátitelných akcí:", {"action": "undo_history", "params": {}}
+
+        # ── HARDWARE INFO ─────────────────────────────
+        if re.search(
+            r"\b(hardware|komponenty|komponenta|procesoru?|grafick|grafika|gpu|cpu\s+model"
+            r"|zakladni\s+deska|ram\s+typ|jaka\s+mas|jaky\s+mas|moje\s+pc|muj\s+pocitac"
+            r"|rekni.*komponenty|zjisti.*hardware|co\s+mas\s+za\s+pc|spec(ifikace)?)\b", t):
+            return "Zjišťuji hardwarové komponenty...", {"action": "hardware_info", "params": {}}
+
+        # ── DISK SPACE ───────────────────────────────────
+        m = re.search(
+            r"\b(kolik\s+(mam|je)\s+(misto|volno|volne|gb|space)|misto\s+na\s+disku"
+            r"|volne\s+misto|disk\s+space|free\s+space|jak\s+plny|obsazeni\s+disku"
+            r"|kapacita\s+disku)\b", t)
+        if m:
+            # Pokud obsahuje cestu, předej ji
+            path_m = re.search(r"(/\S+|~/\S*)", text)
+            path = path_m.group(1) if path_m else "/"
+            return "Zjišťuji místo na disku...", {"action": "disk_space", "params": {"path": path}}
+
+        # ── LIST DIRECTORY ────────────────────────────
+        m = re.search(
+            r"\b(co\s+(mam|je)\s+v\s+|obsah\s+(slozky|adresare|zlozky)|vypis\s+slozky"
+            r"|seznam\s+souboru|ls\s+|dir\s+|browse\s+|procházej?\s+|what.s\s+in)\b", t)
+        if m:
+            path_m = re.search(r"(/\S+|~/\S*|(?:plocha|dokumenty|stazene|desktop|downloads)\b)", text, re.I)
+            if path_m:
+                raw = path_m.group(1)
+                # Mapování českých názvů
+                folder_map = {
+                    "plocha": "~/Plocha", "desktop": "~/Desktop",
+                    "dokumenty": "~/Dokumenty", "documents": "~/Documents",
+                    "stazene": "~/Stažené", "downloads": "~/Downloads",
+                }
+                path = folder_map.get(raw.lower(), raw)
+            else:
+                path = "~"
+            return f"Prohlížím složku {path}...", {"action": "list_directory", "params": {"path": path}}
+
+        # Přímé příkazy pro složky
+        for keyword, path in [
+            ("obsah plochy", "~/Plocha"), ("co mam na plose", "~/Plocha"),
+            ("co mam na ploche", "~/Plocha"), ("obsah dokumentu", "~/Dokumenty"),
+            ("obsah stazene", "~/Stažené"), ("domovsky adresar", "~"),
+            ("home folder", "~"), ("what.*desktop", "~/Desktop"),
+        ]:
+            if keyword in t or re.search(keyword, t):
+                return f"Prohlížím složku {path}...", {"action": "list_directory", "params": {"path": path}}
+
+        # ── FILE INFO ────────────────────────────────
+        m = re.search(
+            r"\b(info\s+o\s+souboru|detail.*soubor|jak\s+velky|velikost\s+souboru"
+            r"|file\s+info|stat\s+souboru)\b", t)
+        if m:
+            path_m = re.search(r"(/\S+|~/\S+)", text)
+            path = path_m.group(1) if path_m else ""
+            return "Zjišťuji info o souboru...", {"action": "file_info", "params": {"path": path}}
 
         # ── SYSTEM INFO ───────────────────────────────
         if re.search(r"\b(využití\s+(cpu|ram|disk)|system\s+info|stav\s+systému|kolik\s+ram)\b", t):
