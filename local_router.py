@@ -243,6 +243,12 @@ def _parse_memory_store(a: str) -> dict:
 import logging
 logger = logging.getLogger(__name__)
 
+try:
+    from router_dsl import RouterDSL as _RouterDSL
+    _HAS_DSL = True
+except ImportError:
+    _HAS_DSL = False
+
 
 class LocalRouter:
     """
@@ -250,10 +256,34 @@ class LocalRouter:
     Vrátí (message, action_data) nebo (None, None) → jde na LLM.
     """
 
+    def __init__(self):
+        if _HAS_DSL:
+            self._dsl = _RouterDSL()
+            # Příklady pravidel jako DSL místo raw regex
+            self._dsl.rule('nastav hlasitost na {num}', 'volume', 'level', coerce=int)
+            self._dsl.rule('hlasitost {num}', 'volume', 'level', coerce=int)
+            self._dsl.rule('timer {num} minut', 'set_timer', 'seconds',
+                           coerce=lambda x: int(float(x)) * 60)
+            self._dsl.rule('timer {num} sekund', 'set_timer', 'seconds', coerce=int)
+            self._dsl.rule('otevri {app}', 'open_app', 'app')
+            self._dsl.rule('spust {app}', 'open_app', 'app')
+        else:
+            self._dsl = None
+
     def route(self, text: str) -> tuple:
         # Normalizujeme diakritiku → "otevři" == "otevri", "spusť" == "spust"
         t  = _norm(text)
         dt = datetime.now()
+
+        # ── DSL FALLBACK (nižší priorita — zkusíme po normalizaci, ale před regex) ──
+        # Poznámka: DSL pravidla mají NIŽŠÍ prioritu než stávající regex bloky.
+        # Proto je voláme zde jako kandidáta a použijeme jej jen pokud stávající
+        # regex nic nenajde. Uložíme výsledek a vrátíme ho na konci.
+        _dsl_result = (None, None)
+        if self._dsl is not None:
+            _dsl_action, _dsl_params = self._dsl.match(t)
+            if _dsl_action is not None:
+                _dsl_result = (None, {"action": _dsl_action, "params": _dsl_params})
 
         # ── ZAVŘÍT / UKONČIT (před fuzzy pasem — jinak "zavři X" matchuje "otevři X") ──
         if _CLOSE_TRIGGER.search(t):
@@ -563,6 +593,11 @@ class LocalRouter:
                 url = "https://" + url
             return f"Otevírám {url}.", {
                 "action": "open_url", "params": {"url": url}}
+
+        # ── DSL pravidla (fallback — nižší priorita než stávající regex) ───────
+        if _dsl_result != (None, None):
+            logger.debug(f"DSL match: '{t}' → {_dsl_result[1]}")
+            return _dsl_result
 
         # Nerozpoznáno → LLM
         return None, None

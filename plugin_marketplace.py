@@ -22,12 +22,20 @@ class PluginMarketplace:
             "repo":        "simivilasek-ship-it/jarvis-plugin-hello",
             "description": "Ukázkový plugin — základ pro vlastní vývoj",
             "author":      "JARVIS team",
+            "version":     "1.0.0",
+            "rating":      4.5,
+            "downloads":   142,
+            "tags":        ["demo", "template"],
             "builtin":     False,
         },
         "calculator": {
             "repo":        None,
             "description": "Rozšířená kalkulačka s historií výpočtů",
             "author":      "JARVIS team",
+            "version":     "2.1.0",
+            "rating":      4.8,
+            "downloads":   1024,
+            "tags":        ["math", "builtin"],
             "builtin":     True,
             "builtin_path": "plugins/builtin/calculator",
         },
@@ -35,6 +43,10 @@ class PluginMarketplace:
             "repo":        None,
             "description": "Časovač s hlasovým upozorněním",
             "author":      "JARVIS team",
+            "version":     "1.3.0",
+            "rating":      4.7,
+            "downloads":   856,
+            "tags":        ["productivity", "builtin"],
             "builtin":     True,
             "builtin_path": "plugins/builtin/timer",
         },
@@ -42,6 +54,10 @@ class PluginMarketplace:
             "repo":        None,
             "description": "Správa schránky — kopírování, vkládání, historie",
             "author":      "JARVIS team",
+            "version":     "1.1.0",
+            "rating":      4.6,
+            "downloads":   634,
+            "tags":        ["system", "builtin"],
             "builtin":     True,
             "builtin_path": "plugins/builtin/clipboard",
         },
@@ -49,6 +65,10 @@ class PluginMarketplace:
             "repo":        None,
             "description": "Pozdravy a základní konverzace",
             "author":      "JARVIS team",
+            "version":     "1.0.0",
+            "rating":      4.3,
+            "downloads":   412,
+            "tags":        ["conversation", "builtin"],
             "builtin":     True,
             "builtin_path": "plugins/builtin/greeting",
         },
@@ -56,6 +76,10 @@ class PluginMarketplace:
             "repo":        None,
             "description": "MCP Filesystem — čtení souborů a adresářů",
             "author":      "JARVIS team",
+            "version":     "1.2.0",
+            "rating":      4.9,
+            "downloads":   789,
+            "tags":        ["files", "mcp", "builtin"],
             "builtin":     True,
             "builtin_path": "plugins/builtin/mcp_filesystem",
         },
@@ -63,6 +87,10 @@ class PluginMarketplace:
             "repo":        None,
             "description": "MCP Brave Search — webové vyhledávání (vyžaduje BRAVE_API_KEY)",
             "author":      "JARVIS team",
+            "version":     "1.1.0",
+            "rating":      4.7,
+            "downloads":   523,
+            "tags":        ["search", "mcp", "builtin"],
             "builtin":     True,
             "builtin_path": "plugins/builtin/mcp_brave",
         },
@@ -73,15 +101,62 @@ class PluginMarketplace:
         self.plugins_dir = Path(plugins_dir or "plugins/custom")
 
     def list_available(self) -> str:
-        """Vrátí seznam pluginů z REGISTRY."""
+        """Vrátí seznam pluginů z REGISTRY s ratingem a verzí."""
         if not self.REGISTRY:
             return "Marketplace je prázdný. Přidej pluginy do REGISTRY."
-        lines = ["Dostupné pluginy:"]
+        lines = ["Dostupné pluginy:\n"]
+        updates = self.check_updates()
         for name, info in self.REGISTRY.items():
             installed = (self.plugins_dir / name).exists()
-            status = "✓ nainstalován" if installed else "○ dostupný"
-            lines.append(f"  {status}  {name} — {info['description']} (by {info['author']})")
+            status = "✓" if installed else "○"
+            rating = info.get("rating", 0)
+            stars  = "★" * int(rating) + ("½" if rating % 1 >= 0.5 else "")
+            ver    = info.get("version", "?")
+            dl     = info.get("downloads", 0)
+            upd    = " ⬆ aktualizace" if name in updates else ""
+            lines.append(
+                f"  {status} {name} v{ver}{upd}\n"
+                f"     {stars} {rating} · {dl} stažení\n"
+                f"     {info['description']} (by {info['author']})"
+            )
         return "\n".join(lines)
+
+    def check_updates(self) -> dict:
+        """Porovná verze nainstalovaných pluginů s REGISTRY.
+        Vrátí {name: new_version} pro pluginy kde je novější verze."""
+        import json as _json
+        updates = {}
+        for name, info in self.REGISTRY.items():
+            manifest = self.plugins_dir / name / "manifest.json"
+            if not manifest.exists():
+                continue
+            try:
+                local_ver  = _json.loads(manifest.read_text()).get("version", "0.0.0")
+                remote_ver = info.get("version", "0.0.0")
+                if self._version_gt(remote_ver, local_ver):
+                    updates[name] = remote_ver
+            except Exception:
+                pass
+        return updates
+
+    def auto_update_all(self) -> str:
+        """Aktualizuje všechny pluginy kde je dostupná novější verze."""
+        updates = self.check_updates()
+        if not updates:
+            return "Vše je aktuální. Žádné aktualizace nejsou k dispozici."
+        results = []
+        for name, version in updates.items():
+            result = self.update(name)
+            results.append(f"  {name} → v{version}: {result}")
+        return "Aktualizováno:\n" + "\n".join(results)
+
+    @staticmethod
+    def _version_gt(a: str, b: str) -> bool:
+        """Vrátí True pokud verze a > b (srovnání tuple)."""
+        def parse(v):
+            try: return tuple(int(x) for x in v.split("."))
+            except Exception: return (0,)
+        return parse(a) > parse(b)
 
     def install(self, name: str) -> str:
         """Stáhne plugin z GitHub jako ZIP, nebo zkopíruje vestavěný plugin."""

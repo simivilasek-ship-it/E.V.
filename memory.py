@@ -102,10 +102,15 @@ class _SQLiteMemoryStore:
         metadata     TEXT NOT NULL DEFAULT '{}',
         created_at   REAL NOT NULL,
         last_access  REAL NOT NULL,
-        access_count INTEGER NOT NULL DEFAULT 0
+        access_count INTEGER NOT NULL DEFAULT 0,
+        priority     INTEGER NOT NULL DEFAULT 0,
+        ttl_seconds  INTEGER NOT NULL DEFAULT 0,
+        expires_at   REAL NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_importance ON memories(importance);
     CREATE INDEX IF NOT EXISTS idx_created_at ON memories(created_at);
+    CREATE INDEX IF NOT EXISTS idx_expires_at ON memories(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_priority   ON memories(priority);
     """
 
     def __init__(self, path: Path):
@@ -114,7 +119,24 @@ class _SQLiteMemoryStore:
         self._lock = threading.Lock()
         self._migrate_json(path)
         with self._connect() as con:
+            # Nejdřív přidej nové sloupce do existující DB (idempotentní)
+            self._add_columns(con)
+            # Pak spusť schema (vytvoří tabulku pokud neexistuje)
             con.executescript(self._SCHEMA)
+
+    @staticmethod
+    def _add_columns(con) -> None:
+        """Přidá TTL/priority sloupce do existující DB (idempotentní)."""
+        for col, typedef in [
+            ("priority",    "INTEGER NOT NULL DEFAULT 0"),
+            ("ttl_seconds", "INTEGER NOT NULL DEFAULT 0"),
+            ("expires_at",  "REAL    NOT NULL DEFAULT 0"),
+        ]:
+            try:
+                con.execute(f"ALTER TABLE memories ADD COLUMN {col} {typedef}")
+            except Exception:
+                pass  # sloupec již existuje
+        con.commit()
 
     def _connect(self) -> sqlite3.Connection:
         con = sqlite3.connect(self._db_path, check_same_thread=False)
@@ -135,7 +157,9 @@ class _SQLiteMemoryStore:
                 con.executescript(self._SCHEMA)
                 for e in data:
                     con.execute(
-                        "INSERT OR IGNORE INTO memories VALUES (?,?,?,?,?,?,?,?)",
+                        "INSERT OR IGNORE INTO memories"
+                        "(id,content,importance,tags,metadata,created_at,last_access,access_count)"
+                        " VALUES (?,?,?,?,?,?,?,?)",
                         (e["id"], e["content"], e["importance"],
                          json.dumps(e.get("tags", []), ensure_ascii=False),
                          json.dumps(e.get("metadata", {}), ensure_ascii=False),
@@ -147,16 +171,17 @@ class _SQLiteMemoryStore:
             logger.warning(f"JSON→SQLite migrace selhala: {e}")
 
     def store(self, content: str, importance: float, tags: List[str],
-              metadata: dict) -> str:
+              metadata: dict, ttl_seconds: int = 0, priority: int = 0) -> str:
         mid = str(uuid.uuid4())[:8]
         now = time.time()
+        expires_at = now + ttl_seconds if ttl_seconds > 0 else 0
         with self._lock, self._connect() as con:
             con.execute(
-                "INSERT INTO memories VALUES (?,?,?,?,?,?,?,?)",
+                "INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (mid, content, importance,
                  json.dumps(tags, ensure_ascii=False),
                  json.dumps(metadata, ensure_ascii=False),
-                 now, now, 0),
+                 now, now, 0, priority, ttl_seconds, expires_at),
             )
         return mid
 
@@ -166,8 +191,10 @@ class _SQLiteMemoryStore:
         engine = get_embedding_engine()
         with self._lock, self._connect() as con:
             rows = con.execute(
-                "SELECT * FROM memories WHERE importance >= ?",
-                (min_importance,),
+                "SELECT * FROM memories WHERE importance >= ?"
+                " AND (expires_at = 0 OR expires_at > ?)"
+                " ORDER BY priority DESC, importance DESC",
+                (min_importance, now),
             ).fetchall()
 
         results = []
@@ -240,11 +267,26 @@ class _SQLiteMemoryStore:
         with self._lock, self._connect() as con:
             row = con.execute(
                 "SELECT COUNT(*) as total, AVG(importance) as avg_imp FROM memories"
+                " WHERE (expires_at = 0 OR expires_at > ?)", (time.time(),)
             ).fetchone()
         return {
             "total_memories": row["total"] or 0,
             "avg_importance": round(row["avg_imp"] or 0.0, 3),
         }
+
+    def run_maintenance(self) -> dict:
+        """Smaže expirované záznamy. Vrátí statistiku."""
+        now = time.time()
+        with self._lock, self._connect() as con:
+            total_before = con.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+            deleted = con.execute(
+                "DELETE FROM memories WHERE expires_at > 0 AND expires_at < ?", (now,)
+            ).rowcount
+            con.commit()
+            total_after = total_before - deleted
+        if deleted:
+            logger.info(f"Memory maintenance: smazáno {deleted} expirovaných záznamů")
+        return {"deleted_expired": deleted, "total": total_after}
 
 
 # Alias pro zpětnou kompatibilitu
@@ -294,7 +336,8 @@ class JarvisMemory:
     # ── Store ──────────────────────────────────────────
 
     def store(self, content: str, importance: float = 0.5, context: str = None,
-              tags: List[str] = None, metadata: dict = None) -> Optional[str]:
+              tags: List[str] = None, metadata: dict = None,
+              ttl_seconds: int = 0, priority: int = 0) -> Optional[str]:
         if self.system:
             try:
                 mem = self.system.store(content=content, importance=importance,
@@ -304,7 +347,8 @@ class JarvisMemory:
             except Exception as e:
                 logger.error(f"Neural memory store chyba: {e}")
                 return None
-        return self._store.store(content, importance, tags or [], metadata or {})
+        return self._store.store(content, importance, tags or [], metadata or {},
+                                 ttl_seconds=ttl_seconds, priority=priority)
 
     # ── Recall ─────────────────────────────────────────
 

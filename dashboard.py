@@ -284,7 +284,21 @@ setInterval(refresh, 5000);
 
 if HAS_FASTAPI:
     app = FastAPI(title="JARVIS Dashboard", docs_url=None, redoc_url=None)
-    _ws_clients = set()
+    _ws_clients: set = set()
+    _graph_clients: set = set()
+
+    async def broadcast_graph_event(event: dict):
+        """Broadcastuje graph event všem připojeným klientům."""
+        dead = set()
+        payload = json.dumps(event)
+        for client in list(_graph_clients):
+            try:
+                await client.send_text(payload)
+            except Exception:
+                dead.add(client)
+        _graph_clients.difference_update(dead)
+
+    app.broadcast_graph_event = broadcast_graph_event
 
     @app.get("/health")
     async def health():
@@ -537,6 +551,35 @@ if HAS_FASTAPI:
             _ws_clients.discard(ws)
         except Exception:
             _ws_clients.discard(ws)
+
+    @app.websocket("/ws/graph")
+    async def ws_graph(ws: WebSocket):
+        """Streaming stavu Graf agenta — posílá JSON eventi."""
+        await ws.accept()
+        _graph_clients.add(ws)
+        try:
+            while True:
+                await asyncio.sleep(30)  # keep-alive
+        except WebSocketDisconnect:
+            _graph_clients.discard(ws)
+        except Exception:
+            _graph_clients.discard(ws)
+
+    @app.get("/api/graph/state")
+    async def graph_state():
+        """Vrátí aktuální stav graf agenta."""
+        return {
+            "nodes": ["planner", "router", "executor", "critic"],
+            "edges": [
+                {"from": "planner", "to": "router"},
+                {"from": "router", "to": "executor"},
+                {"from": "executor", "to": "critic"},
+                {"from": "critic", "to": "router"},
+                {"from": "critic", "to": "done"},
+            ],
+            "active_node": None,
+            "status": "idle",
+        }
 
     @app.websocket("/ws/agents")
     async def ws_agents(ws: WebSocket):
