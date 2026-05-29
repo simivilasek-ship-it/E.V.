@@ -14,6 +14,7 @@ Příklady faktů:
 from __future__ import annotations
 import json
 import logging
+import re
 import threading
 import time
 from pathlib import Path
@@ -129,7 +130,6 @@ class UserProfile:
 
     def extract_from_text(self, text: str) -> List[str]:
         """Zkusí extrahovat fakta z textu uživatele. Vrátí seznam nalezených klíčů."""
-        import re
         normalized = _norm(text)   # odstraň diakritiku — STT text může být bez ní
         found = []
         for pattern, key in _FACT_PATTERNS:

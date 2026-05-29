@@ -22,13 +22,10 @@ from local_router import (
     LocalRouter, _router,
     _parse_args,
     _HAS_FUZZY, _FUZZY_THRESHOLD, _FUZZY_COMMANDS,
-    _HOME as _HOME, _USER as _USER,
+    _HOME, _USER,
 )
 
 logger = logging.getLogger(__name__)
-
-_HOME = os.path.expanduser("~")
-_USER = os.environ.get("USER", os.path.basename(_HOME))
 
 
 # ══════════════════════════════════════════════════════
@@ -130,25 +127,12 @@ class LLMEngine:
     def quick_match(self, text: str) -> tuple:
         return _router.route(text)
 
-    # ── ASK (non-streaming) ──────────────────────────
+    # ── SHARED: sestavení messages pro LLM ───────────
 
-    def ask(self, user_text: str) -> Tuple[str, Dict]:
-        msg, action = self.quick_match(user_text)
-        if action is not None:
-            # Do LLM history ukládáme jen informační odpovědi, ne akce (otevři, zavři…)
-            action_name = action.get("action", "")
-            if action_name == "answer" and msg:
-                self.history.append({"role": "user",     "content": user_text})
-                self.history.append({"role": "assistant", "content": msg})
-                self.memory.store_conversation(user_text, msg, importance=0.4)
-            return msg or "", action
-
-        self.history.append({"role": "user", "content": user_text})
-
-        # Extrahuj fakta o uživateli z textu
+    def _build_messages(self, user_text: str) -> tuple:
+        """Vrátí (messages, routed_model, temperature, max_tokens) pro LLM volání."""
         self._extract_user_facts(user_text)
 
-        # Sestaví systémový prompt (SYSTEM_PROMPT + UserProfile + memory kontext)
         context = self.memory.recall_context(user_text, top_k=3)
         system = self._build_system_prompt()
         if context:
@@ -158,15 +142,29 @@ class LLMEngine:
         routed_model, temperature, max_tokens = self._llm_router.get_model_for_task(task)
 
         messages = [{"role": "system", "content": system}, *list(self.history)]
-        # Odhadni spotřebované tokeny (1 token ≈ 4 znaky) a zkraťuj historii dokud
-        # nezůstane alespoň 512 tokenů pro odpověď.
         MAX_CONTEXT = 3072
         while len(messages) > 2:
             used = sum(len(m.get("content", "")) for m in messages) // 4
             if used + max_tokens <= MAX_CONTEXT:
                 break
-            messages.pop(1)  # odstraň nejstarší user/assistant pár (index 1, za system)
+            messages.pop(1)
 
+        return messages, routed_model, temperature, max_tokens
+
+    # ── ASK (non-streaming) ──────────────────────────
+
+    def ask(self, user_text: str) -> Tuple[str, Dict]:
+        msg, action = self.quick_match(user_text)
+        if action is not None:
+            # Do LLM history ukládáme jen informační odpovědi, ne akce (otevři, zavři…)
+            if action.get("action") == "answer" and msg:
+                self.history.append({"role": "user",     "content": user_text})
+                self.history.append({"role": "assistant", "content": msg})
+                self.memory.store_conversation(user_text, msg, importance=0.4)
+            return msg or "", action
+
+        self.history.append({"role": "user", "content": user_text})
+        messages, routed_model, temperature, max_tokens = self._build_messages(user_text)
         payload = {
             "model":    routed_model,
             "messages": messages,
@@ -192,8 +190,7 @@ class LLMEngine:
     def stream_ask(self, user_text: str):
         msg, action = self.quick_match(user_text)
         if action is not None:
-            action_name = action.get("action", "")
-            if action_name == "answer" and msg:
+            if action.get("action") == "answer" and msg:
                 self.history.append({"role": "user",     "content": user_text})
                 self.history.append({"role": "assistant", "content": msg})
                 self.memory.store_conversation(user_text, msg, importance=0.4)
@@ -203,37 +200,18 @@ class LLMEngine:
 
         self.history.append({"role": "user", "content": user_text})
         self._stream_resp = None
-
-        # Extrahuj fakta o uživateli z textu
-        self._extract_user_facts(user_text)
-
-        context = self.memory.recall_context(user_text, top_k=3)
-        system = self._build_system_prompt()
-        if context:
-            system += f"\n\nRelevantní kontext z paměti:\n{context}"
-
-        task = self._llm_router.detect_task(user_text)
-        routed_model, temperature, max_tokens = self._llm_router.get_model_for_task(task)
-
-        messages = [{"role": "system", "content": system}, *list(self.history)]
-        MAX_CONTEXT = 3072
-        while len(messages) > 2:
-            used = sum(len(m.get("content", "")) for m in messages) // 4
-            if used + max_tokens <= MAX_CONTEXT:
-                break
-            messages.pop(1)
-
+        messages, routed_model, temperature, max_tokens = self._build_messages(user_text)
         payload = {
             "model":    routed_model,
             "messages": messages,
             "stream":   True,
             "options":  {"temperature": temperature, "num_predict": max_tokens},
         }
+        full_response = ""
         try:
             self._stream_resp = requests.post(
                 self.url, json=payload, stream=True, timeout=60)
             self._stream_resp.raise_for_status()
-            full_response = ""
             for line in self._stream_resp.iter_lines():
                 if not line:
                     continue
@@ -248,12 +226,12 @@ class LLMEngine:
                 except json.JSONDecodeError:
                     continue
 
-            # Ulož konverzaci do neural memory
             if full_response.strip():
                 self.memory.store_conversation(user_text, full_response.strip(), importance=0.6)
 
         except Exception as e:
             logger.error(f"Stream chyba: {e}")
+            self.history.pop()
             yield f"Chyba: {e}"
         finally:
             self._stream_resp = None

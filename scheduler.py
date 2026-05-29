@@ -53,6 +53,7 @@ class Scheduler:
         self._lock    = threading.RLock()
         self._running = False
         self._thread: Optional[threading.Thread] = None
+        self._wakeup  = threading.Event()
 
     def start(self):
         if self._running:
@@ -65,6 +66,7 @@ class Scheduler:
 
     def stop(self):
         self._running = False
+        self._wakeup.set()
         if self._thread:
             self._thread.join(timeout=2.0)
 
@@ -152,6 +154,7 @@ class Scheduler:
             "fire_at": datetime.fromtimestamp(fire_at).strftime("%H:%M:%S"),
             "repeat": repeat,
         })
+        self._wakeup.set()
         return task_id
 
     def _loop(self):
@@ -160,11 +163,14 @@ class Scheduler:
             to_run = []
 
             with self._lock:
+                next_fire = None
                 for task in list(self._tasks.values()):
                     if task.status != TaskStatus.PENDING:
                         continue
                     if task.fire_at <= now:
                         to_run.append(task)
+                    elif next_fire is None or task.fire_at < next_fire:
+                        next_fire = task.fire_at
 
             for task in to_run:
                 self._run_task(task)
@@ -179,7 +185,10 @@ class Scheduler:
                 for tid in done_ids:
                     del self._tasks[tid]
 
-            time.sleep(0.5)
+            # Spi přesně do nejbližšího tasku, max 60s (fallback pro nové přidání)
+            timeout = max(0.1, (next_fire - time.time())) if next_fire else 60.0
+            self._wakeup.wait(timeout=timeout)
+            self._wakeup.clear()
 
     def _run_task(self, task: ScheduledTask):
         task.status   = TaskStatus.RUNNING
@@ -198,8 +207,8 @@ class Scheduler:
             task.status = TaskStatus.FAILED
             logger.error(f"Task {task.name} selhal: {e}")
 
-        # Plánuj příští spuštění pro opakující se úlohy
-        if (task.repeat and task.status != TaskStatus.FAILED and
+        # Plánuj příští spuštění pro opakující se úlohy (i po selhání — aby maintenance nevypadla)
+        if (task.repeat and
                 (task.max_runs is None or task.run_count < task.max_runs)):
             with self._lock:
                 new_task = ScheduledTask(

@@ -85,9 +85,16 @@ if HAS_FASTAPI:
 
     @app.post("/chat")
     def chat(req: ChatRequest):
-        if req.model:
-            _llm.model = req.model
-        msg, action = _llm.ask(req.text)
+        if req.model and req.model != _llm.model:
+            # Vytvoř jednorázový engine s jiným modelem místo mutace sdíleného stavu
+            from llm import LLMEngine as _LLMEng
+            import copy as _copy
+            cfg = _copy.copy(_llm.config)
+            cfg["ollama_model"] = req.model
+            engine = _LLMEng(cfg, memory=_llm.memory)
+            msg, action = engine.ask(req.text)
+        else:
+            msg, action = _llm.ask(req.text)
         return {"message": msg, "action": action}
 
     @app.post("/command")

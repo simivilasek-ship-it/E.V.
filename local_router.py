@@ -110,7 +110,7 @@ _FUZZY_THRESHOLD = 82  # 0–100, 82 = toleruje 1–2 překlepy
 def _extract_app_name(text: str) -> str:
     """Odstraní trigger slova a vrátí název aplikace/procesu."""
     t = re.sub(
-        r"\b(zavri|ukonci|zabij|kill|stop|otevri|spust|open|start"
+        r"\b(zavri|ukonci|zabij|zabi|kill|stop|ukoncit|otevri|spust|open|start"
         r"|okno|aplikaci|program|proces|appku|app|web|stranku)\b",
         "", _norm(text), flags=re.IGNORECASE
     ).strip(" ,.-")
