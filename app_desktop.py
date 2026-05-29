@@ -94,19 +94,36 @@ def _has_qt() -> bool:
 # ── Spuštění okna ─────────────────────────────────────
 
 def run_webview(url: str):
-    """Zkusí spustit pywebview s dostupným backendem (GTK nebo Qt)."""
+    """Spustí pywebview okno."""
     import webview
 
-    # Vyber GUI backend
-    if _has_gtk():
-        gui = "gtk"
-    elif _has_qt():
-        gui = "qt"
-    else:
+    gui = "gtk" if _has_gtk() else "qt" if _has_qt() else None
+    if not gui:
         raise RuntimeError("Žádný GUI backend (gtk/qt) není dostupný")
 
+    # Qt WebEngine: nastav cesty k resources a zakáže GPU akceleraci
+    if gui == "qt":
+        try:
+            import PyQt6
+            qt6_dir = os.path.join(os.path.dirname(PyQt6.__file__), "Qt6")
+            resources_dir = os.path.join(qt6_dir, "resources")
+            locales_dir   = os.path.join(qt6_dir, "translations", "qtwebengine_locales")
+
+            os.environ.setdefault("QTWEBENGINE_RESOURCES_PATH", resources_dir)
+            os.environ.setdefault("QTWEBENGINE_LOCALES_PATH",   locales_dir)
+            # Renderer proces potřebuje tyto flagy
+            flags = (
+                f"--webengine-resources-path={resources_dir} "
+                f"--webengine-locales-path={locales_dir} "
+                "--disable-gpu --no-sandbox"
+            )
+            os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = flags
+        except Exception:
+            os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu")
+        os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
+
     class JarvisAPI:
-        def get_version(self):    return "4.3"
+        def get_version(self): return "4.3"
         def get_status(self):
             try:
                 from config import CONFIG

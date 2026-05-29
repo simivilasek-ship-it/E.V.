@@ -5,10 +5,28 @@
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-422%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-420%20passing-brightgreen)]()
 [![Version](https://img.shields.io/badge/version-4.3.0-orange)]()
 
 ---
+## Co je nového v v4.3
+
+| Změna | Detail |
+|---|---|
+| **Desktop app** | `app_desktop.py` — pywebview nativní okno, stejné React HUD UI jako web |
+| **Sci-Fi HUD** | Orbitron font, SVG arc progress rings, sparkline grafy, hex grid pozadí |
+| **3D AI Orb** | GLSL vertex shader (Simplex noise), pulsující glow, ring + particle system |
+| **Plugin sandbox** | `ManifestValidator` + `ThreadPoolExecutor` timeout — pluginy nemohou zablokovat JARVIS |
+| **420 testů** | 0 failed — stabilizace celé test suite |
+| **Vosk offline STT** | Fallback bez internetu, český model ~50 MB |
+| **Streaming TTS** | `edge-tts → ffplay stdin`, první slovo ~1s dříve |
+| **`/health` endpoint** | `{"status":"ok","ws":"running"}` pro monitoring |
+| **WS exponential backoff** | Max 5 pokusů: 1s→2s→4s→8s→16s, jasná chybová hláška |
+| **ruff clean** | 0 kritických chyb (F821/F811/E711/E712) |
+
+---
+
+
 
 ## Demo
 
@@ -40,12 +58,6 @@ bash start_desktop.sh
 bash start_jarvis.sh
 ```
 
-### Průvodce prvního spuštění
-```bash
-python setup_wizard.py
-# Ověří závislosti, stáhne model, nastaví mikrofon a TTS
-```
-
 ---
 
 ## Rozhraní
@@ -55,7 +67,7 @@ python setup_wizard.py
 Nativní okno postavené na **pywebview + FastAPI + React**. Žádný prohlížeč není potřeba.
 
 - **AI Orb** — 3D koule s GLSL vertex shaderem (simplex noise), mění barvu a amplitudu podle stavu (`idle / listening / thinking / speaking`)
-- **Chat** — streamovaná odpověď, suggestion chips, markdown rendering
+- **Chat** — streamovaná odpověď chunk po chunku, markdown + code highlighting, historie ↑↓
 - **SystemPanel** — SVG arc ringly pro CPU / RAM / disk s live daty
 - **PluginStore** — instalace pluginů z marketplace jedním kliknutím
 - **StatusBar** — Ollama status, aktuální model, connection dot
@@ -359,7 +371,6 @@ app_core.py           — orchestrátor, lazy init, routing pipeline
 │
 ├── dashboard.py      — FastAPI web UI + /ws/chat (localhost:8002)
 ├── api.py            — REST API pro integraci
-├── setup_wizard.py   — průvodce prvního spuštění
 │
 ├── commands/         — 40+ akcí (system, apps, files, media, utils)
 │
@@ -368,7 +379,7 @@ app_core.py           — orchestrátor, lazy init, routing pipeline
     ├── src/store/jarvis.js    — Zustand, persistent WS chat
     └── src/components/
         ├── AIOrb.jsx          — GLSL vertex shader, 4 stavy
-        ├── ChatPanel.jsx      — streaming, suggestion chips
+        ├── ChatPanel.jsx      — streaming, markdown, historie příkazů ↑↓
         ├── SystemPanel.jsx    — SVG arc ringly CPU/RAM/disk
         ├── PluginStore.jsx    — marketplace UI
         └── StatusBar.jsx      — Ollama status, model, connection
