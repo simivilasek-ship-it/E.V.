@@ -7,6 +7,7 @@ import PluginStore from './components/PluginStore'
 import ParticleBackground from './components/ParticleBackground'
 import AgentGraph from './components/AgentGraph'
 import ToastContainer from './components/Toast'
+import DashboardPanel from './components/DashboardPanel'
 
 // Lucide-style inline SVG icons
 const Icons = {
@@ -14,13 +15,15 @@ const Icons = {
   plugin:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><path d="M20.24 12.24a6 6 0 00-8.49-8.49L5 10.5V19h8.5l6.74-6.76z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>,
   system:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
   agent:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>,
+  dash:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="nav-icon"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
 }
 
 const TABS = [
-  { id: 'CHAT',    label: 'CHAT',    icon: Icons.chat },
-  { id: 'PLUGINY', label: 'PLUGINS', icon: Icons.plugin },
-  { id: 'SYSTÉM',  label: 'SYSTEM',  icon: Icons.system },
-  { id: 'AGENT',   label: 'AGENT',   icon: Icons.agent },
+  { id: 'CHAT',      label: 'CHAT',      icon: Icons.chat },
+  { id: 'PLUGINY',   label: 'PLUGINS',   icon: Icons.plugin },
+  { id: 'SYSTÉM',    label: 'SYSTEM',    icon: Icons.system },
+  { id: 'AGENT',     label: 'AGENT',     icon: Icons.agent },
+  { id: 'DASHBOARD', label: 'DASHBOARD', icon: Icons.dash },
 ]
 
 const STATE_GLOW = {
@@ -190,6 +193,12 @@ export default function App() {
             <div className="panel" style={{ padding:0 }}>
               <AgentGraph active={tab === 'AGENT'} />
             </div>
+          </div>
+        )}
+
+        {tab === 'DASHBOARD' && (
+          <div style={{ height:'100%', overflowY:'auto', maxWidth:1100, margin:'0 auto' }}>
+            <DashboardPanel />
           </div>
         )}
       </main>
