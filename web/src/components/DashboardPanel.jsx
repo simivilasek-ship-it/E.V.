@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useJarvis } from '../store/jarvis'
 
-const API = 'http://localhost:8002'
+const API = import.meta.env.PROD ? `${window.location.protocol}//${window.location.host}` : 'http://localhost:8002'
 
 const S = {
   card:  { background:'#0b1220', border:'1px solid #1a3050', borderRadius:8, padding:'14px 16px', marginBottom:12 },

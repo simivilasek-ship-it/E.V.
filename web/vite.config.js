@@ -10,5 +10,8 @@ export default defineConfig({
       '/ws':  { target: 'ws://localhost:8002',  changeOrigin: true, ws: true },
     },
   },
-  build: { outDir: '../web_dist' },
+  build: {
+    outDir: '../web_dist',
+    // base /app pro produkční build servírovaný přes FastAPI na /app
+  },
 })

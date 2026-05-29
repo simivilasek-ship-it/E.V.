@@ -26,6 +26,7 @@ ROOT         = Path(__file__).parent.parent
 WEB_DIST     = ROOT / "web_dist"
 BACKEND_PORT = 8002
 BACKEND_URL  = f"http://127.0.0.1:{BACKEND_PORT}"
+APP_URL      = f"http://127.0.0.1:{BACKEND_PORT}/app"   # React web chat
 WINDOW_TITLE = "JARVIS"
 USE_WEBVIEW  = "--webview" in sys.argv
 USE_TRAY     = "--tray" in sys.argv
@@ -214,7 +215,8 @@ def main():
     ok = wait_for_backend(timeout=15)
     print("✓" if ok else "⚠ timeout")
 
-    url = BACKEND_URL if ok else (
+    # Použij /app (React chat) pokud existuje build, jinak fallback na root dashboard
+    url = APP_URL if ok else (
         str(WEB_DIST / "index.html") if WEB_DIST.exists() else BACKEND_URL)
 
     if USE_TRAY:

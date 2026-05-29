@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
-const API    = 'http://localhost:8002'
-const WS_URL = 'ws://localhost:8002'
+const API    = import.meta.env.PROD ? `${window.location.protocol}//${window.location.host}` : 'http://localhost:8002'
+const WS_URL = import.meta.env.PROD ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}` : 'ws://localhost:8002'
 const MAX_ATTEMPTS = 5
 
 // Exponential backoff: 1s, 2s, 4s, 8s, 16s — pak stop

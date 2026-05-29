@@ -751,10 +751,46 @@ if HAS_FASTAPI:
     app.broadcast_log = _broadcast_log
 
 
+def _mount_web_app():
+    """Připojí React build jako statické soubory na /app."""
+    if not HAS_FASTAPI:
+        return
+    from pathlib import Path as _Path
+    web_dist = _Path(__file__).parent / "web_dist"
+    if not web_dist.exists():
+        return
+    try:
+        from fastapi.staticfiles import StaticFiles
+        from fastapi.responses import FileResponse
+
+        # Statické soubory (JS, CSS, ikony)
+        app.mount("/app/assets", StaticFiles(directory=str(web_dist / "assets")),
+                  name="web_assets")
+
+        # Všechny ostatní cesty pod /app → index.html (SPA fallback)
+        @app.get("/app/{full_path:path}", include_in_schema=False)
+        async def web_app(full_path: str):
+            return FileResponse(str(web_dist / "index.html"))
+
+        @app.get("/app", include_in_schema=False)
+        async def web_app_root():
+            return FileResponse(str(web_dist / "index.html"))
+
+    except Exception as e:
+        import logging as _log
+        _log.getLogger(__name__).warning(f"Web app mount selhal: {e}")
+
+
+# Připoj React web app při importu
+if HAS_FASTAPI:
+    _mount_web_app()
+
+
 def run_dashboard(port: int = 8002):
     if not HAS_FASTAPI:
         print("FastAPI není nainstalováno: pip install fastapi uvicorn")
         return
+    print(f"JARVIS Web Chat  → http://localhost:{port}/app")
     print(f"JARVIS Dashboard → http://localhost:{port}")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
 
