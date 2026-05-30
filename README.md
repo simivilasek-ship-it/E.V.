@@ -199,6 +199,9 @@ Security check → CommandExecutor (+ undo stack) / MCP / Vision → TTS
 | „Zapamatuj si X" | SQLite memory (TTL/priority + conflict check) |
 | „Vrať poslední akci" | Undo stack |
 | Obecná otázka / kód | Ollama LLM (structured outputs) |
+| „PSG vs Arsenal výsledek" | DuckDuckGo → výsledek přímo v chatu |
+| „tabulka premier league" | DuckDuckGo → živá tabulka |
+| „bitcoin cena" / „kurz eura" | DuckDuckGo → aktuální kurz |
 
 ### ReAct + Multi-agent
 ```
