@@ -190,10 +190,10 @@ body::after {
 /* Nav */
 .sidebar-nav {
   flex: 1;
-  padding: 10px 10px;
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   overflow-y: auto;
 }
 
@@ -201,20 +201,20 @@ body::after {
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 9px 12px;
+  padding: 10px 14px;
   border-radius: 8px;
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text2);
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   text-align: left;
   width: 100%;
   transition: all .18s ease;
   position: relative;
-  letter-spacing: .02em;
+  letter-spacing: .01em;
 }
 
 .nav-item:hover {
@@ -476,19 +476,20 @@ kbd {
 
 .copy-btn {
   position: absolute;
-  top: 7px; right: 8px;
+  top: 0; right: 0;
   opacity: 0;
-  background: rgba(0,200,255,.08);
-  border: 1px solid rgba(0,200,255,.15);
+  background: rgba(0,0,0,.45);
+  border: 1px solid rgba(255,255,255,.08);
   border-radius: 5px;
   color: var(--text2);
   cursor: pointer;
-  font-size: 11px;
-  padding: 2px 7px;
+  font-size: 10px;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
   transition: all .15s;
 }
-.bubble:hover .copy-btn { opacity: 1; }
-.copy-btn:hover { color: var(--cyan); background: rgba(0,200,255,.14); }
+.copy-btn:hover { opacity: 1 !important; color: var(--cyan); border-color: rgba(0,200,255,.2); }
+div:hover > div > .copy-btn { opacity: 0.7; }
 
 /* Typing indicator */
 .typing-indicator { display: flex; gap: 5px; padding: 2px 0; }

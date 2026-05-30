@@ -67,53 +67,89 @@ function Message({ msg }) {
 
   if (isUser) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}
-        className="msg-group user">
-        <div style={{ maxWidth: 520 }}>
-          <div className="bubble u">{renderContent(msg.text)}</div>
-          <div style={{ textAlign: 'right', marginTop: 3, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text2)' }}>
+      <div style={{
+        display: 'flex', justifyContent: 'flex-end',
+        marginBottom: 20, gap: 10, alignItems: 'flex-end',
+      }}>
+        <div style={{ maxWidth: 580 }}>
+          <div style={{
+            padding: '10px 16px',
+            background: 'linear-gradient(135deg, rgba(59,130,246,.18), rgba(99,102,241,.14))',
+            border: '1px solid rgba(99,102,241,.25)',
+            borderRadius: '16px 16px 4px 16px',
+            fontSize: 14, lineHeight: 1.65, color: 'var(--text)',
+            boxShadow: '0 2px 12px rgba(59,130,246,.1)',
+          }}>
+            {renderContent(msg.text)}
+          </div>
+          <div style={{
+            textAlign: 'right', marginTop: 4,
+            fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)',
+          }}>
             {formatTime(msg.ts)}
           </div>
         </div>
+        {/* User avatar */}
+        <div style={{
+          width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+          background: 'linear-gradient(135deg, rgba(59,130,246,.18), rgba(99,102,241,.12))',
+          border: '1px solid rgba(99,102,241,.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'var(--font-hud)', fontSize: 10, fontWeight: 700,
+          color: '#93c5fd',
+        }}>U</div>
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'flex-start' }}
-      className="msg-group">
-      {/* Avatar */}
+    <div style={{ display: 'flex', gap: 12, marginBottom: 24, alignItems: 'flex-start' }}>
+      {/* JARVIS avatar */}
       <div style={{
-        width: 32, height: 32, borderRadius: 10, flexShrink: 0, marginTop: 2,
-        background: 'linear-gradient(135deg, rgba(0,200,255,.15), rgba(99,102,241,.1))',
-        border: '1px solid rgba(0,200,255,.22)',
+        width: 30, height: 30, borderRadius: 8, flexShrink: 0, marginTop: 1,
+        background: 'linear-gradient(135deg, rgba(0,200,255,.12), rgba(99,102,241,.08))',
+        border: '1px solid rgba(0,200,255,.2)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: 'var(--font-hud)', fontSize: 11, fontWeight: 700,
-        color: 'var(--cyan)', boxShadow: '0 0 10px rgba(0,200,255,.1)',
+        fontFamily: 'var(--font-hud)', fontSize: 10, fontWeight: 700,
+        color: 'var(--cyan)', boxShadow: '0 0 12px rgba(0,200,255,.08)',
       }}>J</div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Name + time */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          marginBottom: 5, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text2)',
+          display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6,
+          fontFamily: 'var(--font-mono)', fontSize: 10,
         }}>
-          <span style={{ color: 'rgba(0,200,255,.6)', letterSpacing: '.08em' }}>JARVIS</span>
-          <span>·</span>
-          <span>{formatTime(msg.ts)}</span>
+          <span style={{ color: 'rgba(0,200,255,.7)', letterSpacing: '.06em', fontWeight: 600 }}>JARVIS</span>
+          <span style={{ color: 'var(--text3)' }}>·</span>
+          <span style={{ color: 'var(--text3)' }}>{formatTime(msg.ts)}</span>
         </div>
 
-        <div style={{ position: 'relative', lineHeight: 1.7, fontSize: 13.5, color: 'var(--text)' }}>
-          {renderContent(msg.text)}
-          {msg.streaming && !msg.text && <TypingDots />}
-          {msg.streaming && msg.text && <span className="cursor-blink" />}
+        {/* Content */}
+        <div style={{ position: 'relative' }}>
+          <div style={{
+            fontSize: 14, lineHeight: 1.75, color: 'rgba(219,234,254,.9)',
+            position: 'relative',
+          }}>
+            {renderContent(msg.text)}
+            {msg.streaming && !msg.text && <TypingDots />}
+            {msg.streaming && msg.text && <span className="cursor-blink" />}
+          </div>
 
           {!msg.streaming && msg.text && (
-            <button className="copy-btn" onClick={copy} style={{
-              top: 0, right: 0,
-              background: copied ? 'rgba(34,211,165,.1)' : undefined,
-              color: copied ? 'var(--green)' : undefined,
-            }}>
-              {copied ? '✓ kopírováno' : '⎘'}
+            <button onClick={copy} style={{
+              position: 'absolute', top: -2, right: 0,
+              background: copied ? 'rgba(34,211,165,.1)' : 'rgba(0,0,0,.4)',
+              border: `1px solid ${copied ? 'rgba(34,211,165,.3)' : 'rgba(255,255,255,.08)'}`,
+              borderRadius: 5, color: copied ? 'var(--green)' : 'var(--text2)',
+              cursor: 'pointer', fontSize: 10, padding: '2px 8px',
+              fontFamily: 'var(--font-mono)',
+              opacity: 0, transition: 'opacity .15s, background .15s',
+            }}
+              className="copy-btn"
+              onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+            >
+              {copied ? '✓' : '⎘'}
             </button>
           )}
         </div>
@@ -212,32 +248,44 @@ export default function ChatPanel({ orbGlow, orbState }) {
           flex: 1, overflowY: 'auto', width: '100%',
           display: 'flex', flexDirection: 'column', alignItems: 'center',
         }}>
-          <div style={{ width: '100%', maxWidth: 760, padding: '20px 16px 8px' }}>
-            {messages.length === 0 ? (
-              <div className="chat-empty" style={{ minHeight: 300 }}>
-                <div style={{
-                  width: 64, height: 64, borderRadius: 18,
-                  background: 'linear-gradient(135deg, rgba(0,200,255,.12), rgba(99,102,241,.08))',
-                  border: '1px solid rgba(0,200,255,.2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'var(--font-hud)', fontSize: 24, fontWeight: 900,
-                  color: 'var(--cyan)', boxShadow: '0 0 30px rgba(0,200,255,.12)',
-                  animation: 'breathe 4s ease-in-out infinite',
-                }}>J</div>
-                <div style={{ fontFamily: 'var(--font-hud)', fontSize: 15, fontWeight: 600,
-                  color: 'rgba(0,200,255,.5)', letterSpacing: '.2em', marginTop: 8 }}>
-                  JARVIS
-                </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10,
-                  color: 'var(--text2)', letterSpacing: '.1em', marginTop: 4 }}>
-                  Jak ti mohu pomoct?
-                </div>
-              </div>
-            ) : (
-              messages.map(m => <Message key={m.id} msg={m} />)
-            )}
-            <div ref={bottomRef} />
-          </div>
+          {messages.length === 0 ? (
+            /* Empty state — vertically centered */
+            <div style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 10,
+              padding: 32, pointerEvents: 'none',
+            }}>
+              <div style={{
+                width: 72, height: 72, borderRadius: 20,
+                background: 'linear-gradient(135deg, rgba(0,200,255,.1), rgba(99,102,241,.07))',
+                border: '1px solid rgba(0,200,255,.18)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'var(--font-hud)', fontSize: 26, fontWeight: 900,
+                color: 'var(--cyan)', boxShadow: '0 0 40px rgba(0,200,255,.1)',
+                animation: 'breathe 4s ease-in-out infinite',
+              }}>J</div>
+              <div style={{
+                fontFamily: 'var(--font-hud)', fontSize: 16, fontWeight: 700,
+                color: 'rgba(0,200,255,.45)', letterSpacing: '.25em',
+              }}>JARVIS</div>
+              <div style={{
+                fontFamily: 'var(--font-ui)', fontSize: 13,
+                color: 'var(--text2)', marginTop: 2,
+              }}>Jak ti mohu pomoct?</div>
+            </div>
+          ) : (
+            /* Messages — push to bottom when few */
+            <div style={{
+              width: '100%', maxWidth: 760,
+              display: 'flex', flexDirection: 'column',
+              justifyContent: 'flex-end',
+              minHeight: '100%',
+              padding: '24px 20px 8px',
+            }}>
+              {messages.map(m => <Message key={m.id} msg={m} />)}
+              <div ref={bottomRef} />
+            </div>
+          )}
         </div>
 
         {/* Suggestions */}
