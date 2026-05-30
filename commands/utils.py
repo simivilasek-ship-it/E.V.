@@ -249,14 +249,82 @@ def cmd_reminder_set(text: str, time_str: str = "1 minuta") -> str:
 
 
 def cmd_weather(city: str = "") -> str:
+    """Počasí přes Open-Meteo (free, bez API klíče) + wttr.in fallback."""
     import requests
-    url = (f"https://wttr.in/{quote(city)}?format=3" if city
-           else "https://wttr.in/?format=3")
+
+    # WMO weather kódy → emoji + popis
+    _WMO = {
+        0: ("☀️",  "Jasno"),
+        1: ("🌤️", "Převážně jasno"), 2: ("⛅", "Polojasno"), 3: ("☁️", "Zataženo"),
+        45: ("🌫️","Mlha"), 48: ("🌫️","Námrazová mlha"),
+        51: ("🌦️","Slabé mrholení"), 53: ("🌦️","Mrholení"), 55: ("🌧️","Silné mrholení"),
+        61: ("🌧️","Slabý déšť"), 63: ("🌧️","Déšť"), 65: ("🌧️","Silný déšť"),
+        71: ("🌨️","Slabý sníh"), 73: ("❄️","Sníh"), 75: ("❄️","Silný sníh"),
+        77: ("🌨️","Sněhové vločky"),
+        80: ("🌦️","Přeháňky"), 81: ("🌧️","Silné přeháňky"), 82: ("⛈️","Průtrž"),
+        85: ("🌨️","Sněhové přeháňky"), 86: ("❄️","Silné sněhové přeháňky"),
+        95: ("⛈️","Bouřka"), 96: ("⛈️","Bouřka s krupobitím"), 99: ("⛈️","Silná bouřka"),
+    }
+
+    target = city.strip() or "Praha"
+
     try:
-        resp = requests.get(url, timeout=8, headers={"User-Agent": "curl/7.0"})
-        return resp.text.strip()
+        # 1. Geokódování
+        geo = requests.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={"name": target, "count": 1, "language": "cs", "format": "json"},
+            timeout=6,
+        ).json()
+        results = geo.get("results")
+        if not results:
+            return f"Město '{target}' nenalezeno."
+        loc  = results[0]
+        lat, lon = loc["latitude"], loc["longitude"]
+        name = loc.get("name", target)
+        country = loc.get("country", "")
+
+        # 2. Aktuální počasí
+        weather = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude":  lat,
+                "longitude": lon,
+                "current":   "temperature_2m,apparent_temperature,relative_humidity_2m,"
+                             "wind_speed_10m,precipitation,weather_code",
+                "timezone":  "auto",
+                "wind_speed_unit": "kmh",
+            },
+            timeout=6,
+        ).json()
+        cur   = weather.get("current", {})
+        code  = cur.get("weather_code", 0)
+        emoji, desc = _WMO.get(code, ("🌡️", f"kód {code}"))
+        temp  = cur.get("temperature_2m", "?")
+        feels = cur.get("apparent_temperature", "?")
+        humid = cur.get("relative_humidity_2m", "?")
+        wind  = cur.get("wind_speed_10m", "?")
+        precip = cur.get("precipitation", 0)
+
+        result = (
+            f"{emoji} {name}{', ' + country if country else ''}: {desc}\n"
+            f"   🌡️ {temp}°C (pocitová {feels}°C)  💧 {humid}%  💨 {wind} km/h"
+        )
+        if precip and float(precip) > 0:
+            result += f"  🌧️ {precip} mm"
+        return result
+
     except Exception as e:
-        return f"Chyba počasí: {e}"
+        # Fallback na wttr.in
+        try:
+            r = requests.get(
+                f"https://wttr.in/{quote(city)}?format=3",
+                timeout=8, headers={"User-Agent": "curl/7.0"})
+            text = r.text.strip()
+            if "render failed" not in text.lower():
+                return text
+        except Exception:
+            pass
+        return f"Počasí nedostupné: {e}"
 
 
 def cmd_wiki_search(query: str) -> str:

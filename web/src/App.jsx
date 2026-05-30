@@ -88,7 +88,7 @@ export default function App() {
             <span style={{ fontFamily:'var(--font-hud)', fontSize:14, fontWeight:900, color:'var(--cyan)' }}>J</span>
           </div>
           <span className="logo-text">JARVIS</span>
-          <span className="version-badge">v4.3</span>
+          <span className="version-badge">v4.4</span>
         </div>
 
         <nav style={{ display:'flex', height:'100%', marginLeft:8 }}>
@@ -257,7 +257,7 @@ export default function App() {
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         onNavigate={setTab}
-        onModelChange={(model) => { /* TODO: dispatch to store */ }}
+        onModelChange={(model) => { useJarvis.getState().setModel(model) }}
       />
     </div>
   )

@@ -23,6 +23,7 @@ export const useJarvis = create((set, get) => ({
   system:      { cpu: 0, ram: 0, disk: 0, cpu_temp: null, net: null, gpu: null },
   agents:      [],
   plugins:     [],
+  currentModel: 'qwen2.5:3b',
   isConnected: false,
   connStatus:  'disconnected', // disconnected | connecting | connected | error | failed
   connError:   null,           // null nebo chybová zpráva pro UI
@@ -207,6 +208,15 @@ export const useJarvis = create((set, get) => ({
 
   setOrbState(s)  { set({ orbState: s }) },
   setSystem(data) { set({ system: data }) },
+  setModel(model) {
+    set({ currentModel: model })
+    // Pošli model změnu na backend
+    fetch(`${API}/api/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ollama_model: model }),
+    }).catch(() => {})
+  },
   setAgents(data) { set({ agents: data }) },
   setPlugins(data){ set({ plugins: data }) },
   clearMessages() { set({ messages: [] }) },

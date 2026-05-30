@@ -323,7 +323,7 @@ if HAS_FASTAPI:
             "ws": "running",                 # WebSocket server běží
             "uptime_s": uptime,
             "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "version": "4.3",
+            "version": "4.4.0",
             "port": 8002,
             "checks": {
                 "ollama": {"ok": ollama_ok},
@@ -575,6 +575,24 @@ if HAS_FASTAPI:
             return safe
         except Exception:
             return {}
+
+    @app.post("/api/config")
+    async def update_config(body: dict):
+        """Aktualizuje konfiguraci za běhu (whitelist bezpečných klíčů)."""
+        ALLOWED = {"ollama_model", "tts_rate", "tts_voice", "stt_language",
+                   "wake_word_enabled", "tts_enabled", "tts_streaming"}
+        try:
+            from config import CONFIG, save_config
+            changed = {}
+            for k, v in body.items():
+                if k in ALLOWED:
+                    CONFIG[k] = v
+                    changed[k] = v
+            if changed:
+                save_config(CONFIG)
+            return {"updated": changed, "ok": True}
+        except Exception as e:
+            return {"error": str(e), "ok": False}
 
     # ── Agent Timeline ────────────────────────────────
     _agent_timeline: list = []   # in-memory buffer posledních runů

@@ -519,9 +519,16 @@ class LocalRouter:
 
         # ── POČASÍ ────────────────────────────────────
         if re.search(r"\b(pocasi|weather|bude\s+prset|teplota\s+v)\b", t):
+            # "pocasi Praha" nebo "Praha pocasi" nebo "pocasi v Praze"
             m = re.search(r"\b(pocasi|weather)\b\s+(?:v\s+)?(\w+)", t)
-            city = m.group(2).capitalize() if m else ""
-            return f"Počasí{' v ' + city if city else ''}.", {
+            if not m:
+                # Město PŘED slovem počasí: "Ostrava pocasi"
+                m = re.search(r"\b(\w+)\s+(?:pocasi|weather)\b", t)
+            city = m.group(2 if m and m.lastindex >= 2 else 1).capitalize() if m else ""
+            # Ignoruj stopslova jako trigger slova
+            if city.lower() in ("pocasi", "weather", "dnes", "zitra", "bude"):
+                city = ""
+            return f"Počasí{' — ' + city if city else ''}:", {
                 "action": "weather", "params": {"city": city}}
 
         # ── TIMER ─────────────────────────────────────
