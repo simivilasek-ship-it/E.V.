@@ -2,18 +2,22 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useJarvis } from '../store/jarvis'
 
 const PLACEHOLDERS = [
-  "ENTER COMMAND...",
-  "Otevři Spotify...",
-  "Kolik je hodin?",
-  "Popiš obrazovku...",
-  "Zahraj něco...",
+  'Zadej příkaz nebo otázku…',
+  'Otevři Spotify…',
+  'Počasí Praha…',
+  'Popiš obrazovku…',
+  'Zahraj něco…',
+  'Hardware info…',
 ]
 
-const SUGGESTIONS = ["kolik je hodin?", "počasí Praha", "info o systému", "screenshot"]
+const SUGGESTIONS = [
+  'kolik je hodin?', 'počasí Praha', 'info o systému',
+  'screenshot', 'hardware info',
+]
 
 function formatTime(ts) {
   const diff = (Date.now() - ts) / 1000
-  if (diff < 60) return 'právě teď'
+  if (diff < 60)   return 'právě teď'
   if (diff < 3600) return `před ${Math.floor(diff / 60)} min`
   return new Date(ts).toLocaleTimeString('cs', { hour: '2-digit', minute: '2-digit' })
 }
@@ -22,7 +26,7 @@ function TypingDots() {
   return (
     <div className="typing-indicator">
       {[0, 1, 2].map(i => (
-        <span key={i} className="typing-dot" style={{ animationDelay: `${i * 0.18}s` }} />
+        <span key={i} className="typing-dot" style={{ animationDelay: `${i * 0.16}s` }} />
       ))}
     </div>
   )
@@ -37,15 +41,14 @@ function renderContent(text) {
       const code = p.replace(/^```\w*\n?/, '').replace(/\n?```$/, '')
       return (
         <pre key={i}>
-          {lang && <span style={{ float: 'right', fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>{lang}</span>}
+          {lang && <span style={{ float: 'right', fontSize: 8, color: 'var(--text2)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{lang}</span>}
           {code}
         </pre>
       )
     }
-    const chunks = p.split(/(`[^`]+`)/g)
     return (
       <span key={i}>
-        {chunks.map((c, j) =>
+        {p.split(/(`[^`]+`)/g).map((c, j) =>
           c.startsWith('`') ? <code key={j}>{c.slice(1, -1)}</code> : c
         )}
       </span>
@@ -55,36 +58,33 @@ function renderContent(text) {
 
 function Message({ msg }) {
   const isUser = msg.sender === 'user'
-  const t = formatTime(msg.ts)
+  const [copied, setCopied] = useState(false)
+
+  const copy = () => {
+    navigator.clipboard.writeText(msg.text || '')
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   return (
-    <div className={`msg-group ${isUser ? 'user' : ''} fade-up`}>
-      <div className={`avatar-hud ${isUser ? 'u' : 'j'}`}>{isUser ? 'U' : 'J'}</div>
+    <div className={`msg-group ${isUser ? 'user' : ''}`}>
+      <div className={`avatar ${isUser ? 'u' : 'j'}`}>
+        {isUser ? 'U' : 'J'}
+      </div>
       <div className="msg-content">
         <div className="msg-meta">
-          {isUser ? 'USER' : 'JARVIS'} · {t}
+          <span className="msg-meta-name">{isUser ? 'USER' : 'JARVIS'}</span>
+          <span>·</span>
+          <span>{formatTime(msg.ts)}</span>
         </div>
-        <div className={`bubble ${isUser ? 'u' : 'j'}`} style={{ position: 'relative' }}>
+        <div className={`bubble ${isUser ? 'u' : 'j'}`}>
           {renderContent(msg.text)}
           {msg.streaming && !msg.text && <TypingDots />}
-          {msg.streaming && msg.text && (
-            <span style={{
-              display: 'inline-block', width: 8, height: 13, background: 'var(--cyan)',
-              marginLeft: 2, verticalAlign: 'middle', animation: 'pulse 0.8s ease-in-out infinite',
-              borderRadius: 1, boxShadow: '0 0 6px var(--cyan)'
-            }} />
-          )}
-          {!isUser && (
-            <button
-              onClick={() => navigator.clipboard.writeText(msg.text || '')}
-              title="Kopírovat"
-              style={{
-                position: 'absolute', top: 6, right: 6, opacity: 0,
-                background: 'none', border: 'none', color: 'var(--text2)',
-                cursor: 'pointer', fontSize: 12, transition: 'opacity .2s',
-              }}
-              className="copy-btn"
-            >⎘</button>
+          {msg.streaming && msg.text && <span className="cursor-blink" />}
+          {!isUser && !msg.streaming && msg.text && (
+            <button className="copy-btn" onClick={copy}>
+              {copied ? '✓' : '⎘'}
+            </button>
           )}
         </div>
       </div>
@@ -92,47 +92,24 @@ function Message({ msg }) {
   )
 }
 
-function ConnBadge() {
-  const connStatus = useJarvis(s => s.connStatus)
-  const retry = useJarvis(s => s.retry)
-  const map = {
-    connected: { color: 'var(--green)', label: 'CONNECTED' },
-    connecting: { color: 'var(--amber)', label: 'CONNECTING' },
-    disconnected: { color: 'var(--red)', label: 'OFFLINE' },
-    error: { color: 'var(--red)', label: 'ERROR' },
-    failed: { color: 'var(--red)', label: 'FAILED' },
-  }
-  const { color, label } = map[connStatus] || map.disconnected
-  return (
-    <button onClick={retry} className="conn-badge" style={{
-      color, borderColor: `${color}33`, background: `${color}0a`,
-    }}>
-      <span style={{
-        width: 5, height: 5, borderRadius: '50%', background: color,
-        boxShadow: `0 0 6px ${color}`,
-        animation: connStatus === 'connecting' ? 'pulse 1s ease-in-out infinite' : 'none'
-      }} />
-      {label}
-    </button>
-  )
-}
-
 export default function ChatPanel() {
-  const [input, setInput] = useState('')
-  const messages = useJarvis(s => s.messages)
-  const sendCmd = useJarvis(s => s.sendCommand)
+  const [input, setInput]   = useState('')
+  const messages  = useJarvis(s => s.messages)
+  const sendCmd   = useJarvis(s => s.sendCommand)
   const clearMsgs = useJarvis(s => s.clearMessages)
-  const orbState = useJarvis(s => s.orbState)
+  const orbState  = useJarvis(s => s.orbState)
   const bottomRef = useRef()
-  const taRef = useRef()
-  const [hist, setHist] = useState([])
-  const [hidx, setHidx] = useState(-1)
+  const taRef     = useRef()
+  const [hist, setHist]   = useState([])
+  const [hidx, setHidx]   = useState(-1)
   const [plIdx, setPlIdx] = useState(0)
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   useEffect(() => {
-    const t = setInterval(() => setPlIdx(i => (i + 1) % PLACEHOLDERS.length), 3000)
+    const t = setInterval(() => setPlIdx(i => (i + 1) % PLACEHOLDERS.length), 3200)
     return () => clearInterval(t)
   }, [])
 
@@ -148,7 +125,7 @@ export default function ChatPanel() {
   }, [input, orbState, sendCmd])
 
   const onKey = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); return }
     if (e.key === 'ArrowUp' && !input) {
       e.preventDefault()
       const n = Math.min(hidx + 1, hist.length - 1)
@@ -165,27 +142,29 @@ export default function ChatPanel() {
 
   return (
     <>
-      <style>{`.bubble:hover .copy-btn { opacity: 1 !important; }`}</style>
-
+      {/* Header */}
       <div className="panel-header">
         <span className="panel-title">COMMUNICATION</span>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <ConnBadge />
-          <button onClick={clearMsgs} style={{
-            fontFamily: 'var(--font-hud)', fontSize: 8, letterSpacing: '.1em',
-            color: 'var(--text2)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
-          }}>CLEAR</button>
-        </div>
+        <button onClick={clearMsgs} style={{
+          fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.1em',
+          color: 'var(--text2)', background: 'none', border: 'none',
+          cursor: 'pointer', padding: '2px 6px', borderRadius: 4,
+          transition: 'color .15s',
+        }}
+          onMouseEnter={e => e.target.style.color = 'var(--red)'}
+          onMouseLeave={e => e.target.style.color = 'var(--text2)'}
+        >
+          CLEAR
+        </button>
       </div>
 
+      {/* Messages */}
       <div className="messages">
         {messages.length === 0 ? (
           <div className="chat-empty">
-            <div className="chat-empty-logo">J</div>
-            <div className="chat-empty-sub" style={{ letterSpacing: '.2em' }}>JARVIS ONLINE</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, opacity: .4, marginTop: 4 }}>
-              ENTER COMMAND ↵
-            </div>
+            <div className="empty-logo">J</div>
+            <div className="empty-tagline">JARVIS ONLINE</div>
+            <div className="empty-hint">ENTER COMMAND ↵</div>
           </div>
         ) : (
           messages.map(m => <Message key={m.id} msg={m} />)
@@ -193,22 +172,18 @@ export default function ChatPanel() {
         <div ref={bottomRef} />
       </div>
 
+      {/* Suggestions */}
       {messages.length === 0 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 12px 8px' }}>
+        <div className="suggestions">
           {SUGGESTIONS.map(s => (
-            <button key={s} onClick={() => sendCmd(s)}
-              style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 10px',
-                borderRadius: 20, background: 'rgba(0,212,255,.06)',
-                border: '1px solid rgba(0,212,255,.2)', color: 'var(--cyan)',
-                cursor: 'pointer', letterSpacing: '.05em'
-              }}>
+            <button key={s} className="suggestion-chip" onClick={() => sendCmd(s)}>
               {s}
             </button>
           ))}
         </div>
       )}
 
+      {/* Input */}
       <div className="input-area">
         <textarea
           ref={taRef}
@@ -216,7 +191,7 @@ export default function ChatPanel() {
           onChange={e => {
             setInput(e.target.value)
             e.target.style.height = 'auto'
-            e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'
+            e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'
           }}
           onKeyDown={onKey}
           placeholder={PLACEHOLDERS[plIdx]}
@@ -224,7 +199,13 @@ export default function ChatPanel() {
           className="chat-input"
           disabled={busy}
         />
-        <button onClick={send} disabled={busy || !input.trim()} className="send-btn">↵</button>
+        <button onClick={send} disabled={busy || !input.trim()} className="send-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            style={{ width: 16, height: 16 }}>
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
       </div>
     </>
   )
