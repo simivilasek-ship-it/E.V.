@@ -9,7 +9,7 @@ import asyncio
 import json
 import time
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -322,7 +322,7 @@ if HAS_FASTAPI:
             "ok": True,                      # jednoduché pole pro frontend
             "ws": "running",                 # WebSocket server běží
             "uptime_s": uptime,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "version": "4.3",
             "port": 8002,
             "checks": {
