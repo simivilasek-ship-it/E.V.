@@ -3,12 +3,18 @@ import { useJarvis } from '../store/jarvis'
 import SystemPanel from './SystemPanel'
 import AIOrb from './AIOrb'
 
+// Každý placeholder ukazuje reálný příkaz který JARVIS umí — funguje jako feature discovery
 const PLACEHOLDERS = [
-  'Zadej příkaz nebo otázku…',
-  'Otevři Spotify…',
-  'Počasí Praha…',
-  'Popiš obrazovku…',
-  'Hardware info…',
+  { text: 'Otevři Spotify…',             tag: 'ovládání PC' },
+  { text: 'Počasí Praha…',               tag: 'Open-Meteo' },
+  { text: 'Popiš obrazovku…',            tag: 'vision AI' },
+  { text: 'Zahraj Bohemian Rhapsody…',   tag: 'YouTube' },
+  { text: 'Jaké máš komponenty?',        tag: 'hardware' },
+  { text: 'Screenshot…',                 tag: 'systém' },
+  { text: 'Zavři Chrome…',               tag: 'procesy' },
+  { text: 'Přelož hello world…',         tag: 'AI překlad' },
+  { text: 'Vypočítej 15% z 2400…',       tag: 'kalkulačka' },
+  { text: 'Zapamatuj si…',               tag: 'paměť' },
 ]
 
 const SUGGESTIONS = [
@@ -306,22 +312,49 @@ export default function ChatPanel({ orbGlow, orbState }) {
           padding: '8px 16px 14px',
           flexShrink: 0,
         }}>
+          {/* Feature tag — ukazuje kategorii aktuálního placeholderu */}
+          {!input && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              marginBottom: 8, paddingLeft: 2,
+            }}>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 9,
+                color: 'var(--text3)', letterSpacing: '.04em',
+              }}>
+                JARVIS umí:
+              </span>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 9,
+                padding: '2px 8px', borderRadius: 10,
+                background: 'rgba(78,205,196,.08)',
+                border: '1px solid rgba(78,205,196,.2)',
+                color: '#4ecdc4',
+                letterSpacing: '.04em',
+                transition: 'all .3s',
+                key: plIdx,
+              }}>
+                {PLACEHOLDERS[plIdx].tag}
+              </span>
+            </div>
+          )}
+
           <div style={{
             display: 'flex', gap: 8, alignItems: 'flex-end',
-            background: 'rgba(6,12,26,.8)',
-            border: '1px solid rgba(0,200,255,.14)',
+            background: 'rgba(6,12,26,.85)',
+            border: '1px solid rgba(0,200,255,.16)',
             borderRadius: 14,
             padding: '6px 6px 6px 14px',
-            boxShadow: '0 4px 24px rgba(0,0,0,.3)',
+            boxShadow: '0 4px 24px rgba(0,0,0,.35)',
             transition: 'border-color .2s, box-shadow .2s',
           }}
             onFocusCapture={e => {
-              e.currentTarget.style.borderColor = 'rgba(0,200,255,.28)'
-              e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,.3), 0 0 0 3px rgba(0,200,255,.04)'
+              e.currentTarget.style.borderColor = 'rgba(78,205,196,.35)'
+              e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,.35), 0 0 0 3px rgba(78,205,196,.05)'
             }}
             onBlurCapture={e => {
-              e.currentTarget.style.borderColor = 'rgba(0,200,255,.14)'
-              e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,.3)'
+              e.currentTarget.style.borderColor = 'rgba(0,200,255,.16)'
+              e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,.35)'
             }}
           >
             <textarea
@@ -333,7 +366,7 @@ export default function ChatPanel({ orbGlow, orbState }) {
                 e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
               }}
               onKeyDown={onKey}
-              placeholder={PLACEHOLDERS[plIdx]}
+              placeholder={PLACEHOLDERS[plIdx].text}
               rows={1}
               style={{
                 flex: 1, background: 'transparent', border: 'none',
@@ -346,14 +379,14 @@ export default function ChatPanel({ orbGlow, orbState }) {
             <button onClick={send} disabled={busy || !input.trim()} style={{
               width: 38, height: 38, flexShrink: 0,
               background: input.trim() && !busy
-                ? 'linear-gradient(135deg, var(--cyan), #3b82f6)'
-                : 'rgba(255,255,255,.05)',
+                ? 'linear-gradient(135deg, #4ecdc4, #0066ff)'
+                : 'rgba(255,255,255,.04)',
               border: 'none', borderRadius: 10,
-              color: input.trim() && !busy ? '#000' : 'var(--text2)',
+              color: input.trim() && !busy ? '#fff' : 'var(--text2)',
               cursor: input.trim() && !busy ? 'pointer' : 'not-allowed',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all .2s',
-              boxShadow: input.trim() && !busy ? '0 0 16px rgba(0,200,255,.3)' : 'none',
+              boxShadow: input.trim() && !busy ? '0 0 18px rgba(78,205,196,.35)' : 'none',
             }}>
               {busy ? (
                 <div style={{ width: 14, height: 14, border: '2px solid var(--text2)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />
@@ -366,6 +399,7 @@ export default function ChatPanel({ orbGlow, orbState }) {
               )}
             </button>
           </div>
+
           <div style={{
             textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 9,
             color: 'var(--text3)', marginTop: 6, letterSpacing: '.05em',

@@ -105,37 +105,54 @@ body::after {
 }
 
 .sidebar-brand {
-  padding: 18px 20px 16px;
+  padding: 20px 18px 18px;
   border-bottom: 1px solid var(--border2);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   flex-shrink: 0;
 }
 
 .brand-icon {
-  width: 36px; height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(0,200,255,.15), rgba(99,102,241,.1));
-  border: 1px solid rgba(0,200,255,.3);
-  box-shadow: 0 0 20px rgba(0,200,255,.15), inset 0 1px 0 rgba(255,255,255,.06);
+  width: 44px; height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, rgba(78,205,196,.18), rgba(0,200,255,.12), rgba(99,102,241,.1));
+  border: 1px solid rgba(78,205,196,.4);
+  box-shadow: 0 0 20px rgba(78,205,196,.4), 0 0 40px rgba(0,200,255,.15),
+              inset 0 1px 0 rgba(255,255,255,.08);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
+  animation: logoPulse 3s ease-in-out infinite;
+}
+
+@keyframes logoPulse {
+  0%,100% { box-shadow: 0 0 20px rgba(78,205,196,.4), 0 0 40px rgba(0,200,255,.15), inset 0 1px 0 rgba(255,255,255,.08); }
+  50%     { box-shadow: 0 0 30px rgba(78,205,196,.6), 0 0 60px rgba(0,200,255,.25), inset 0 1px 0 rgba(255,255,255,.08); }
 }
 
 .brand-icon span {
   font-family: var(--font-hud);
-  font-size: 16px; font-weight: 900;
-  color: var(--cyan);
-  text-shadow: var(--glow-xs);
+  font-size: 20px; font-weight: 900;
+  color: #4ecdc4;
+  text-shadow: 0 0 12px rgba(78,205,196,.8), 0 0 24px rgba(78,205,196,.4);
 }
 
 .brand-name {
   font-family: var(--font-hud);
-  font-size: 14px; font-weight: 700;
-  letter-spacing: .3em;
+  font-size: 15px; font-weight: 700;
+  letter-spacing: .28em;
   color: var(--cyan);
-  text-shadow: var(--glow-xs);
+  text-shadow: 0 0 12px rgba(0,200,255,.5);
+  line-height: 1.2;
+}
+
+.brand-sub {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--text2);
+  letter-spacing: .02em;
+  margin-top: 2px;
+  opacity: .8;
 }
 
 .brand-ver {

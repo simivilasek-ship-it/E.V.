@@ -56,7 +56,7 @@ function Sidebar({ tab, setTab, paletteOpen, setPaletteOpen }) {
         <div className="brand-icon"><span>J</span></div>
         <div>
           <div className="brand-name">JARVIS</div>
-          <div className="brand-ver">v4.5</div>
+          <div className="brand-sub">Lokální AI asistent</div>
         </div>
       </div>
 
