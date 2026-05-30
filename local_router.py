@@ -568,10 +568,19 @@ class LocalRouter:
             r"|paris|arsenal|chelsea|manchester|real\s+madrid|barcelona"
             r"|liverpool|inter|juventus|milan|dortmund)\b", t, re.IGNORECASE)
         if sport_m:
-            return f"Vyhledávám: {text}", {
+            # Vyhledej přímo v chatu přes DuckDuckGo (ne otevírat prohlížeč)
+            try:
+                from plugins.custom.mcp_fetch.skill import _ddg_search
+                result = _ddg_search(text, max_chars=1200)
+                if result and len(result) > 50:
+                    return result, {"action": "answer", "params": {}}
+            except Exception:
+                pass
+            # Fallback: otevři prohlížeč
+            return f"Hledám na googlu: {text}.", {
                 "action": "search_web", "params": {"query": text}}
 
-        # Novinky, počasí dnes, kurzy, ceny akcií
+        # Novinky, kurzy, krypto
         news_m = re.search(
             r"\b(novinky|aktualni|trending|co\s+se\s+deje"
             r"|kurz\s+(eura|dolaru|btc|koruny)|cena\s+(akcie|bitcoinu|bitcoin|zlata|ropy|btc)"
@@ -579,7 +588,14 @@ class LocalRouter:
             r"|tabulka\s+(ligy|standings)|kam\s+postoupil|kdo\s+sestoupil"
             r"|bitcoin|ethereum|krypto)\b", t, re.IGNORECASE)
         if news_m:
-            return f"Vyhledávám: {text}", {
+            try:
+                from plugins.custom.mcp_fetch.skill import _ddg_search
+                result = _ddg_search(text, max_chars=1200)
+                if result and len(result) > 50:
+                    return result, {"action": "answer", "params": {}}
+            except Exception:
+                pass
+            return f"Hledám: {text}.", {
                 "action": "search_web", "params": {"query": text}}
 
         # ── HLEDÁNÍ ───────────────────────────────────

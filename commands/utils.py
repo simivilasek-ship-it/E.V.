@@ -399,3 +399,179 @@ def cmd_memory_maintenance(config: Dict[str, Any]) -> str:
         return f"Údržba dokončena: {result}"
     except Exception as e:
         return f"Chyba: {e}"
+
+
+# ══════════════════════════════════════════════════════
+#  SPORTS — ESPN API (bez API klíče)
+# ══════════════════════════════════════════════════════
+
+# Mapování sport/liga → ESPN endpoint path
+_SPORT_LEAGUES = {
+    # Fotbal
+    "premier league": "soccer/eng.1",
+    "pl":             "soccer/eng.1",
+    "champions league": "soccer/UEFA.CHAMPIONS",
+    "ucl":            "soccer/UEFA.CHAMPIONS",
+    "europa league":  "soccer/UEFA.EUROPA",
+    "la liga":        "soccer/esp.1",
+    "serie a":        "soccer/ita.1",
+    "bundesliga":     "soccer/ger.1",
+    "ligue 1":        "soccer/fra.1",
+    "česká liga":     "soccer/CZE.1",
+    "fortuna liga":   "soccer/CZE.1",
+    "mls":            "soccer/usa.1",
+    # Hokej
+    "nhl":            "hockey/nhl",
+    "hokej":          "hockey/nhl",
+    # Basketball
+    "nba":            "basketball/nba",
+    "basket":         "basketball/nba",
+    "basketball":     "basketball/nba",
+    # Americký fotbal
+    "nfl":            "football/nfl",
+    # Baseball
+    "mlb":            "baseball/mlb",
+}
+
+# Výchozí ligy pokud není specifikováno (nejpopulárnější)
+_DEFAULT_LEAGUES = [
+    ("⚽ Premier League",   "soccer/eng.1"),
+    ("⚽ Champions League", "soccer/UEFA.CHAMPIONS"),
+    ("⚽ La Liga",          "soccer/esp.1"),
+    ("🏒 NHL",             "hockey/nhl"),
+    ("🏀 NBA",             "basketball/nba"),
+]
+
+_STATUS_MAP = {
+    "Scheduled":  "🕐 Naplánováno",
+    "In Progress": "🔴 ŽIVĚ",
+    "Halftime":   "⏸ Poločas",
+    "Final":      "✅ Konec",
+    "Full Time":  "✅ Konec",
+    "Postponed":  "📅 Odloženo",
+    "Canceled":   "❌ Zrušeno",
+    "Suspended":  "⏸ Přerušeno",
+}
+
+
+def _fetch_espn_scores(league_path: str) -> list[dict]:
+    """Načte výsledky/zápasy z ESPN API pro danou ligu."""
+    import requests
+    url = f"https://site.api.espn.com/apis/site/v2/sports/{league_path}/scoreboard"
+    r = requests.get(url, timeout=7, headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+    events = r.json().get("events", [])
+    results = []
+    for ev in events:
+        comp   = ev.get("competitions", [{}])[0]
+        status = comp.get("status", {}).get("type", {}).get("description", "?")
+        detail = comp.get("status", {}).get("type", {}).get("detail", "")
+        clock  = comp.get("status", {}).get("displayClock", "")
+        period = comp.get("status", {}).get("period", 0)
+
+        teams = comp.get("competitors", [])
+        home = next((t for t in teams if t.get("homeAway") == "home"), teams[0] if teams else {})
+        away = next((t for t in teams if t.get("homeAway") == "away"), teams[1] if len(teams)>1 else {})
+
+        home_name  = home.get("team", {}).get("displayName", "?")
+        away_name  = away.get("team", {}).get("displayName", "?")
+        home_score = home.get("score", "")
+        away_score = away.get("score", "")
+
+        # Datum/čas zápasu
+        date_str = ev.get("date", "")
+        try:
+            from datetime import timezone
+            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            local_dt = dt.astimezone(timezone.utc)
+            time_label = local_dt.strftime("%d.%m %H:%M")
+        except Exception:
+            time_label = date_str[:10]
+
+        results.append({
+            "home": home_name, "away": away_name,
+            "home_score": home_score, "away_score": away_score,
+            "status": status, "detail": detail,
+            "clock": clock, "period": period,
+            "time": time_label,
+        })
+    return results
+
+
+def _format_match(m: dict) -> str:
+    status_label = _STATUS_MAP.get(m["status"], m["status"])
+    has_score = m["home_score"] != "" and m["away_score"] != ""
+
+    if has_score:
+        score = f"{m['home_score']} – {m['away_score']}"
+        if m["status"] == "In Progress":
+            clock = f" ({m['clock']})" if m["clock"] else ""
+            return f"{status_label}{clock}  {m['home']} {score} {m['away']}"
+        return f"{status_label}  {m['home']} {score} {m['away']}"
+    else:
+        return f"{status_label} {m['time']}  {m['home']} vs {m['away']}"
+
+
+def cmd_sports(query: str = "") -> str:
+    """Živé výsledky a zápasy přes ESPN API (bez API klíče).
+
+    query může být: "fotbal", "premier league", "nhl", "nba", "výsledky dnes" atd.
+    """
+    import requests
+    import re
+
+    q = query.lower().strip()
+
+    # Zjisti konkrétní ligu z dotazu
+    target_league = None
+    target_label  = None
+    for keyword, path in _SPORT_LEAGUES.items():
+        if keyword in q:
+            target_league = path
+            target_label  = keyword.title()
+            break
+
+    lines = []
+
+    if target_league:
+        # Konkrétní liga
+        try:
+            matches = _fetch_espn_scores(target_league)
+            if not matches:
+                return f"Žádné zápasy nenalezeny pro {target_label}."
+            lines.append(f"**{target_label}** — {len(matches)} zápasů\n")
+            for m in matches[:10]:
+                lines.append(f"  {_format_match(m)}")
+        except Exception as e:
+            return f"Chyba při načítání dat pro {target_label}: {e}"
+    else:
+        # Přehled — nejpopulárnější ligy
+        today = datetime.now().strftime("%d. %m. %Y")
+        lines.append(f"**Sportovní přehled — {today}**\n")
+
+        found_any = False
+        for label, path in _DEFAULT_LEAGUES:
+            try:
+                matches = _fetch_espn_scores(path)
+                live    = [m for m in matches if m["status"] == "In Progress"]
+                today_m = [m for m in matches if m["status"] in ("Scheduled", "In Progress", "Halftime")]
+                ended   = [m for m in matches if "Final" in m["status"] or "Full Time" in m["status"]]
+
+                if not matches:
+                    continue
+
+                found_any = True
+                lines.append(f"{label}:")
+
+                # Živé zápasy mají přednost
+                show = live or today_m or ended[:3]
+                for m in show[:4]:
+                    lines.append(f"  {_format_match(m)}")
+                lines.append("")
+            except Exception:
+                continue
+
+        if not found_any:
+            return "Nepodařilo se načíst sportovní data. Zkus konkrétní ligu: 'premier league výsledky'"
+
+    return "\n".join(lines).rstrip()
