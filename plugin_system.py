@@ -635,11 +635,13 @@ class PluginManager:
         results = []
         for plugin in self.plugins.values():
             info = {
-                "name":    plugin.name,
-                "status":  "ok",
-                "routes":  0,
-                "actions": 0,
-                "error":   None,
+                "name":        plugin.name,
+                "status":      "ok",
+                "routes":      0,
+                "actions":     0,
+                "error":       None,
+                "permissions": list(getattr(plugin._manifest, "permissions", [])
+                                    if hasattr(plugin, "_manifest") else []),
             }
             try:
                 routes  = plugin.get_routes()

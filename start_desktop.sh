@@ -23,5 +23,5 @@ if [ -d web ] && [ ! -f web_dist/index.html ]; then
     (cd web && npm install --legacy-peer-deps -s 2>/dev/null && npm run build -s)
 fi
 
-echo "Spouštím JARVIS Desktop..."
-exec python app_desktop.py "$@"
+echo "Spouštím JARVIS..."
+exec python jarvis.py "$@"

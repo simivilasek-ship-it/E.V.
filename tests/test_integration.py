@@ -197,7 +197,7 @@ class TestPluginSandbox:
         # bez permission → blokováno
         assert self._check(source, []) is not None
         # s permission os → povoleno
-        assert self._check(source, ["os"]) is None
+        assert self._check(source, ["system.info"]) is None  # system.info zahrnuje os
 
     def test_plugin_path_outside_root_rejected(self):
         from plugin_system import SkillLoader

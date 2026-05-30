@@ -348,62 +348,83 @@ class STTEngine:
 #  WHISPER STT — lokální, přesný, offline
 # ══════════════════════════════════════════════════════
 
-try:
-    from faster_whisper import WhisperModel as _WhisperModel
-    HAS_WHISPER = True
-except ImportError:
-    HAS_WHISPER = False
-
 class WhisperSTT:
-    """Lokální Whisper STT přes faster-whisper (CTranslate2).
+    """Offline STT přes OpenAI Whisper (přes faster-whisper nebo openai-whisper).
 
-    Přesnější než Vosk, podporuje češtinu bez speciálního modelu.
+    Výhody oproti Vosk: přesnější čeština, GPU akcelerace, lepší interpunkce.
+    Opt-in — bez instalace funguje VoskSTT jako fallback.
+
     Instalace: pip install faster-whisper
-    Modely:    tiny (75 MB) | base (145 MB) | small (466 MB) | medium (1.5 GB)
+    Model se stáhne automaticky (~150 MB pro 'small').
     """
 
-    MODELS = {
-        "tiny":   "tiny",
-        "base":   "base",
-        "small":  "small",
-        "medium": "medium",
-    }
-    DEFAULT_MODEL = "base"
-    DEFAULT_LANG  = "cs"
+    DEFAULT_MODEL = "small"  # tiny/base/small/medium/large
+    SUPPORTED_MODELS = {"tiny", "base", "small", "medium", "large", "large-v2", "large-v3"}
 
-    def __init__(self, model_size: str = None, language: str = None,
-                 device: str = "cpu", compute_type: str = "int8"):
-        self._model     = None
-        self._available = False
-        self._language  = language or self.DEFAULT_LANG
+    def __init__(self, model_size: str = None, device: str = "auto", language: str = "cs"):
+        self._model       = None
+        self._available   = False
+        self._language    = language
+        model_size = model_size or self.DEFAULT_MODEL
 
-        if not HAS_WHISPER:
-            logger.info("WhisperSTT: faster-whisper není nainstalován — pip install faster-whisper")
-            return
-        size = model_size or self.DEFAULT_MODEL
         try:
-            self._model = _WhisperModel(size, device=device, compute_type=compute_type)
+            from faster_whisper import WhisperModel
+            # device="auto" → GPU pokud dostupné, jinak CPU
+            compute = "float16" if device in ("cuda", "auto") else "int8"
+            self._model = WhisperModel(
+                model_size,
+                device=device,
+                compute_type=compute,
+                download_root=os.path.expanduser("~/.jarvis/whisper-models"),
+            )
             self._available = True
-            logger.info(f"WhisperSTT: model '{size}' načten ({device}/{compute_type})")
+            logger.info(f"WhisperSTT: model '{model_size}' načten ({device})")
+        except ImportError:
+            logger.info("WhisperSTT: faster-whisper není nainstalován (pip install faster-whisper)")
         except Exception as e:
-            logger.error(f"WhisperSTT: chyba načítání modelu '{size}': {e}")
+            logger.warning(f"WhisperSTT: init selhal: {e}")
 
     @property
     def available(self) -> bool:
         return self._available
 
     def transcribe_file(self, audio_path: str) -> str:
-        """Přepíše audio soubor (WAV/MP3/...) na text."""
+        """Přepíše audio soubor na text. Vrátí "" při chybě."""
         if not self._available:
             return ""
         try:
             segments, info = self._model.transcribe(
-                audio_path, language=self._language, beam_size=5)
-            text = " ".join(s.text.strip() for s in segments)
-            logger.info(f"WhisperSTT: '{text[:80]}' (lang={info.language}, p={info.language_probability:.2f})")
-            return text.strip()
+                audio_path,
+                language=self._language,
+                beam_size=5,
+                vad_filter=True,          # Voice Activity Detection
+                vad_parameters={"min_silence_duration_ms": 500},
+            )
+            text = " ".join(s.text.strip() for s in segments).strip()
+            logger.info(f"Whisper přepsal: {text[:80]}")
+            return text
         except Exception as e:
             logger.error(f"WhisperSTT.transcribe_file chyba: {e}")
+            return ""
+
+    def transcribe_bytes(self, audio_bytes: bytes, sample_rate: int = 16000) -> str:
+        """Přepíše raw PCM bytes na text."""
+        if not self._available:
+            return ""
+        import tempfile, wave
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                tmp = f.name
+            with wave.open(tmp, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)  # 16-bit
+                wf.setframerate(sample_rate)
+                wf.writeframes(audio_bytes)
+            result = self.transcribe_file(tmp)
+            os.unlink(tmp)
+            return result
+        except Exception as e:
+            logger.error(f"WhisperSTT.transcribe_bytes chyba: {e}")
             return ""
 
     def listen(self, timeout: float = 10.0, silence_after: float = 1.5) -> str:
@@ -411,7 +432,7 @@ class WhisperSTT:
         if not self._available:
             return ""
         try:
-            import pyaudio, wave, tempfile, os, time as _t
+            import pyaudio, wave, tempfile, time as _t
             RATE, CHUNK, CHANNELS = 16000, 1024, 1
             pa     = pyaudio.PyAudio()
             stream = pa.open(format=pyaudio.paInt16, channels=CHANNELS,
