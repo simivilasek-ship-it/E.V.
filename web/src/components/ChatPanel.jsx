@@ -1,18 +1,18 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useJarvis } from '../store/jarvis'
+import SystemPanel from './SystemPanel'
+import AIOrb from './AIOrb'
 
 const PLACEHOLDERS = [
   'Zadej příkaz nebo otázku…',
   'Otevři Spotify…',
   'Počasí Praha…',
   'Popiš obrazovku…',
-  'Zahraj něco…',
   'Hardware info…',
 ]
 
 const SUGGESTIONS = [
-  'kolik je hodin?', 'počasí Praha', 'info o systému',
-  'screenshot', 'hardware info',
+  'kolik je hodin?', 'počasí Praha', 'info o systému', 'screenshot', 'hardware info',
 ]
 
 function formatTime(ts) {
@@ -41,7 +41,7 @@ function renderContent(text) {
       const code = p.replace(/^```\w*\n?/, '').replace(/\n?```$/, '')
       return (
         <pre key={i}>
-          {lang && <span style={{ float: 'right', fontSize: 8, color: 'var(--text2)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{lang}</span>}
+          {lang && <span style={{ float: 'right', fontSize: 8, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>{lang}</span>}
           {code}
         </pre>
       )
@@ -59,31 +59,61 @@ function renderContent(text) {
 function Message({ msg }) {
   const isUser = msg.sender === 'user'
   const [copied, setCopied] = useState(false)
-
   const copy = () => {
     navigator.clipboard.writeText(msg.text || '')
     setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    setTimeout(() => setCopied(false), 1400)
+  }
+
+  if (isUser) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}
+        className="msg-group user">
+        <div style={{ maxWidth: 520 }}>
+          <div className="bubble u">{renderContent(msg.text)}</div>
+          <div style={{ textAlign: 'right', marginTop: 3, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text2)' }}>
+            {formatTime(msg.ts)}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className={`msg-group ${isUser ? 'user' : ''}`}>
-      <div className={`avatar ${isUser ? 'u' : 'j'}`}>
-        {isUser ? 'U' : 'J'}
-      </div>
-      <div className="msg-content">
-        <div className="msg-meta">
-          <span className="msg-meta-name">{isUser ? 'USER' : 'JARVIS'}</span>
+    <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'flex-start' }}
+      className="msg-group">
+      {/* Avatar */}
+      <div style={{
+        width: 32, height: 32, borderRadius: 10, flexShrink: 0, marginTop: 2,
+        background: 'linear-gradient(135deg, rgba(0,200,255,.15), rgba(99,102,241,.1))',
+        border: '1px solid rgba(0,200,255,.22)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontFamily: 'var(--font-hud)', fontSize: 11, fontWeight: 700,
+        color: 'var(--cyan)', boxShadow: '0 0 10px rgba(0,200,255,.1)',
+      }}>J</div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          marginBottom: 5, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text2)',
+        }}>
+          <span style={{ color: 'rgba(0,200,255,.6)', letterSpacing: '.08em' }}>JARVIS</span>
           <span>·</span>
           <span>{formatTime(msg.ts)}</span>
         </div>
-        <div className={`bubble ${isUser ? 'u' : 'j'}`}>
+
+        <div style={{ position: 'relative', lineHeight: 1.7, fontSize: 13.5, color: 'var(--text)' }}>
           {renderContent(msg.text)}
           {msg.streaming && !msg.text && <TypingDots />}
           {msg.streaming && msg.text && <span className="cursor-blink" />}
-          {!isUser && !msg.streaming && msg.text && (
-            <button className="copy-btn" onClick={copy}>
-              {copied ? '✓' : '⎘'}
+
+          {!msg.streaming && msg.text && (
+            <button className="copy-btn" onClick={copy} style={{
+              top: 0, right: 0,
+              background: copied ? 'rgba(34,211,165,.1)' : undefined,
+              color: copied ? 'var(--green)' : undefined,
+            }}>
+              {copied ? '✓ kopírováno' : '⎘'}
             </button>
           )}
         </div>
@@ -92,22 +122,19 @@ function Message({ msg }) {
   )
 }
 
-export default function ChatPanel() {
-  const [input, setInput]   = useState('')
+export default function ChatPanel({ orbGlow, orbState }) {
+  const [input, setInput]       = useState('')
+  const [showRight, setShowRight] = useState(false)
   const messages  = useJarvis(s => s.messages)
   const sendCmd   = useJarvis(s => s.sendCommand)
   const clearMsgs = useJarvis(s => s.clearMessages)
-  const orbState  = useJarvis(s => s.orbState)
   const bottomRef = useRef()
   const taRef     = useRef()
   const [hist, setHist]   = useState([])
   const [hidx, setHidx]   = useState(-1)
   const [plIdx, setPlIdx] = useState(0)
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
   useEffect(() => {
     const t = setInterval(() => setPlIdx(i => (i + 1) % PLACEHOLDERS.length), 3200)
     return () => clearInterval(t)
@@ -117,8 +144,7 @@ export default function ChatPanel() {
     const t = input.trim()
     if (!t || orbState === 'thinking') return
     setHist(h => [t, ...h.slice(0, 49)])
-    setHidx(-1)
-    setInput('')
+    setHidx(-1); setInput('')
     if (taRef.current) taRef.current.style.height = 'auto'
     sendCmd(t)
     taRef.current?.focus()
@@ -141,72 +167,195 @@ export default function ChatPanel() {
   const busy = orbState === 'thinking' || orbState === 'speaking'
 
   return (
-    <>
-      {/* Header */}
-      <div className="panel-header">
-        <span className="panel-title">COMMUNICATION</span>
-        <button onClick={clearMsgs} style={{
-          fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.1em',
-          color: 'var(--text2)', background: 'none', border: 'none',
-          cursor: 'pointer', padding: '2px 6px', borderRadius: 4,
-          transition: 'color .15s',
-        }}
-          onMouseEnter={e => e.target.style.color = 'var(--red)'}
-          onMouseLeave={e => e.target.style.color = 'var(--text2)'}
-        >
-          CLEAR
-        </button>
-      </div>
+    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden' }}>
 
-      {/* Messages */}
-      <div className="messages">
-        {messages.length === 0 ? (
-          <div className="chat-empty">
-            <div className="empty-logo">J</div>
-            <div className="empty-tagline">JARVIS ONLINE</div>
-            <div className="empty-hint">ENTER COMMAND ↵</div>
-          </div>
-        ) : (
-          messages.map(m => <Message key={m.id} msg={m} />)
-        )}
-        <div ref={bottomRef} />
-      </div>
+      {/* ── Main chat area ── */}
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', overflow: 'hidden',
+      }}>
 
-      {/* Suggestions */}
-      {messages.length === 0 && (
-        <div className="suggestions">
-          {SUGGESTIONS.map(s => (
-            <button key={s} className="suggestion-chip" onClick={() => sendCmd(s)}>
-              {s}
+        {/* Toolbar */}
+        <div style={{
+          width: '100%', maxWidth: 760,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 16px 6px',
+          borderBottom: '1px solid var(--border2)',
+          flexShrink: 0,
+        }}>
+          <span className="panel-title">CHAT</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => setShowRight(r => !r)} style={{
+              fontFamily: 'var(--font-mono)', fontSize: 9,
+              color: showRight ? 'var(--cyan)' : 'var(--text2)',
+              background: showRight ? 'rgba(0,200,255,.07)' : 'none',
+              border: `1px solid ${showRight ? 'rgba(0,200,255,.2)' : 'transparent'}`,
+              borderRadius: 5, cursor: 'pointer', padding: '2px 8px',
+              transition: 'all .18s',
+            }}>
+              METRIKY
             </button>
-          ))}
+            <button onClick={clearMsgs} style={{
+              fontFamily: 'var(--font-mono)', fontSize: 9,
+              color: 'var(--text2)', background: 'none', border: 'none',
+              cursor: 'pointer', padding: '2px 8px', borderRadius: 5,
+              transition: 'color .15s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}
+            >CLEAR</button>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div style={{
+          flex: 1, overflowY: 'auto', width: '100%',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+        }}>
+          <div style={{ width: '100%', maxWidth: 760, padding: '20px 16px 8px' }}>
+            {messages.length === 0 ? (
+              <div className="chat-empty" style={{ minHeight: 300 }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: 18,
+                  background: 'linear-gradient(135deg, rgba(0,200,255,.12), rgba(99,102,241,.08))',
+                  border: '1px solid rgba(0,200,255,.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'var(--font-hud)', fontSize: 24, fontWeight: 900,
+                  color: 'var(--cyan)', boxShadow: '0 0 30px rgba(0,200,255,.12)',
+                  animation: 'breathe 4s ease-in-out infinite',
+                }}>J</div>
+                <div style={{ fontFamily: 'var(--font-hud)', fontSize: 15, fontWeight: 600,
+                  color: 'rgba(0,200,255,.5)', letterSpacing: '.2em', marginTop: 8 }}>
+                  JARVIS
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10,
+                  color: 'var(--text2)', letterSpacing: '.1em', marginTop: 4 }}>
+                  Jak ti mohu pomoct?
+                </div>
+              </div>
+            ) : (
+              messages.map(m => <Message key={m.id} msg={m} />)
+            )}
+            <div ref={bottomRef} />
+          </div>
+        </div>
+
+        {/* Suggestions */}
+        {messages.length === 0 && (
+          <div style={{
+            width: '100%', maxWidth: 760,
+            display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 16px 10px',
+          }}>
+            {SUGGESTIONS.map(s => (
+              <button key={s} className="suggestion-chip" onClick={() => sendCmd(s)}>{s}</button>
+            ))}
+          </div>
+        )}
+
+        {/* Input */}
+        <div style={{
+          width: '100%', maxWidth: 760,
+          padding: '8px 16px 14px',
+          flexShrink: 0,
+        }}>
+          <div style={{
+            display: 'flex', gap: 8, alignItems: 'flex-end',
+            background: 'rgba(6,12,26,.8)',
+            border: '1px solid rgba(0,200,255,.14)',
+            borderRadius: 14,
+            padding: '6px 6px 6px 14px',
+            boxShadow: '0 4px 24px rgba(0,0,0,.3)',
+            transition: 'border-color .2s, box-shadow .2s',
+          }}
+            onFocusCapture={e => {
+              e.currentTarget.style.borderColor = 'rgba(0,200,255,.28)'
+              e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,.3), 0 0 0 3px rgba(0,200,255,.04)'
+            }}
+            onBlurCapture={e => {
+              e.currentTarget.style.borderColor = 'rgba(0,200,255,.14)'
+              e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,.3)'
+            }}
+          >
+            <textarea
+              ref={taRef}
+              value={input}
+              onChange={e => {
+                setInput(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
+              }}
+              onKeyDown={onKey}
+              placeholder={PLACEHOLDERS[plIdx]}
+              rows={1}
+              style={{
+                flex: 1, background: 'transparent', border: 'none',
+                color: 'var(--text)', fontSize: 14,
+                fontFamily: 'var(--font-ui)', resize: 'none', outline: 'none',
+                minHeight: 36, maxHeight: 160, lineHeight: 1.55, padding: '6px 0',
+              }}
+              disabled={busy}
+            />
+            <button onClick={send} disabled={busy || !input.trim()} style={{
+              width: 38, height: 38, flexShrink: 0,
+              background: input.trim() && !busy
+                ? 'linear-gradient(135deg, var(--cyan), #3b82f6)'
+                : 'rgba(255,255,255,.05)',
+              border: 'none', borderRadius: 10,
+              color: input.trim() && !busy ? '#000' : 'var(--text2)',
+              cursor: input.trim() && !busy ? 'pointer' : 'not-allowed',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all .2s',
+              boxShadow: input.trim() && !busy ? '0 0 16px rgba(0,200,255,.3)' : 'none',
+            }}>
+              {busy ? (
+                <div style={{ width: 14, height: 14, border: '2px solid var(--text2)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                  style={{ width: 15, height: 15 }}>
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              )}
+            </button>
+          </div>
+          <div style={{
+            textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 9,
+            color: 'var(--text3)', marginTop: 6, letterSpacing: '.05em',
+          }}>
+            ↵ odeslat · ⇧↵ nový řádek · ↑↓ historie
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right panel: orb + metrics (collapsible) ── */}
+      {showRight && (
+        <div style={{
+          width: 240, flexShrink: 0,
+          borderLeft: '1px solid var(--border2)',
+          display: 'flex', flexDirection: 'column', gap: 8,
+          padding: 10, overflowY: 'auto',
+        }}>
+          {/* Orb */}
+          <div className="panel orb-panel" style={{
+            boxShadow: `var(--card-shadow), 0 0 30px ${orbGlow || 'rgba(0,200,255,.1)'}`,
+            transition: 'box-shadow 1.2s ease',
+          }}>
+            <AIOrb size={180} />
+            <div style={{
+              fontFamily: 'var(--font-hud)', fontSize: 8, letterSpacing: '.18em',
+              marginTop: 10, transition: 'color .4s',
+              color: { idle: 'var(--text2)', listening: 'var(--cyan)', thinking: 'var(--purple)', speaking: 'var(--green)' }[orbState],
+            }}>
+              {{ idle: '○ IDLE', listening: '◉ LISTENING', thinking: '◎ PROCESSING', speaking: '● SPEAKING' }[orbState]}
+            </div>
+          </div>
+
+          {/* Metrics */}
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <SystemPanel compact />
+          </div>
         </div>
       )}
-
-      {/* Input */}
-      <div className="input-area">
-        <textarea
-          ref={taRef}
-          value={input}
-          onChange={e => {
-            setInput(e.target.value)
-            e.target.style.height = 'auto'
-            e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'
-          }}
-          onKeyDown={onKey}
-          placeholder={PLACEHOLDERS[plIdx]}
-          rows={1}
-          className="chat-input"
-          disabled={busy}
-        />
-        <button onClick={send} disabled={busy || !input.trim()} className="send-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-            style={{ width: 16, height: 16 }}>
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
-        </button>
-      </div>
-    </>
+    </div>
   )
 }

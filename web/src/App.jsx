@@ -166,39 +166,8 @@ export default function App() {
         {/* Pages */}
         <div className="page">
           {tab === 'CHAT' && (
-            <div className="chat-layout">
-              {/* Chat */}
-              <div className="panel chat-panel"><ChatPanel /></div>
-
-              {/* Orb */}
-              <div className="orb-col">
-                <div className="panel orb-panel" style={{
-                  boxShadow: `var(--card-shadow), 0 0 40px ${orbGlow}`,
-                  transition: 'box-shadow 1.2s ease',
-                }}>
-                  <AIOrb size={240} />
-                  <div className="orb-state-label" style={{
-                    color: { idle: 'var(--text2)', listening: 'var(--cyan)', thinking: 'var(--purple)', speaking: 'var(--green)' }[orbState],
-                    textShadow: orbState !== 'idle' ? '0 0 12px currentColor' : 'none',
-                  }}>
-                    {{ idle: '○ IDLE', listening: '◉ LISTENING', thinking: '◎ PROCESSING', speaking: '● SPEAKING' }[orbState]}
-                  </div>
-                </div>
-
-                {/* Shortcuts */}
-                <div className="panel shortcuts-panel">
-                  <div className="panel-title" style={{ marginBottom: 10 }}>SHORTCUTS</div>
-                  {[['↵ Enter', 'Send'], ['⇧ Enter', 'New line'], ['↑ ↓', 'History'], ['⌘K', 'Palette']].map(([k, v]) => (
-                    <div key={k} className="shortcut-row">
-                      <span className="shortcut-key">{k}</span>
-                      <span className="shortcut-desc">{v}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* System */}
-              <div className="sys-col"><SystemPanel /></div>
+            <div className="chat-page">
+              <ChatPanel orbGlow={orbGlow} orbState={orbState} />
             </div>
           )}
 
