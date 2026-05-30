@@ -255,29 +255,100 @@ export default function ChatPanel({ orbGlow, orbState }) {
           display: 'flex', flexDirection: 'column', alignItems: 'center',
         }}>
           {messages.length === 0 ? (
-            /* Empty state — vertically centered */
+            /* Empty state — pulsing orb */
             <div style={{
               flex: 1, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 10,
-              padding: 32, pointerEvents: 'none',
+              alignItems: 'center', justifyContent: 'center',
+              gap: 20, padding: 32, pointerEvents: 'none',
             }}>
-              <div style={{
-                width: 72, height: 72, borderRadius: 20,
-                background: 'linear-gradient(135deg, rgba(0,200,255,.1), rgba(99,102,241,.07))',
-                border: '1px solid rgba(0,200,255,.18)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'var(--font-hud)', fontSize: 26, fontWeight: 900,
-                color: 'var(--cyan)', boxShadow: '0 0 40px rgba(0,200,255,.1)',
-                animation: 'breathe 4s ease-in-out infinite',
-              }}>J</div>
-              <div style={{
-                fontFamily: 'var(--font-hud)', fontSize: 16, fontWeight: 700,
-                color: 'rgba(0,200,255,.45)', letterSpacing: '.25em',
-              }}>JARVIS</div>
-              <div style={{
-                fontFamily: 'var(--font-ui)', fontSize: 13,
-                color: 'var(--text2)', marginTop: 2,
-              }}>Jak ti mohu pomoct?</div>
+              <style>{`
+                /* Vrstva 1 — vnitřní glow kolem ikony */
+                @keyframes orbInner {
+                  0%,100% { box-shadow:
+                    0 0 18px rgba(78,205,196,.55),
+                    0 0 36px rgba(78,205,196,.25),
+                    inset 0 0 20px rgba(78,205,196,.12); }
+                  50%     { box-shadow:
+                    0 0 28px rgba(78,205,196,.8),
+                    0 0 56px rgba(78,205,196,.4),
+                    inset 0 0 30px rgba(78,205,196,.22); }
+                }
+
+                /* Vrstva 2 — střední pulse ring */
+                @keyframes orbRing {
+                  0%,100% { transform: scale(1);   opacity: .45; }
+                  50%     { transform: scale(1.12); opacity: .18; }
+                }
+
+                /* Vrstva 3 — vnější odlesk */
+                @keyframes orbOuter {
+                  0%,100% { transform: scale(1);   opacity: .15; }
+                  50%     { transform: scale(1.28); opacity: 0; }
+                }
+
+                /* Logo pomalu dýchá */
+                @keyframes orbLogo {
+                  0%,100% { transform: scale(1);    filter: brightness(1); }
+                  50%     { transform: scale(1.04); filter: brightness(1.15); }
+                }
+              `}</style>
+
+              {/* Wrapper — pozicování vrstev */}
+              <div style={{ position: 'relative', width: 140, height: 140,
+                display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+
+                {/* Vrstva 3 — vnější odlesk (největší, nejjemnější) */}
+                <div style={{
+                  position: 'absolute',
+                  width: 140, height: 140, borderRadius: '50%',
+                  border: '1px solid rgba(78,205,196,.35)',
+                  animation: 'orbOuter 4s ease-in-out infinite',
+                }} />
+
+                {/* Vrstva 2 — střední pulse ring */}
+                <div style={{
+                  position: 'absolute',
+                  width: 108, height: 108, borderRadius: '50%',
+                  border: '1.5px solid rgba(78,205,196,.5)',
+                  background: 'radial-gradient(circle, rgba(78,205,196,.04) 0%, transparent 70%)',
+                  animation: 'orbRing 4s ease-in-out infinite',
+                  animationDelay: '.4s',
+                }} />
+
+                {/* Vrstva 1 — ikona s vnitřním glow */}
+                <div style={{
+                  width: 76, height: 76, borderRadius: '50%',
+                  background: 'radial-gradient(circle at 35% 35%, rgba(78,205,196,.22), rgba(0,200,255,.08) 60%, rgba(99,102,241,.06))',
+                  border: '1.5px solid rgba(78,205,196,.45)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  animation: 'orbInner 4s ease-in-out infinite, orbLogo 4s ease-in-out infinite',
+                  animationDelay: '0s, .8s',
+                  position: 'relative', zIndex: 1,
+                }}>
+                  <span style={{
+                    fontFamily: 'var(--font-hud)',
+                    fontSize: 28, fontWeight: 900,
+                    color: '#4ecdc4',
+                    textShadow: '0 0 16px rgba(78,205,196,.9), 0 0 32px rgba(78,205,196,.4)',
+                    letterSpacing: '.05em',
+                    lineHeight: 1,
+                  }}>J</span>
+                </div>
+              </div>
+
+              {/* Texty pod orbem */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                <div style={{
+                  fontFamily: 'var(--font-hud)', fontSize: 15, fontWeight: 700,
+                  letterSpacing: '.3em',
+                  background: 'linear-gradient(135deg, #4ecdc4, #00c8ff)',
+                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                }}>JARVIS</div>
+                <div style={{
+                  fontFamily: 'var(--font-ui)', fontSize: 13,
+                  color: 'var(--text2)',
+                }}>Jak ti mohu pomoct?</div>
+              </div>
             </div>
           ) : (
             /* Messages — push to bottom when few */
