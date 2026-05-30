@@ -558,6 +558,30 @@ class LocalRouter:
                     "action": "open_url",
                     "params": {"url": url if url.startswith("http") else "https://"+url}}
 
+        # ── SPORT & AKTUÁLNÍ ZPRÁVY → automatický web search ────
+        # Zápasy, výsledky, novinky — JARVIS nemá realtime data, vyhledá za uživatele
+        sport_m = re.search(
+            r"\b(vs\.?|versus|proti|zapas|zápas|vysledek|výsledek|skore|skóre"
+            r"|goal|gol|liga|champions|premier|bundesliga|serie\s*a|laliga"
+            r"|nba|nhl|nfl|mlb|f1|formula|mma|ufc|wta|atp|tenis|golf"
+            r"|ko\s+\d|\d+:\d+|final[ae]?|semifinal[ae]?"
+            r"|paris|arsenal|chelsea|manchester|real\s+madrid|barcelona"
+            r"|liverpool|inter|juventus|milan|dortmund)\b", t, re.IGNORECASE)
+        if sport_m:
+            return f"Vyhledávám: {text}", {
+                "action": "search_web", "params": {"query": text}}
+
+        # Novinky, počasí dnes, kurzy, ceny akcií
+        news_m = re.search(
+            r"\b(novinky|aktualni|trending|co\s+se\s+deje"
+            r"|kurz\s+(eura|dolaru|btc|koruny)|cena\s+(akcie|bitcoinu|bitcoin|zlata|ropy|btc)"
+            r"|kdo\s+vyhral|kdo\s+postoupil|vysledky\s+dnes|zapasy\s+dnes|dnesni\s+zapasy"
+            r"|tabulka\s+(ligy|standings)|kam\s+postoupil|kdo\s+sestoupil"
+            r"|bitcoin|ethereum|krypto)\b", t, re.IGNORECASE)
+        if news_m:
+            return f"Vyhledávám: {text}", {
+                "action": "search_web", "params": {"query": text}}
+
         # ── HLEDÁNÍ ───────────────────────────────────
         if re.search(r"\b(hledej|vyhledej|najdi\s+na\s+googlu|search)\b", t):
             query = re.sub(r"\b(hledej|vyhledej|najdi\s+na\s+googlu|search)\b\s*",
