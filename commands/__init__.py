@@ -28,7 +28,8 @@ from .utils  import (cmd_calculate, cmd_translate, cmd_note_add, cmd_note_list,
                      cmd_reminder_set, cmd_weather, cmd_wiki_search,
                      cmd_currency_convert, cmd_write_email,
                      cmd_memory_recall, cmd_memory_store,
-                     cmd_memory_stats, cmd_memory_maintenance)
+                     cmd_memory_stats, cmd_memory_maintenance,
+                     cmd_sports)
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +221,9 @@ class CommandExecutor:
     def _cmd_screen_describe(self, **_):           return cmd_screen_describe()
     def _cmd_screen_ocr(self, **_):                return cmd_screen_ocr()
     def _cmd_webcam_describe(self, **_):           return cmd_webcam_describe()
+
+    # ── sports ───────────────────────────────────────
+    def _cmd_sports(self, query="", **_):            return cmd_sports(query)
 
     # ── undo ─────────────────────────────────────────
     def _cmd_undo(self, **_):                        return self.undo()

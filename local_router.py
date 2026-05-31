@@ -95,6 +95,11 @@ _FUZZY_COMMANDS = [
     ("rekni komponenty", "hardware_info",   lambda: {}),
     ("jaky mas hardware","hardware_info",   lambda: {}),
     ("moje pc komponenty","hardware_info",  lambda: {}),
+    ("fotbalove vysledky","sports",         lambda: {"query": "fotbal"}),
+    ("sportovni vysledky","sports",         lambda: {"query": ""}),
+    ("kdo hraje dnes",   "sports",         lambda: {"query": "fotbal"}),
+    ("premier league",   "sports",         lambda: {"query": "premier league"}),
+    ("champions league", "sports",         lambda: {"query": "champions league"}),
     ("kolik mam mista",  "disk_space",      lambda: {"path": "/"}),
     ("kolik je mista",   "disk_space",      lambda: {"path": "/"}),
     ("misto na disku",   "disk_space",      lambda: {"path": "/"}),
@@ -516,6 +521,19 @@ class LocalRouter:
                 return f"Přehrávám: {query}.", {
                     "action": "youtube_play",
                     "params": {"query": query, "index": 1, "audio_only": audio_only}}
+
+        # ── SPORT ─────────────────────────────────────
+        if re.search(
+            r"\b(sport|fotbal|hokej|nhl|nba|nfl|mlb|basket"
+            r"|premier\s*league|champions\s*league|liga\s*mistr"
+            r"|la\s*liga|serie\s*a|bundesliga|ligue\s*1|fortuna\s*liga"
+            r"|zapas|zapasy|vysledky|skore|live\s*score"
+            r"|hraje\s+dnes|kdo\s+hraje|co\s+se\s+hraje|novinky\s+sport)\b", t):
+            # Vezmi celý dotaz jako query — ESPN API si s tím poradí
+            query = re.sub(
+                r"\b(rekni|rici|zjisti|ukazmi|jak\s+to\s+dopadlo|co\s+je|jake\s+jsou)\b",
+                "", text, flags=re.IGNORECASE).strip()
+            return "Načítám sportovní výsledky...", {"action": "sports", "params": {"query": query}}
 
         # ── POČASÍ ────────────────────────────────────
         if re.search(r"\b(pocasi|weather|bude\s+prset|teplota\s+v)\b", t):
