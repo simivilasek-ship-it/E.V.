@@ -764,11 +764,16 @@ Pravidla pro skill.py:
     @app.websocket("/ws/graph")
     async def ws_graph(ws: WebSocket):
         """Streaming stavu Graf agenta — posílá JSON eventi."""
+        import json as _json
         await ws.accept()
         _graph_clients.add(ws)
         try:
+            # Pošli iniciální stav ihned — komponenta zobrazí graf
+            await ws.send_text(_json.dumps({"type": "ready", "status": "idle"}))
             while True:
-                await asyncio.sleep(30)  # keep-alive
+                await asyncio.sleep(20)
+                # Keep-alive ping
+                await ws.send_text(_json.dumps({"type": "ping"}))
         except WebSocketDisconnect:
             _graph_clients.discard(ws)
         except Exception:

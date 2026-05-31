@@ -140,7 +140,10 @@ export default function AgentGraph({ active: tabActive }) {
     function connect() {
       if (dead) return
       try {
-        ws = new WebSocket('ws://localhost:8002/ws/graph')
+        const wsUrl = import.meta.env.PROD
+          ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/graph`
+          : `ws://${location.hostname}:${location.port || 3000}/ws/graph`
+        ws = new WebSocket(wsUrl)
         wsRef.current = ws
 
         ws.onopen = () => setStatus('online')
@@ -148,6 +151,7 @@ export default function AgentGraph({ active: tabActive }) {
         ws.onmessage = (e) => {
           try {
             const event = JSON.parse(e.data)
+            if (event.type === 'ready')      setStatus('online')
             if (event.type === 'node_enter') setActiveNode(event.node)
             if (event.type === 'node_exit')  setActiveNode(null)
             if (event.type === 'reasoning')  setLog(l => [...l.slice(-9), event.text])
