@@ -162,7 +162,105 @@ body::after {
   letter-spacing: .05em;
 }
 
-/* Status row */
+/* ── Status compact block ─────────────────────────── */
+.sidebar-statusblock {
+  padding: 6px 12px 8px;
+  border-bottom: 1px solid var(--border2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.statusblock-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  cursor: default;
+  width: 100%;
+  transition: background .15s;
+}
+
+button.statusblock-row { cursor: pointer; }
+button.statusblock-row:hover { background: rgba(255,255,255,.03); }
+
+.statusblock-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all .4s;
+}
+
+.statusblock-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .05em;
+  transition: all .4s;
+}
+
+.statusblock-model {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  padding: 1px 6px;
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── New Chat button ──────────────────────────────── */
+.new-chat-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(78,205,196,.07);
+  border: 1px solid rgba(78,205,196,.2);
+  border-radius: 9px;
+  color: #4ecdc4;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .18s;
+  letter-spacing: .01em;
+}
+
+.new-chat-btn:hover {
+  background: rgba(78,205,196,.13);
+  border-color: rgba(78,205,196,.35);
+  box-shadow: 0 0 14px rgba(78,205,196,.12);
+}
+
+.new-chat-btn svg { flex-shrink: 0; }
+
+/* ── Nav group ────────────────────────────────────── */
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 4px;
+}
+
+.nav-group-label {
+  font-family: var(--font-hud);
+  font-size: 8px;
+  letter-spacing: .18em;
+  color: var(--text3);
+  padding: 8px 14px 4px;
+  text-transform: uppercase;
+}
+
+/* Status row — legacy alias */
 .sidebar-status {
   padding: 10px 16px;
   display: flex;
@@ -257,11 +355,20 @@ body::after {
 
 .nav-icon {
   width: 15px; height: 15px;
-  opacity: .6;
+  opacity: .55;
   flex-shrink: 0;
   transition: opacity .18s;
+  display: flex; align-items: center; justify-content: center;
 }
+.nav-icon svg { width: 15px; height: 15px; }
 .nav-item:hover .nav-icon, .nav-item.active .nav-icon { opacity: 1; }
+
+.nav-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Sidebar footer */
 .sidebar-footer {
