@@ -14,15 +14,14 @@
 
 | Změna | Detail |
 |---|---|
-| **Hero Panel** | Prázdný chat = dashboard: pozdrav, hodiny, CPU/RAM/model, 8 quick akcí, agenti |
+| **Settings Panel** | Nový tab Nastavení (Alt+9) — LLM model, TTS hlas/rychlost, STT jazyk/citlivost, MCP toggles |
+| **Hero Panel** | Prázdný chat = dashboard: pozdrav, hodiny, CPU/RAM/model, 8 quick akcí, agent status |
 | **Alt+Space Spotlight** | Inline widgets — počasí, sport, systém, hodiny, kalkulačka bez otevření chatu |
 | **ContextOrchestrator v2** | JARVIS vidí okna přes ewmh (python-xlib) — bez xdotool/wmctrl |
-| **MCP +6 serverů** | GitHub, Google Maps, Slack, YouTube Transcript, SQLite, Everything |
-| **Grid opacity fix** | Mřížka v pozadí snížena na opacity 0.015 — méně dominantní |
-| **System prompt fix** | Model ví že vidí okna/clipboard, nepíše "nemám přístup" |
-| **LLM cache** | LRU cache TTL 10 min — opakované dotazy okamžitě |
-| **Paralelní agenti** | `run_parallel()` — kroky ve 2 vlnách přes ThreadPoolExecutor |
-| **519 testů** | 0 failed, TypeScript build OK |
+| **MCP +6 serverů** | GitHub, Google Maps, Slack, YouTube Transcript, SQLite, Everything (celkem 15 serverů) |
+| **Grid opacity 0.015** | Mřížka v pozadí méně dominantní, lepší čitelnost |
+| **System prompt fix** | Model explicitně ví že vidí okna/clipboard — neopakuje "nemám přístup" |
+| **API rozšíření** | `/api/settings`, `/api/tts/voices`, `/api/mcp/status`, `/api/mcp/toggle`, `/api/profile` |
 
 ---
 
