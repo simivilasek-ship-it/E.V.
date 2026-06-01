@@ -9,9 +9,9 @@ const REGISTRY: { name: string; desc: string; author: string }[] = [
 type Plugin = { name?: string; version?: string } | string
 
 export default function PluginStore() {
-  const plugins      = useJarvis((s: Record<string, unknown>) => s.plugins) as Plugin[]
-  const fetchPlugins = useJarvis((s: Record<string, unknown>) => s.fetchPlugins) as () => void
-  const sendCommand  = useJarvis((s: Record<string, unknown>) => s.sendCommand) as (cmd: string) => void
+  const plugins      = useJarvis(s => s.plugins) as Plugin[]
+  const fetchPlugins = useJarvis(s => s.fetchPlugins) as () => void
+  const sendCommand  = useJarvis(s => s.sendCommand) as (cmd: string) => void
   const [msg, setMsg] = useState<string>('')
   const ghInputRef    = useRef<HTMLInputElement>(null)
 

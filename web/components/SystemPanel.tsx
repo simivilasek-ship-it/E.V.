@@ -228,13 +228,14 @@ function logColor(text: string) {
   return 'var(--text2)'
 }
 
-export default function SystemPanel() {
-  const system   = useJarvis((s: Record<string, unknown>) => s.system) as SystemData
-  const agents   = useJarvis((s: Record<string, unknown>) => s.agents) as Array<Record<string, unknown>>
-  const logs     = useJarvis((s: Record<string, unknown>) => s.logs) as Array<{ text?: string }>
-  const isConn   = useJarvis((s: Record<string, unknown>) => s.isConnected) as boolean
-  const fetchAge = useJarvis((s: Record<string, unknown>) => s.fetchAgents) as () => void
-  const clearLogs= useJarvis((s: Record<string, unknown>) => s.clearLogs) as () => void
+interface SystemPanelProps { fullMode?: boolean; compact?: boolean }
+export default function SystemPanel(_props: SystemPanelProps = {}) {
+  const system   = useJarvis(s => s.system) as SystemData
+  const agents   = useJarvis(s => s.agents) as unknown as Array<Record<string, unknown>>
+  const logs     = useJarvis(s => s.logs) as Array<{ text?: string }>
+  const isConn   = useJarvis(s => s.isConnected) as boolean
+  const fetchAge = useJarvis(s => s.fetchAgents) as () => void
+  const clearLogs= useJarvis(s => s.clearLogs) as () => void
 
   const [cpuHist,  setCpuHist]  = useState<number[]>([])
   const [ramHist,  setRamHist]  = useState<number[]>([])

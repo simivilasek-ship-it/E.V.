@@ -62,9 +62,9 @@ interface AuditEntry {
 }
 
 export default function DashboardPanel() {
-  const system  = useJarvis((s: Record<string, unknown>) => s.system) as SystemData
-  const logs    = useJarvis((s: Record<string, unknown>) => s.logs) as LogEntry[]
-  const agents  = useJarvis((s: Record<string, unknown>) => s.agents) as AgentEntry[]
+  const system  = useJarvis(s => s.system) as SystemData
+  const logs    = useJarvis(s => s.logs) as LogEntry[]
+  const agents  = useJarvis(s => s.agents) as unknown as AgentEntry[]
 
   const [audit,     setAudit]     = useState<AuditEntry[]>([])
   const [scheduler, setScheduler] = useState<SchedulerEntry[]>([])

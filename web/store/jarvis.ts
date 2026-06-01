@@ -62,6 +62,9 @@ interface JarvisState {
   setPlugins:     (data: unknown[]) => void
   setModel:       (model: string) => void
   checkBackend:   () => Promise<boolean>
+  fetchSystem:    () => Promise<void>
+  fetchAgents:    () => Promise<void>
+  fetchPlugins:   () => Promise<void>
   _scheduleReconnect: () => void
 }
 
@@ -228,16 +231,26 @@ export const useJarvis = create<JarvisState>((set, get) => ({
       chatWs.send(JSON.stringify({ command: text, text }))
       return
     }
-    get().addToast('WebSocket nedostupný — REST fallback', 'warning')
+
+    // REST fallback — WebSocket nedostupný
     try {
-      const r = await fetch(`${getApiBase()}/api/command`, {
+      const r = await fetch(`${getApiBase()}/api/chat`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: text }),
+        body: JSON.stringify({ text }),
       })
+      if (!r.ok) throw new Error(`Backend ${r.status}: ${r.statusText}`)
+      const ct = r.headers.get('content-type') ?? ''
+      if (!ct.includes('application/json')) {
+        throw new Error('Backend nevrátil JSON — zkontroluj zda backend běží na :8002')
+      }
       const d = await r.json()
       get().updateLastMessage({ text: d.response || 'OK', streaming: false })
     } catch (e: unknown) {
-      get().updateLastMessage({ text: `Chyba: ${(e as Error).message}`, streaming: false, error: true })
+      const msg = (e as Error).message
+      get().updateLastMessage({
+        text: `Backend nedostupný. Spusť: \`python jarvis.py\`\n\n_${msg}_`,
+        streaming: false, error: true,
+      })
     } finally {
       set(s => {
         const msgs = [...s.messages]
@@ -268,4 +281,19 @@ export const useJarvis = create<JarvisState>((set, get) => ({
   setAgents(data) { set({ agents: data }) },
   setPlugins(data){ set({ plugins: data }) },
   setModel(model) { set({ currentModel: model }) },
+  async fetchSystem() {
+    try { get().setSystem(await fetch(`${getApiBase()}/api/system`).then(r => r.json())) } catch {}
+  },
+  async fetchAgents() {
+    try {
+      const d = await fetch(`${getApiBase()}/api/agents`).then(r => r.json())
+      get().setAgents(d)
+    } catch {}
+  },
+  async fetchPlugins() {
+    try {
+      const d = await fetch(`${getApiBase()}/api/plugins`).then(r => r.json())
+      get().setPlugins(d.plugins || [])
+    } catch {}
+  },
 }))
