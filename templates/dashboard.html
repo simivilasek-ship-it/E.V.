@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Courier New', monospace; background: #070b12;
+         color: #e2f0ff; }
+  .nav { background: #0b1220; border-bottom: 1px solid #1a3050;
+         padding: 12px 24px; display: flex; gap: 20px; align-items: center; }
+  .nav h1 { color: #00d4ff; font-size: 16px; letter-spacing: 4px; margin-right: 20px; }
+  .nav a { color: #7ea8d4; text-decoration: none; font-size: 12px;
+           padding: 4px 10px; border-radius: 4px; border: 1px solid #1a3050; }
+  .nav a:hover, .nav a.active { color: #00d4ff; border-color: #00d4ff; }
+  .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 16px; margin-bottom: 20px; }
+  .card { background: #0b1220; border: 1px solid #1a3050; border-radius: 8px;
+          padding: 16px; }
+  .card h3 { color: #7ea8d4; font-size: 10px; letter-spacing: 2px;
+             margin-bottom: 10px; }
+  .metric { font-size: 28px; color: #00d4ff; font-weight: bold; }
+  .metric-sub { font-size: 11px; color: #475569; margin-top: 4px; }
+  .bar { height: 4px; background: #1a3050; border-radius: 2px; margin-top: 8px; }
+  .bar-fill { height: 100%; border-radius: 2px; background: #00d4ff;
+              transition: width 0.5s; }
+  .bar-fill.warn { background: #fbbf24; }
+  .bar-fill.danger { background: #ef4444; }
+  .log-box { background: #050a15; border: 1px solid #1a3050; border-radius: 6px;
+             padding: 12px; height: 300px; overflow-y: auto; font-size: 11px;
+             line-height: 1.6; }
+  .log-line { padding: 2px 0; border-bottom: 1px solid #0b1220; }
+  .log-line.error { color: #ef4444; }
+  .log-line.warn { color: #fbbf24; }
+  .log-line.ok { color: #10b981; }
+  .log-line.info { color: #7ea8d4; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { color: #475569; font-size: 10px; letter-spacing: 1px; text-align: left;
+       padding: 6px 8px; border-bottom: 1px solid #1a3050; }
+  td { padding: 6px 8px; border-bottom: 1px solid #0b1220; color: #e2f0ff; }
+  tr:hover td { background: #0b1220; }
+  .badge { display: inline-block; padding: 2px 6px; border-radius: 3px;
+           font-size: 10px; }
+  .badge.green { background: #064e3b; color: #10b981; }
+  .badge.red { background: #7f1d1d; color: #ef4444; }
+  .badge.blue { background: #1e3a8a; color: #60a5fa; }
+  .status-dot { display: inline-block; width: 8px; height: 8px;
+                border-radius: 50%; margin-right: 6px; }
+  .dot-green { background: #10b981; }
+  .dot-red { background: #ef4444; }
+  #refresh-time { color: #475569; font-size: 10px; margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="nav">
+  <h1>J A R V I S</h1>
+  <a href="#overview" class="active">Přehled</a>
+  <a href="#logs">Logy</a>
+  <a href="#audit">Audit</a>
+  <a href="#scheduler">Scheduler</a>
+  <a href="#agents">Agenti</a>
+  <span id="refresh-time">Obnovuje se...</span>
+</div>
+
+<div class="container">
+
+  <!-- Přehled -->
+  <div id="overview">
+    <div class="grid" id="metrics-grid">
+      <div class="card">
+        <h3>CPU</h3>
+        <div class="metric" id="cpu-val">—</div>
+        <div class="bar"><div class="bar-fill" id="cpu-bar" style="width:0%"></div></div>
+      </div>
+      <div class="card">
+        <h3>RAM</h3>
+        <div class="metric" id="ram-val">—</div>
+        <div class="bar"><div class="bar-fill" id="ram-bar" style="width:0%"></div></div>
+      </div>
+      <div class="card">
+        <h3>DISK</h3>
+        <div class="metric" id="disk-val">—</div>
+        <div class="bar"><div class="bar-fill" id="disk-bar" style="width:0%"></div></div>
+      </div>
+      <div class="card">
+        <h3>OLLAMA</h3>
+        <div class="metric" id="ollama-status" style="font-size:14px">—</div>
+        <div class="metric-sub" id="ollama-model">—</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h3>AGENTI</h3>
+      <table id="agents-table">
+        <thead><tr><th>Agent</th><th>Status</th><th>Interval</th></tr></thead>
+        <tbody><tr><td colspan="3" style="color:#475569">Načítám...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Scheduler -->
+  <div class="card" id="scheduler" style="margin-bottom:16px">
+    <h3>NAPLÁNOVANÉ ÚLOHY</h3>
+    <table id="tasks-table">
+      <thead><tr><th>ID</th><th>Název</th><th>Spuštění</th><th>Opakování</th><th>Počet</th></tr></thead>
+      <tbody><tr><td colspan="5" style="color:#475569">Žádné naplánované úlohy</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Audit log -->
+  <div class="card" id="audit" style="margin-bottom:16px">
+    <h3>AUDIT LOG (posledních 20)</h3>
+    <table id="audit-table">
+      <thead><tr><th>Čas</th><th>Akce</th><th>Povoleno</th><th>Důvod</th></tr></thead>
+      <tbody><tr><td colspan="4" style="color:#475569">Načítám...</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Logy -->
+  <div class="card" id="logs">
+    <h3>SYSTEM LOGY</h3>
+    <div class="log-box" id="log-box">Připojuji se...</div>
+  </div>
+
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function barClass(pct) {
+  return pct > 90 ? 'danger' : pct > 75 ? 'warn' : '';
+}
+
+async function refresh() {
+  try {
+    // Metriky systému
+    const sys = await fetch('/api/system').then(r => r.json());
+    $('cpu-val').textContent = sys.cpu + '%';
+    $('ram-val').textContent = sys.ram + '%';
+    $('disk-val').textContent = sys.disk + '%';
+    ['cpu','ram','disk'].forEach(k => {
+      const bar = $(k+'-bar');
+      bar.style.width = sys[k] + '%';
+      bar.className = 'bar-fill ' + barClass(sys[k]);
+    });
+
+    // Ollama
+    const status = await fetch('/api/status').then(r => r.json());
+    $('ollama-status').innerHTML =
+      `<span class="status-dot ${status.ollama ? 'dot-green':'dot-red'}"></span>` +
+      (status.ollama ? 'Online' : 'Offline');
+    $('ollama-model').textContent = status.model || '—';
+
+    // Agenti
+    const agents = await fetch('/api/agents').then(r => r.json());
+    const atbody = $('agents-table').querySelector('tbody');
+    atbody.innerHTML = Object.entries(agents).map(([n,a]) =>
+      `<tr><td>${n}</td>
+       <td><span class="badge ${a.running?'green':'red'}">${a.running?'běží':'zastaven'}</span></td>
+       <td>${a.interval}s</td></tr>`
+    ).join('') || '<tr><td colspan="3" style="color:#475569">Žádní agenti</td></tr>';
+
+    // Scheduler
+    const tasks = await fetch('/api/scheduler').then(r => r.json());
+    const ttbody = $('tasks-table').querySelector('tbody');
+    ttbody.innerHTML = tasks.length ?
+      tasks.map(t =>
+        `<tr><td style="color:#475569">${t.id}</td><td>${t.name}</td>
+         <td>${t.fire_at}</td>
+         <td>${t.repeat ? t.repeat+'s' : '—'}</td>
+         <td>${t.run_count}</td></tr>`
+      ).join('') :
+      '<tr><td colspan="5" style="color:#475569">Žádné naplánované úlohy</td></tr>';
+
+    // Audit
+    const audit = await fetch('/api/audit').then(r => r.json());
+    const aubody = $('audit-table').querySelector('tbody');
+    aubody.innerHTML = audit.map(e => {
+      const t = new Date(e.timestamp*1000).toLocaleTimeString();
+      return `<tr>
+        <td style="color:#475569">${t}</td>
+        <td>${e.action}</td>
+        <td><span class="badge ${e.allowed?'green':'red'}">${e.allowed?'ANO':'NE'}</span></td>
+        <td style="color:#475569">${e.reason}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="4" style="color:#475569">Prázdný log</td></tr>';
+
+    $('refresh-time').textContent = 'Obnoveno: ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+// WebSocket pro logy
+const ws = new WebSocket(`ws://${location.host}/ws/logs`);
+ws.onmessage = e => {
+  const box = $('log-box');
+  const line = document.createElement('div');
+  const data = JSON.parse(e.data);
+  line.className = 'log-line ' + (data.level||'info').toLowerCase();
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${data.message}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+  if (box.children.length > 200) box.removeChild(box.firstChild);
+};
+ws.onerror = () => {
+  $('log-box').innerHTML = '<div class="log-line warn">WebSocket nedostupný</div>';
+};
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

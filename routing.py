@@ -90,20 +90,36 @@ class CommandRouter:
         # 3. Grafový agent
         from agent_graph import should_handle as _graph_should
         if getattr(app, "graph_agent", None) and _graph_should(text):
+            import time as _t, uuid as _uuid
             app._gui(lambda: app.gui.set_status("Plánovač přemýšlí…"))
+            steps: list = []
+            t0 = _t.time()
             answer = app.graph_agent.run(
                 text,
-                on_step=lambda s: app._gui(lambda m=s: app.gui.set_status(m)))
+                on_step=lambda s: (
+                    steps.append({"type": "plan", "text": s, "ts": _t.time()}),
+                    app._gui(lambda m=s: app.gui.set_status(m)),
+                ))
+            self._save_run(str(_uuid.uuid4())[:8], text, steps, answer,
+                           "done", round(_t.time() - t0, 2))
             app._execute_result(answer, {"action": "answer", "params": {}})
             return True
 
         # 4. ReAct agent
         from agent_react import should_handle as _react_should
         if getattr(app, "react_agent", None) and _react_should(text):
+            import time as _t, uuid as _uuid
             app._gui(lambda: app.gui.set_status("Agent přemýšlí…"))
+            steps: list = []
+            t0 = _t.time()
             answer = app.react_agent.run(
                 text,
-                on_step=lambda s: app._gui(lambda m=s: app.gui.set_status(m)))
+                on_step=lambda s: (
+                    steps.append({"type": "react", "text": s, "ts": _t.time()}),
+                    app._gui(lambda m=s: app.gui.set_status(m)),
+                ))
+            self._save_run(str(_uuid.uuid4())[:8], text, steps, answer,
+                           "done", round(_t.time() - t0, 2))
             app._execute_result(answer, {"action": "answer", "params": {}})
             return True
 
@@ -149,6 +165,26 @@ class CommandRouter:
         if full_text:
             app._execute_result(full_text, {"action": "answer", "params": {}},
                                 speak=False)
+
+    def _save_run(self, run_id: str, task: str, steps: list,
+                  result: str, status: str, duration: float) -> None:
+        """Uloží agentský run do SQLite přes dashboard API (fire-and-forget)."""
+        try:
+            import threading, json, urllib.request
+            data = json.dumps({
+                "id": run_id, "task": task, "steps": steps,
+                "result": result[:500], "status": status, "duration": duration,
+            }).encode()
+            req = urllib.request.Request(
+                "http://127.0.0.1:8002/api/agent/timeline",
+                data=data, method="POST",
+                headers={"Content-Type": "application/json"},
+            )
+            threading.Thread(
+                target=lambda: urllib.request.urlopen(req, timeout=2),
+                daemon=True).start()
+        except Exception:
+            pass
 
     def _plugin_routes(self, text: str) -> Optional[Tuple[str, dict]]:
         app = self._app

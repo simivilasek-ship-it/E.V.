@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import sys
 import webbrowser
-from pathlib import Path
 
 BACKEND_URL = "http://127.0.0.1:8002"
 

@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&family=Inter:wght@300;400;500&display=swap');
+
+:root {
+  --bg:         #040910;
+  --bg-card:    rgba(8,16,32,.75);
+  --bg-card2:   rgba(6,12,26,.9);
+  --cyan:       #00c8ff;
+  --teal:       #4ecdc4;
+  --green:      #22d3a5;
+  --amber:      #f59e0b;
+  --red:        #f43f5e;
+  --purple:     #a855f7;
+  --text:       #dbeafe;
+  --muted:      #4d7090;
+  --border:     rgba(0,200,255,.1);
+  --border2:    rgba(0,200,255,.06);
+  --card-shadow: 0 8px 32px rgba(0,0,0,.4), 0 1px 0 rgba(255,255,255,.03) inset;
+}
+
+[data-theme="light"] {
+  --bg:        #f0f4f8;
+  --bg-card:   rgba(255,255,255,.88);
+  --bg-card2:  rgba(248,250,252,.96);
+  --cyan:      #0284c7;
+  --teal:      #0d9488;
+  --text:      #0f172a;
+  --muted:     #64748b;
+  --border:    rgba(0,0,0,.08);
+  --border2:   rgba(0,0,0,.04);
+  --card-shadow: 0 2px 16px rgba(0,0,0,.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); }
+body { color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 13px; line-height: 1.5; }
+
+::-webkit-scrollbar       { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,200,255,.2); border-radius: 2px; }
+
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 20%, rgba(0,80,160,.18) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 85% 80%, rgba(80,0,160,.12) 0%, transparent 60%);
+}
+
+body::after {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(0,200,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,200,255,.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: gridDrift 24s linear infinite;
+  mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 40%, transparent 100%);
+}
+
+.card {
+  background: var(--bg-card);
+  backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--card-shadow);
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 10%, rgba(0,200,255,.15) 50%, transparent 90%);
+}
+
+.font-hud  { font-family: 'Orbitron', sans-serif !important; }
+.font-mono { font-family: 'Share Tech Mono', 'Courier New', monospace !important; }
+
+@keyframes gridDrift  { 0%{background-position:0 0} 100%{background-position:48px 48px} }
+@keyframes logoPulse {
+  0%,100%{box-shadow:0 0 20px rgba(78,205,196,.4),0 0 40px rgba(0,200,255,.15),inset 0 1px 0 rgba(255,255,255,.08)}
+  50%    {box-shadow:0 0 30px rgba(78,205,196,.6),0 0 60px rgba(0,200,255,.25),inset 0 1px 0 rgba(255,255,255,.08)}
+}
+@keyframes orbInner {
+  0%,100%{box-shadow:0 0 18px rgba(78,205,196,.55),0 0 36px rgba(78,205,196,.25),inset 0 0 20px rgba(78,205,196,.12)}
+  50%    {box-shadow:0 0 28px rgba(78,205,196,.8), 0 0 56px rgba(78,205,196,.4), inset 0 0 30px rgba(78,205,196,.22)}
+}
+@keyframes orbRing  {0%,100%{transform:scale(1);opacity:.45}   50%{transform:scale(1.12);opacity:.18}}
+@keyframes orbOuter {0%,100%{transform:scale(1);opacity:.15}   50%{transform:scale(1.28);opacity:0}}
+@keyframes orbLogo  {0%,100%{transform:scale(1);filter:brightness(1)} 50%{transform:scale(1.04);filter:brightness(1.15)}}
+@keyframes breathe  {0%,100%{transform:scale(1)} 50%{transform:scale(1.025)}}
+@keyframes bounceDot{0%,60%,100%{transform:translateY(0);opacity:.35} 30%{transform:translateY(-5px);opacity:1}}
+@keyframes blinkCur {0%,100%{opacity:1} 50%{opacity:0}}
+@keyframes pulseDot {0%,100%{opacity:.5} 50%{opacity:1}}
+@keyframes slideUp  {from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)}}
+@keyframes msgIn    {from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)}}
+@keyframes spinAnim {to{transform:rotate(360deg)}}
+
+.anim-logo-pulse{animation:logoPulse 3s ease-in-out infinite}
+.anim-orb-inner {animation:orbInner  4s ease-in-out infinite}
+.anim-orb-ring  {animation:orbRing   4s ease-in-out infinite .4s}
+.anim-orb-outer {animation:orbOuter  4s ease-in-out infinite}
+.anim-orb-logo  {animation:orbLogo   4s ease-in-out infinite .8s}
+.anim-breathe   {animation:breathe   4s ease-in-out infinite}
+.anim-bounce    {animation:bounceDot 1.3s ease-in-out infinite}
+.anim-blink     {animation:blinkCur  .7s step-end infinite}
+.anim-pulse     {animation:pulseDot  1s ease-in-out infinite}
+.anim-slide-up  {animation:slideUp   .25s ease-out}
+.anim-msg-in    {animation:msgIn     .25s ease-out}
+.anim-spin      {animation:spinAnim  .8s linear infinite}
+
+.prose-j pre {
+  margin:8px 0;padding:12px 14px;
+  background:rgba(0,0,0,.5);border:1px solid rgba(0,200,255,.12);border-left:2px solid var(--cyan);
+  border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:11px;color:#7dd3fc;
+  overflow-x:auto;white-space:pre;
+}
+.prose-j code {
+  background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.15);
+  padding:1px 5px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:11px;color:#7dd3fc;
+}

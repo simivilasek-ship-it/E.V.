@@ -4,7 +4,6 @@ Integrates plugin system, async operations, and robust error handling."""
 import logging
 import signal
 import threading
-import re
 import sys
 from typing import Optional, Tuple
 

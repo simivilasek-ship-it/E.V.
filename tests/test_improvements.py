@@ -148,7 +148,8 @@ class TestFuzzyMatching:
         if not _HAS_FUZZY:
             pytest.skip("rapidfuzz není nainstalován")
         from rapidfuzz import fuzz
-        from llm import _FUZZY_COMMANDS, _norm
+        from llm import _FUZZY_COMMANDS
+        from commands.utils import normalize_text as _norm
         # "ahoj jak se mas" nesmí matchnout na "kolik je hodin"
         score = fuzz.partial_ratio(_norm("ahoj jak se mas"), "kolik je hodin")
         assert score < _FUZZY_THRESHOLD

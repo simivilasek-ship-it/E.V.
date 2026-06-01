@@ -33,7 +33,8 @@ export const useJarvis = create((set, get) => ({
   _attempt:  0,
   _retryId:  null,
   _metricsWs: null,
-  _chatWs:   null,   // persistent chat WebSocket
+  _chatWs:      null,   // persistent chat WebSocket
+  _chatRetryId: null,   // cancel handle pro reconnect timeout
 
   // ── Health check před WebSocket ──────────────────────
 
@@ -224,10 +225,13 @@ export const useJarvis = create((set, get) => ({
 
   // ── Příkazy ──────────────────────────────────────────
 
-  // Otevře persistent chat WebSocket (voláme jednou při startu)
+  // Otevře persistent chat WebSocket s exponential backoff a bez memory leaku
   connectChat() {
-    const existing = get()._chatWs
-    if (existing && existing.readyState <= WebSocket.OPEN) return
+    const { _chatWs, _chatRetryId } = get()
+    // Zruš čekající retry pokud existuje
+    if (_chatRetryId) { clearTimeout(_chatRetryId); set({ _chatRetryId: null }) }
+    if (_chatWs && _chatWs.readyState <= WebSocket.OPEN) return
+
     const ws = new WebSocket(`${WS_URL}/ws/chat`)
     ws.onmessage = (e) => {
       try {
@@ -255,9 +259,12 @@ export const useJarvis = create((set, get) => ({
       } catch {}
     }
     ws.onclose = () => {
-      set({ _chatWs: null })
-      // Reconnect po 2s pokud nebyla záměrně zavřena
-      setTimeout(() => get().connectChat(), 2000)
+      // Uklid a naplánuj reconnect (cancel-safe — přemazání _chatRetryId)
+      const id = setTimeout(() => {
+        set({ _chatRetryId: null })
+        get().connectChat()
+      }, 3000)
+      set({ _chatWs: null, _chatRetryId: id })
     }
     set({ _chatWs: ws })
   },

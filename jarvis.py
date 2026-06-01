@@ -6,6 +6,23 @@ Výchozí: spustí backend + otevře prohlížeč na http://localhost:8002/app
 from config import __version__
 
 
+def _check_setup() -> None:
+    """Zkontroluje závislosti a upozorní na chybějící."""
+    import shutil
+    missing = []
+    if not shutil.which("ollama"):
+        missing.append("ollama (https://ollama.com)")
+    if not shutil.which("ffmpeg"):
+        missing.append("ffmpeg (sudo apt install ffmpeg)")
+    if not shutil.which("node"):
+        missing.append("Node.js 18+ (pro MCP servery)")
+    if missing:
+        print("\n⚠️  Chybí závislosti:")
+        for m in missing:
+            print(f"   • {m}")
+        print("   Spusť: ./install.sh\n")
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(

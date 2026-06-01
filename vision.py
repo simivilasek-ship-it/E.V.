@@ -2,7 +2,6 @@
 vision.py — VisionEngine: OCR + LLaVA screen describe + webcam
 """
 
-import base64
 import logging
 import os
 import subprocess

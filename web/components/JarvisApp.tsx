@@ -1,0 +1,175 @@
+'use client'
+import { useEffect, useState, useCallback } from 'react'
+import { useJarvis } from '@/store/jarvis'
+import Sidebar, { type Tab } from './Sidebar'
+import ChatPanel from './ChatPanel'
+import ToastContainer from './Toast'
+import ErrorBoundary from './ErrorBoundary'
+import dynamic from 'next/dynamic'
+
+// Lazy load heavy panels
+const SystemPanel  = dynamic(() => import('./SystemPanel'),  { ssr: false })
+const DashboardPanel = dynamic(() => import('./DashboardPanel'), { ssr: false })
+const PluginStore  = dynamic(() => import('./PluginStore'),  { ssr: false })
+const AgentGraph   = dynamic(() => import('./AgentGraph'),   { ssr: false })
+const AgentTimeline = dynamic(() => import('./AgentTimeline'), { ssr: false })
+const MemoryGraph  = dynamic(() => import('./MemoryGraph'),  { ssr: false })
+const SkillGenerator = dynamic(() => import('./SkillGenerator'), { ssr: false })
+
+const NAV_KEYS: Record<string, Tab> = {
+  '1': 'CHAT', '2': 'SYSTEM', '3': 'PLUGINS', '4': 'SKILL',
+  '5': 'AGENT', '6': 'TIMELINE', '7': 'MEMORY', '8': 'DASHBOARD',
+}
+
+function useTheme() {
+  const [theme, setTheme] = useState<string>('dark')
+  useEffect(() => {
+    const saved = localStorage.getItem('jarvis-theme') ?? 'dark'
+    setTheme(saved)
+    document.documentElement.setAttribute('data-theme', saved)
+  }, [])
+  const toggle = useCallback(() => {
+    setTheme(t => {
+      const next = t === 'dark' ? 'light' : 'dark'
+      document.documentElement.setAttribute('data-theme', next)
+      localStorage.setItem('jarvis-theme', next)
+      return next
+    })
+  }, [])
+  return [theme, toggle] as const
+}
+
+export default function JarvisApp() {
+  const connect        = useJarvis(s => s.connect)
+  const connectMetrics = useJarvis(s => s.connectMetrics)
+  const connectChat    = useJarvis(s => s.connectChat)
+  const connError      = useJarvis(s => s.connError)
+  const clearMessages  = useJarvis(s => s.clearMessages)
+  const retry          = useJarvis(s => s.retry)
+  const [tab, setTab]  = useState<Tab>('CHAT')
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [theme, toggleTheme] = useTheme()
+
+  useEffect(() => { connect(); connectMetrics(); connectChat() }, [connect, connectMetrics, connectChat])
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setPaletteOpen(p => !p) }
+      if (e.key === 'Escape') setPaletteOpen(false)
+      if (e.altKey && !e.ctrlKey && NAV_KEYS[e.key]) { e.preventDefault(); setTab(NAV_KEYS[e.key]) }
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [])
+
+  const PageWrapper = ({ children }: { children: React.ReactNode }) => (
+    <div className="flex-1 overflow-y-auto flex flex-col items-center p-3 gap-3">
+      <div className="w-full max-w-[860px] flex flex-col gap-3">{children}</div>
+    </div>
+  )
+
+  return (
+    <ErrorBoundary>
+      <div className="flex h-screen overflow-hidden relative z-10">
+        <Sidebar
+          tab={tab} setTab={setTab}
+          setPaletteOpen={setPaletteOpen}
+          clearMessages={clearMessages}
+          theme={theme} toggleTheme={toggleTheme}
+        />
+
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Error banner */}
+          {connError && (
+            <div className="flex items-center gap-3 px-5 py-2 shrink-0 font-mono text-[11px]"
+              style={{ background: 'rgba(244,63,94,.05)', borderBottom: '1px solid rgba(244,63,94,.15)' }}>
+              <span style={{ color: 'var(--red)', fontSize: 13 }}>⚠</span>
+              <span className="flex-1" style={{ color: 'rgba(244,63,94,.85)' }}>{connError}</span>
+              <button onClick={retry}
+                className="px-3 py-1 rounded font-hud text-[9px] tracking-widest cursor-pointer"
+                style={{ background: 'rgba(244,63,94,.1)', color: 'var(--red)', border: '1px solid rgba(244,63,94,.25)' }}>
+                RETRY
+              </button>
+            </div>
+          )}
+
+          {/* Pages */}
+          <div className="flex-1 overflow-hidden flex">
+            {tab === 'CHAT' && (
+              <ErrorBoundary><ChatPanel /></ErrorBoundary>
+            )}
+            {tab === 'SYSTEM' && (
+              <div className="flex flex-col overflow-hidden p-3 gap-3 w-full max-w-md">
+                <ErrorBoundary><SystemPanel fullMode /></ErrorBoundary>
+              </div>
+            )}
+            {tab === 'PLUGINS' && (
+              <PageWrapper>
+                <div className="card p-5"><ErrorBoundary><PluginStore /></ErrorBoundary></div>
+              </PageWrapper>
+            )}
+            {tab === 'AGENT' && (
+              <PageWrapper>
+                <div className="card p-0 overflow-hidden">
+                  <ErrorBoundary><AgentGraph active={tab === 'AGENT'} /></ErrorBoundary>
+                </div>
+              </PageWrapper>
+            )}
+            {tab === 'TIMELINE' && (
+              <PageWrapper><ErrorBoundary><AgentTimeline /></ErrorBoundary></PageWrapper>
+            )}
+            {tab === 'MEMORY' && (
+              <PageWrapper><ErrorBoundary><MemoryGraph /></ErrorBoundary></PageWrapper>
+            )}
+            {tab === 'SKILL' && (
+              <PageWrapper><ErrorBoundary><SkillGenerator /></ErrorBoundary></PageWrapper>
+            )}
+            {tab === 'DASHBOARD' && (
+              <div className="flex-1 overflow-y-auto p-3">
+                <div className="max-w-[1100px] mx-auto">
+                  <ErrorBoundary><DashboardPanel /></ErrorBoundary>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <ToastContainer />
+        {paletteOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center pt-28"
+            style={{ background: 'rgba(2,6,14,.75)', backdropFilter: 'blur(8px)' }}
+            onClick={() => setPaletteOpen(false)}>
+            <div className="w-[540px] rounded-[14px] overflow-hidden anim-slide-up"
+              style={{
+                background: 'rgba(6,12,26,.96)',
+                border: '1px solid rgba(0,200,255,.2)',
+                boxShadow: '0 24px 64px rgba(0,0,0,.6)',
+              }}
+              onClick={e => e.stopPropagation()}>
+              <div className="px-5 py-3 font-hud text-[9px] tracking-widest"
+                style={{ color: 'var(--muted)', borderBottom: '1px solid var(--border2)' }}>
+                COMMAND PALETTE — Alt+1..8 pro navigaci
+              </div>
+              <div className="p-2">
+                {Object.entries(NAV_KEYS).map(([key, id]) => (
+                  <button key={id}
+                    onClick={() => { setTab(id); setPaletteOpen(false) }}
+                    className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm transition-all text-left"
+                    style={{ color: 'var(--text)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,200,255,.07)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                    <span className="font-mono text-[9px] px-1.5 py-px rounded"
+                      style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)', color: 'var(--muted)' }}>
+                      Alt+{key}
+                    </span>
+                    {id}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </ErrorBoundary>
+  )
+}

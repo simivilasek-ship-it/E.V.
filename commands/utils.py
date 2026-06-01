@@ -273,7 +273,7 @@ def cmd_weather(city: str = "") -> str:
         geo = requests.get(
             "https://geocoding-api.open-meteo.com/v1/search",
             params={"name": target, "count": 1, "language": "cs", "format": "json"},
-            timeout=6,
+            timeout=3,
         ).json()
         results = geo.get("results")
         if not results:
@@ -294,7 +294,7 @@ def cmd_weather(city: str = "") -> str:
                 "timezone":  "auto",
                 "wind_speed_unit": "kmh",
             },
-            timeout=6,
+            timeout=3,
         ).json()
         cur   = weather.get("current", {})
         code  = cur.get("weather_code", 0)
@@ -314,17 +314,17 @@ def cmd_weather(city: str = "") -> str:
         return result
 
     except Exception as e:
-        # Fallback na wttr.in
+        # Rychlý fallback na wttr.in (3s timeout)
         try:
             r = requests.get(
-                f"https://wttr.in/{quote(city)}?format=3",
-                timeout=8, headers={"User-Agent": "curl/7.0"})
+                f"https://wttr.in/{quote(target or 'Prague')}?format=3",
+                timeout=3, headers={"User-Agent": "curl/7.0"})
             text = r.text.strip()
-            if "render failed" not in text.lower():
+            if text and "render failed" not in text.lower() and len(text) < 200:
                 return text
         except Exception:
             pass
-        return f"Počasí nedostupné: {e}"
+        return f"⚠️ Počasí dočasně nedostupné (zkus znovu za chvíli)"
 
 
 def cmd_wiki_search(query: str) -> str:
@@ -505,7 +505,13 @@ def _format_match(m: dict) -> str:
     if has_score:
         score = f"{m['home_score']} – {m['away_score']}"
         if m["status"] == "In Progress":
-            clock = f" ({m['clock']})" if m["clock"] else ""
+            # clock může být prázdné — fallback na periodu/poločas
+            if m["clock"]:
+                clock = f" ({m['clock']})"
+            elif m.get("period"):
+                clock = f" (p.{m['period']})"
+            else:
+                clock = " (nyní)"
             return f"{status_label}{clock}  {m['home']} {score} {m['away']}"
         return f"{status_label}  {m['home']} {score} {m['away']}"
     else:
@@ -517,8 +523,6 @@ def cmd_sports(query: str = "") -> str:
 
     query může být: "fotbal", "premier league", "nhl", "nba", "výsledky dnes" atd.
     """
-    import requests
-    import re
 
     q = query.lower().strip()
 

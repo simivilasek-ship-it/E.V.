@@ -15,7 +15,6 @@ import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
-from enum import Enum
 
 logger = logging.getLogger(__name__)
 

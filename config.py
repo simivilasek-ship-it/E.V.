@@ -7,7 +7,7 @@ __version__ = "4.5.0"
 
 import os
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 try:
     from dotenv import load_dotenv

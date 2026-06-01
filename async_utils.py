@@ -11,7 +11,7 @@ import queue
 import time
 import functools
 from typing import (Any, Callable, Coroutine, Dict, List, Optional,
-                    TypeVar, Generic, Union, Awaitable)
+                    TypeVar, Generic)
 from concurrent.futures import ThreadPoolExecutor, Future
 from enum import Enum
 from dataclasses import dataclass, field

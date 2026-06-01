@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dev mode — backend na 8002, Vite dev server na 3000 (s HMR).
+# Dev mode — backend na 8002, Next.js dev server na 3000 (s HMR).
 # Použití: bash scripts/dev.sh
 set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -16,14 +16,14 @@ uvicorn.run(app, host='127.0.0.1', port=8002, reload=True, log_level='info')
 " &
 BACKEND_PID=$!
 
-echo "==> Spouštím Vite dev server (port 3000)..."
+echo "==> Spouštím Next.js dev server (port 3000)..."
 cd "$ROOT/web"
 npm run dev &
-VITE_PID=$!
+NEXT_PID=$!
 
 echo ""
 echo "  Backend  → http://localhost:8002"
-echo "  Frontend → http://localhost:3000  (HMR aktivní)"
+echo "  Frontend → http://localhost:3000  (Next.js + HMR)"
 echo ""
 echo "  Ctrl+C pro zastavení obou serverů."
 

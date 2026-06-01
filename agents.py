@@ -7,9 +7,7 @@ from __future__ import annotations
 import threading
 import time
 import logging
-import subprocess
 from typing import Optional, Dict, Any, List
-from dataclasses import dataclass
 
 import psutil
 

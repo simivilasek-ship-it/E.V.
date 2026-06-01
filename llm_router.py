@@ -9,7 +9,7 @@ import logging
 import re
 import time
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 import requests

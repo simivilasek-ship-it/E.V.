@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-import requests
 import threading
 from dataclasses import dataclass, field
 from enum import Enum

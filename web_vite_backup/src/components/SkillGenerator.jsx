@@ -118,18 +118,30 @@ export default function SkillGenerator() {
 
       {result && (
         <div style={S.card}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
-            <div style={{ color:'#10b981', fontSize:12 }}>✓ Vygenerováno: <strong>{result.name}</strong></div>
-            <button onClick={save} disabled={saved} style={{
-              marginLeft:'auto', background: saved ? '#064e3b' : '#10b981',
-              border:'none', borderRadius:6, color:'#000', padding:'5px 14px',
-              fontSize:11, fontWeight:600, cursor: saved ? 'default' : 'pointer',
-            }}>
-              {saved ? '✓ Uloženo do plugins/' : '💾 Uložit plugin'}
-            </button>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12, flexWrap:'wrap' }}>
+            <div style={{ color: result.warning ? '#f59e0b' : '#10b981', fontSize:12 }}>
+              {result.warning ? `⚠ ${result.warning}` : `✓ Vygenerováno: `}
+              <strong>{result.name}</strong>
+            </div>
+            <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+              {saved && (
+                <a href={`${API}/api/skill/download/${result.name}`} download
+                  style={{ background:'#1a3050', border:'none', borderRadius:6,
+                    color:'#00d4ff', padding:'5px 12px', fontSize:11,
+                    fontWeight:600, cursor:'pointer', textDecoration:'none' }}>
+                  📥 ZIP
+                </a>
+              )}
+              <button onClick={save} disabled={saved} style={{
+                background: saved ? '#064e3b' : '#10b981',
+                border:'none', borderRadius:6, color:'#000', padding:'5px 14px',
+                fontSize:11, fontWeight:600, cursor: saved ? 'default' : 'pointer',
+              }}>
+                {saved ? '✓ Uloženo' : '💾 Uložit plugin'}
+              </button>
+            </div>
           </div>
 
-          {/* Popis */}
           {result.description && (
             <div style={{ fontSize:12, color:'#7ea8d4', marginBottom:10 }}>{result.description}</div>
           )}

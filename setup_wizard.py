@@ -8,7 +8,6 @@ import json
 import os
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 CONFIG_PATH = Path(__file__).parent / "config.json"

@@ -15,10 +15,8 @@ Napojení:
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
-import requests
 import threading
 from typing import Callable,  TYPE_CHECKING, List, Optional
 

@@ -173,7 +173,6 @@ class MCPBridge:
         Používá dedikované vlákno s vlastní event loop — vyhne se
         TaskGroup konfliktu při opakovaném volání asyncio.run().
         """
-        import concurrent.futures
         result_container = [None]
         exc_container = [None]
 

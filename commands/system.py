@@ -241,7 +241,6 @@ def cmd_disk_space(path: str = "/") -> str:
 
 def cmd_list_directory(path: str = "~", max_items: int = 30) -> str:
     """Vypíše obsah složky s velikostmi a informacemi."""
-    import os
     from pathlib import Path
 
     try:
@@ -307,7 +306,6 @@ def cmd_list_directory(path: str = "~", max_items: int = 30) -> str:
 
 def cmd_file_info(path: str = "") -> str:
     """Detailní informace o souboru nebo složce."""
-    import os
     from pathlib import Path
     from datetime import datetime
 

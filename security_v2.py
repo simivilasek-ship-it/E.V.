@@ -261,7 +261,6 @@ class SecurityManager:
 
 
 # Typový hint
-from typing import Tuple
 
 # ── Potvrzovací dialog ────────────────────────────────
 

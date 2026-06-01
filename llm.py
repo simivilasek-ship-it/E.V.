@@ -5,17 +5,14 @@ Lokální router je v local_router.py.
 OllamaClient — sdílený HTTP klient pro agenty (agent_graph, agent_react).
 """
 
-import os
 import re
 import json
 import requests
 import logging
-from datetime import datetime
 from typing import Dict, Tuple
 from collections import deque
 
 from memory import JarvisMemory
-from commands.utils import normalize_text as _norm
 
 # Re-export router symbols for backward compatibility
 from local_router import (
@@ -443,7 +440,6 @@ class LLMEngine:
 # ══════════════════════════════════════════════════════
 
 import base64
-import tempfile
 
 def ask_vision(prompt: str, image_path: str, model: str = "llava:7b",
                ollama_url: str = None) -> str:
