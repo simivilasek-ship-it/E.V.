@@ -4,7 +4,8 @@
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-482%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-399%20passing-brightgreen)]()
+[![Next.js](https://img.shields.io/badge/frontend-Next.js%2016%20%2B%20TypeScript-black)](https://nextjs.org/)
 [![Version](https://img.shields.io/badge/version-4.5.0-orange)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -14,20 +15,22 @@
 
 | Změna | Detail |
 |---|---|
-| **Sidebar redesign** | Nav skupiny (NÁSTROJE / INTELIGENCE / MONITOR), live CPU, New Chat, Ctrl+K paleta |
-| **Sport & zprávy v chatu** | ESPN API výsledky, novinky přes DuckDuckGo — bez otevírání prohlížeče |
-| **Pulsující orb** | Animovaný orb na prázdné chat stránce se suggestion chipsami |
-| **Chat redesign** | Centrovaný ChatGPT styl, zprávy od spodu, plynulé bubliny |
-| **Memory Graph** | Force-directed SVG graf paměti — uzly, hrany, fyzika, hledání |
-| **Whisper STT** | `faster-whisper` — přesnější než Vosk, tiny/base/small/medium |
-| **Agent Timeline** | Unified timeline: plan→route→execute→critic, expandovatelné kroky |
-| **Auto-skill gen** | Prompt → LLM → `skill.py` + `manifest.json` → uložení do `plugins/custom/` |
-| **Docker headless** | `docker compose up -d` — Ollama + JARVIS backend + web UI |
-| **Open-Meteo počasí** | WMO emoji, bez API klíče, automatická geolokace |
-| **Hardware info** | `cmd_hardware_info()` — CPU, RAM, disk, GPU |
-| **Silero VAD** | Opt-in voice activity detection (torch) — přesné zachycení řeči |
-| **Memory TTL/priority** | Expirující a prioritní vzpomínky |
-| **OllamaClient.call_json()** | Strukturované výstupy přes `format:"json"` |
+| **Next.js + TypeScript + Tailwind** | Kompletní přepis frontendu — App Router, typed store, tailwind utility třídy |
+| **Dark/light theme** | Toggle ☀️/🌙 v sidebar, persists v localStorage |
+| **LLM response cache** | LRU cache (TTL 10 min) — opakované dotazy okamžitě bez Ollama |
+| **React Error Boundary** | White screen crash → hezká error UI s retry |
+| **Paralelní agenti** | `run_parallel()` — kroky plánu běží ve 2 vlnách přes ThreadPoolExecutor |
+| **Sport v chatu** | ESPN API — živé skóre Premier League, NHL, NBA, Champions League bez API klíče |
+| **Pulsující orb** | 3-vrstvá CSS animace na prázdné chat stránce (orbInner/Ring/Outer) |
+| **Chat redesign** | Centrovaný max-width 760px styl, zprávy od spodu, streaming cursor |
+| **Open-Meteo počasí** | WMO emoji, bez API klíče — nahrazuje broken wttr.in |
+| **Hardware info** | CPU, RAM, disk, GPU ze systémových příkazů (`lscpu`, `lspci`, `nvidia-smi`) |
+| **CriticAgent plausibility** | Heuristická detekce halucinovaných čísel před LLM voláním |
+| **Silero VAD** | Opt-in voice activity detection (torch) — přesné zachycení řeči v hluku |
+| **Memory conflict resolution** | Detekce protichůdných vzpomínek, automatická degradace starých |
+| **Undo stack** | `CommandExecutor` pamatuje 20 posledních souborových akcí |
+| **System tray** | `python jarvis.py --tray` nebo `desktop/tray.py` |
+| **Web-first launcher** | `python jarvis.py` → backend + prohlížeč, `--gui` = Tkinter |
 
 ---
 
@@ -48,9 +51,10 @@ python jarvis.py --tray        # systémový tray
 python jarvis.py --gui         # klasické Tkinter okno
 python jarvis.py --dashboard   # jen backend
 
-# Dev mode (hot-reload)
-cd web && npm run dev          # Vite → localhost:3000 (proxy na :8002)
-python dashboard.py            # backend
+# Dev mode (Next.js + hot-reload)
+bash scripts/dev.sh            # backend + Next.js HMR → localhost:3000
+cd web && npm run dev          # jen frontend (backend musí běžet)
+bash scripts/build.sh          # produkční build → web_dist/
 ```
 
 ### Volitelné závislosti
@@ -68,7 +72,7 @@ sudo apt install tesseract-ocr tesseract-ocr-ces  # OCR
 
 ---
 
-## Web UI — React (`localhost:3000` / `localhost:8002/app`)
+## Web UI — Next.js + TypeScript + Tailwind (`localhost:3000` / `localhost:8002/app`)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -108,11 +112,11 @@ sudo apt install tesseract-ocr tesseract-ocr-ces  # OCR
 
 | Zkratka | Akce |
 |---|---|
-| `Enter` | Odeslat |
+| `Enter` | Odeslat zprávu |
 | `Shift+Enter` | Nový řádek |
 | `Ctrl+K` | Command palette |
-| `Ctrl+L` | Vymazat chat |
-| `1`–`8` | Přejít na tab (při focus mimo input) |
+| `↑ ↓` | Historie příkazů |
+| `Alt+1`–`Alt+8` | Přejít na tab (Chat/Systém/Pluginy/Skill/Agent/Timeline/Paměť/Dashboard) |
 
 ---
 
@@ -304,20 +308,26 @@ commands/files.py       — soubory, web, clipboard, undo stack
 commands/media.py       — screenshot, youtube, timer, klávesnice, vision
 commands/utils.py       — kalkulačka, překlad, počasí, wiki, sport, zprávy
 
-# Web (React + Vite)
-web/src/App.jsx              — sidebar nav skupiny, taby
-web/src/store/jarvis.js      — Zustand, WS, REST fallback, toasty
-web/src/components/
-  ChatPanel.jsx             — chat, streaming, markdown, orb animace
-  SystemPanel.jsx           — arc ringly, sparklines, advanced metriky
-  AgentGraph.jsx            — SVG pipeline vizualizace
-  AgentTimeline.jsx         — unified agent timeline
-  MemoryGraph.jsx           — force-directed SVG knowledge graph
-  SkillGenerator.jsx        — auto-skill gen UI
-  DashboardPanel.jsx        — full monitoring panel
-  CommandPalette.jsx        — Ctrl+K rychlé příkazy
-  PluginStore.jsx           — marketplace UI
-  AIOrb.jsx                 — GLSL orb + Canvas 2D fallback
+# Web (Next.js 16 + TypeScript + Tailwind CSS)
+web/app/layout.tsx           — root layout, Google Fonts v <head>
+web/app/page.tsx             — entry → <JarvisApp />
+web/app/globals.css          — CSS variables, animace, glassmorphism
+web/store/jarvis.ts          — Zustand store s plnými TypeScript typy
+web/components/
+  JarvisApp.tsx             — orchestrátor, lazy dynamic imports
+  Sidebar.tsx               — skupiny, live CPU, New Chat, theme toggle
+  ChatPanel.tsx             — pulsující orb, streaming cursor, feature tags
+  SystemPanel.tsx           — arc ringly, sparklines, advanced metriky
+  AgentGraph.tsx            — SVG pipeline vizualizace
+  AgentTimeline.tsx         — unified agent timeline
+  MemoryGraph.tsx           — force-directed SVG knowledge graph
+  SkillGenerator.tsx        — auto-skill gen UI
+  DashboardPanel.tsx        — full monitoring panel
+  PluginStore.tsx           — marketplace UI
+  ErrorBoundary.tsx         — class component, retry UI
+  Toast.tsx                 — typed toast notifikace
+web/next.config.ts           — proxy /api/* + /ws/* → :8002
+web/tailwind.config.ts       — JARVIS design tokeny + keyframes
 ```
 
 ---
@@ -326,8 +336,8 @@ web/src/components/
 
 ```bash
 source venv/bin/activate
-python -m pytest tests/ test_jarvis.py -v
-# 456 testů, 0 failed
+python -m pytest tests/ -v        # 399 testů, 0 failed
+cd web && npm run build           # TypeScript build check
 ```
 
 ### Přidání nové akce
