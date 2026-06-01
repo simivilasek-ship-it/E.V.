@@ -43,12 +43,13 @@ interface SidebarProps {
   tab: Tab
   setTab: (t: Tab) => void
   setPaletteOpen: (v: boolean) => void
+  setSpotlightOpen?: (v: boolean) => void
   clearMessages: () => void
   theme: string
   toggleTheme: () => void
 }
 
-export default function Sidebar({ tab, setTab, setPaletteOpen, clearMessages, theme, toggleTheme }: SidebarProps) {
+export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen, clearMessages, theme, toggleTheme }: SidebarProps) {
   const connStatus = useJarvis(s => s.connStatus)
   const retry      = useJarvis(s => s.retry)
   const orbState   = useJarvis(s => s.orbState)
@@ -209,6 +210,19 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, clearMessages, th
           </kbd>
           <span>Command palette</span>
         </button>
+        {setSpotlightOpen && (
+          <button onClick={() => setSpotlightOpen(true)}
+            className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md font-mono text-[10px] transition-all"
+            style={{ color: '#4ecdc4', border: '1px solid transparent' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78,205,196,.25)'; (e.currentTarget as HTMLElement).style.background = 'rgba(78,205,196,.05)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'transparent'; (e.currentTarget as HTMLElement).style.background = 'none' }}>
+            <kbd className="px-1 py-px rounded text-[9px]"
+              style={{ background: 'rgba(78,205,196,.1)', border: '1px solid rgba(78,205,196,.3)', color: '#4ecdc4' }}>
+              Alt+Space
+            </kbd>
+            <span>Spotlight</span>
+          </button>
+        )}
         <button onClick={toggleTheme}
           className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md font-mono text-[10px] transition-all"
           style={{ color: 'var(--muted)', border: '1px solid transparent' }}

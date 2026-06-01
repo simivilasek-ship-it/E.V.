@@ -5,6 +5,7 @@ import Sidebar, { type Tab } from './Sidebar'
 import ChatPanel from './ChatPanel'
 import ToastContainer from './Toast'
 import ErrorBoundary from './ErrorBoundary'
+import Spotlight from './Spotlight'
 import dynamic from 'next/dynamic'
 
 // Lazy load heavy panels
@@ -48,6 +49,7 @@ export default function JarvisApp() {
   const retry          = useJarvis(s => s.retry)
   const [tab, setTab]  = useState<Tab>('CHAT')
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [spotlightOpen, setSpotlightOpen] = useState(false)
   const [theme, toggleTheme] = useTheme()
 
   useEffect(() => { connect(); connectMetrics(); connectChat() }, [connect, connectMetrics, connectChat])
@@ -55,7 +57,9 @@ export default function JarvisApp() {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setPaletteOpen(p => !p) }
-      if (e.key === 'Escape') setPaletteOpen(false)
+      // Alt+Space → Spotlight (kdekoliv v OS přes web)
+      if (e.altKey && e.code === 'Space') { e.preventDefault(); setSpotlightOpen(p => !p) }
+      if (e.key === 'Escape') { setPaletteOpen(false); setSpotlightOpen(false) }
       if (e.altKey && !e.ctrlKey && NAV_KEYS[e.key]) { e.preventDefault(); setTab(NAV_KEYS[e.key]) }
     }
     window.addEventListener('keydown', h)
@@ -74,6 +78,7 @@ export default function JarvisApp() {
         <Sidebar
           tab={tab} setTab={setTab}
           setPaletteOpen={setPaletteOpen}
+          setSpotlightOpen={setSpotlightOpen}
           clearMessages={clearMessages}
           theme={theme} toggleTheme={toggleTheme}
         />
@@ -135,6 +140,11 @@ export default function JarvisApp() {
         </div>
 
         <ToastContainer />
+      <Spotlight
+        open={spotlightOpen}
+        onClose={() => setSpotlightOpen(false)}
+        onCommand={(cmd) => { setTab('CHAT'); setSpotlightOpen(false) }}
+      />
         {paletteOpen && (
           <div className="fixed inset-0 z-50 flex items-start justify-center pt-28"
             style={{ background: 'rgba(2,6,14,.75)', backdropFilter: 'blur(8px)' }}
