@@ -302,6 +302,10 @@ class LocalRouter:
             if _dsl_action is not None:
                 _dsl_result = (None, {"action": _dsl_action, "params": _dsl_params})
 
+        # ── ČAS/DATUM (před fuzzy pasem — "dnes" nesmí matchnout sports) ──────
+        if re.search(r"^\s*(dnes|dneska|dnesni\s+datum)\s*$", t):
+            return f"Dnes je {dt.strftime('%-d. %-m. %Y')}.", {"action": "get_date", "params": {}}
+
         # ── ZAVŘÍT / UKONČIT (před fuzzy pasem — jinak "zavři X" matchuje "otevři X") ──
         if _CLOSE_TRIGGER.search(t):
             app_name = _extract_app_name(text)
@@ -560,7 +564,8 @@ class LocalRouter:
             r"|premier\s*league|champions\s*league|liga\s*mistr"
             r"|la\s*liga|serie\s*a|bundesliga|ligue\s*1|fortuna\s*liga"
             r"|zapas|zapasy|vysledky|skore|live\s*score"
-            r"|hraje\s+dnes|kdo\s+hraje|co\s+se\s+hraje|novinky\s+sport)\b", t):
+            r"|hraje\s+dnes|kdo\s+hraje|co\s+se\s+hraje|novinky\s+sport)\b", t) \
+                and not re.search(r"^\s*dnes\s*$", t):
             # Vezmi celý dotaz jako query — ESPN API si s tím poradí
             query = re.sub(
                 r"\b(rekni|rici|zjisti|ukazmi|jak\s+to\s+dopadlo|co\s+je|jake\s+jsou)\b",
