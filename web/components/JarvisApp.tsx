@@ -16,10 +16,12 @@ const AgentGraph   = dynamic(() => import('./AgentGraph'),   { ssr: false })
 const AgentTimeline = dynamic(() => import('./AgentTimeline'), { ssr: false })
 const MemoryGraph  = dynamic(() => import('./MemoryGraph'),  { ssr: false })
 const SkillGenerator = dynamic(() => import('./SkillGenerator'), { ssr: false })
+const SettingsPanel  = dynamic(() => import('./SettingsPanel'),  { ssr: false })
 
 const NAV_KEYS: Record<string, Tab> = {
   '1': 'CHAT', '2': 'SYSTEM', '3': 'PLUGINS', '4': 'SKILL',
   '5': 'AGENT', '6': 'TIMELINE', '7': 'MEMORY', '8': 'DASHBOARD',
+  '9': 'SETTINGS',
 }
 
 function useTheme() {
@@ -134,6 +136,11 @@ export default function JarvisApp() {
                 <div className="max-w-[1100px] mx-auto">
                   <ErrorBoundary><DashboardPanel /></ErrorBoundary>
                 </div>
+              </div>
+            )}
+            {tab === 'SETTINGS' && (
+              <div className="page-wrap-center">
+                <ErrorBoundary><SettingsPanel /></ErrorBoundary>
               </div>
             )}
           </div>

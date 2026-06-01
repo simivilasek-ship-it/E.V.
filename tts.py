@@ -30,6 +30,58 @@ logger = logging.getLogger(__name__)
 _STOP_SENTINEL = object()  # speciální hodnota pro zastavení workeru
 
 
+class PiperTTS:
+    """Lokální TTS přes Piper — rychlý, offline, přirozený hlas.
+
+    Instalace: pip install piper-tts
+    Model: python -m piper.download cs_CZ-jirka-medium
+    Opt-in — bez piper funguje edge-tts jako dřív.
+    """
+
+    DEFAULT_MODEL = "cs_CZ-jirka-medium"  # český hlas
+
+    def __init__(self, model: str = None, data_dir: str = None):
+        self._model_name = model or self.DEFAULT_MODEL
+        self._voice = None
+        self._available = False
+        data = data_dir or os.path.expanduser("~/.local/share/piper")
+
+        try:
+            from piper import PiperVoice  # noqa: F401
+            model_path = os.path.join(data, self._model_name + ".onnx")
+            config_path = model_path + ".json"
+            if os.path.exists(model_path) and os.path.exists(config_path):
+                self._voice = PiperVoice.load(model_path, config_path=config_path)
+                self._available = True
+                logger.info(f"PiperTTS: model načten ({self._model_name})")
+            else:
+                logger.info(
+                    f"PiperTTS: model nenalezen v {model_path}. "
+                    f"Stáhni: python -m piper.download {self.DEFAULT_MODEL}"
+                )
+        except ImportError:
+            logger.info("PiperTTS: piper-tts není nainstalován (pip install piper-tts)")
+        except Exception as e:
+            logger.warning(f"PiperTTS init selhal: {e}")
+
+    @property
+    def available(self) -> bool:
+        return self._available
+
+    def synthesize_to_file(self, text: str, output_path: str) -> bool:
+        """Syntetizuje text do WAV souboru. Vrátí True pokud úspěšně."""
+        if not self._available:
+            return False
+        try:
+            import wave
+            with wave.open(output_path, "w") as wav_file:
+                self._voice.synthesize(text, wav_file)
+            return True
+        except Exception as e:
+            logger.error(f"PiperTTS synthesize chyba: {e}")
+            return False
+
+
 class TTSEngine:
     """Engine pro syntézu řeči — jeden worker, neblokující fronta."""
 
@@ -47,6 +99,12 @@ class TTSEngine:
         self._player = self._find_player()
         self._pyttsx3_engine = None
         self._has_pyttsx3 = False
+
+        # Piper TTS (lokální, opt-in)
+        piper_model = config.get("piper_model", PiperTTS.DEFAULT_MODEL)
+        self._piper = PiperTTS(piper_model)
+        if self._piper.available:
+            logger.info("TTS: Piper lokální TTS dostupný")
 
         # Streaming je výchozí pokud ffplay je dostupný
         self._streaming_enabled = (self._player == "ffplay") and config.get("tts_streaming", True)
@@ -105,13 +163,37 @@ class TTSEngine:
                 self._queue.task_done()
 
     def _play(self, text: str) -> None:
-        """Volá se z worker vlákna. Preferuje streaming pokud ffplay je dostupný."""
+        """Volá se z worker vlákna. Pořadí: Piper → edge-tts → pyttsx3."""
+        # 1. Piper (nejrychlejší, offline)
+        if self._piper.available:
+            tmp = tempfile.mktemp(suffix=".wav")
+            if self._piper.synthesize_to_file(text, tmp):
+                try:
+                    # Preferuj aplay, fallback na ffplay
+                    player_cmd = (
+                        ["aplay", "-q", tmp]
+                        if subprocess.run(["which", "aplay"], capture_output=True).returncode == 0
+                        else ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", tmp]
+                    )
+                    proc = subprocess.Popen(player_cmd)
+                    self._current_proc = proc
+                    proc.wait()
+                    self._current_proc = None
+                    return
+                finally:
+                    try:
+                        os.unlink(tmp)
+                    except Exception:
+                        pass
+        # 2. edge-tts (streaming, vyžaduje internet)
         if HAS_EDGE_TTS:
             if self._player == "ffplay" and self._streaming_enabled:
                 asyncio.run(self._speak_edge_tts_streaming(text))
             else:
                 asyncio.run(self._speak_edge_tts(text))
-        elif self._has_pyttsx3:
+            return
+        # 3. pyttsx3 fallback
+        if self._has_pyttsx3:
             self._speak_pyttsx3(text)
         else:
             logger.warning("TTS není dostupný")
@@ -175,7 +257,7 @@ class TTSEngine:
             self._worker.join(timeout=3)
 
     def is_available(self) -> bool:
-        return self.enabled and (HAS_EDGE_TTS or self._has_pyttsx3)
+        return self.enabled and (self._piper.available or HAS_EDGE_TTS or self._has_pyttsx3)
 
     # ── Interní přehrávání ────────────────────────────
 

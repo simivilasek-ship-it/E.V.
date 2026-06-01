@@ -50,10 +50,10 @@ function renderContent(text: string) {
 
 function TypingDots() {
   return (
-    <div className="flex gap-1 py-0.5">
+    <div className="flex gap-1 py-1">
       {[0, 1, 2].map(i => (
-        <span key={i} className="w-1.5 h-1.5 rounded-full anim-bounce"
-          style={{ background: 'var(--cyan)', animationDelay: `${i * 0.16}s` }} />
+        <div key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce"
+          style={{ animationDelay: `${i * 0.15}s` }} />
       ))}
     </div>
   )
@@ -103,7 +103,7 @@ function MessageBubble({ msg }: { msg: Message }) {
           <span style={{ color: 'var(--muted)' }}>·</span>
           <span style={{ color: 'var(--muted)' }}>{formatTime(msg.ts)}</span>
         </div>
-        <div className="relative text-sm leading-[1.75]" style={{ color: 'rgba(219,234,254,.9)' }}>
+        <div className="group relative text-sm leading-[1.75]" style={{ color: 'rgba(219,234,254,.9)' }}>
           {renderContent(msg.text)}
           {msg.streaming && !msg.text && <TypingDots />}
           {msg.streaming && msg.text && (
@@ -112,7 +112,7 @@ function MessageBubble({ msg }: { msg: Message }) {
           )}
           {!msg.streaming && msg.text && (
             <button onClick={copy}
-              className="absolute top-0 right-0 font-mono text-[10px] px-2 py-0.5 rounded opacity-0 hover:opacity-100 transition-opacity"
+              className="copy-btn absolute top-0 right-0 font-mono text-[10px] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
               style={{
                 background: copied ? 'rgba(34,211,165,.1)' : 'rgba(0,0,0,.45)',
                 border: `1px solid ${copied ? 'rgba(34,211,165,.3)' : 'rgba(255,255,255,.08)'}`,

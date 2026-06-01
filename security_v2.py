@@ -214,7 +214,7 @@ class SecurityManager:
         param_str = str(params)
         for pattern in _DANGEROUS_RE:
             if pattern.search(param_str):
-                reason = f"Nebezpečný vzor detekován v parametrech"
+                reason = "Nebezpečný vzor detekován v parametrech"
                 self._audit.log(action, params, False, reason, user_text)
                 return False, reason
 

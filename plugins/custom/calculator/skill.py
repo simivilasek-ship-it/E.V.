@@ -31,7 +31,7 @@ def _safe_eval(expr: str) -> str:
         if isinstance(result, float) and result == int(result):
             return str(int(result))
         return f"{result:.6g}"
-    except Exception as e:
+    except Exception:
         return None
 
 

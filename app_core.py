@@ -3,7 +3,6 @@ Integrates plugin system, async operations, and robust error handling."""
 
 import logging
 import signal
-import threading
 import sys
 from typing import Optional, Tuple
 
@@ -37,7 +36,7 @@ class JarvisApp:
 
     def __init__(self):
         setup_logging()
-        logger.info("Spouštím JARVIS v4.4...")
+        logger.info("Spouštím JARVIS v4.6...")
 
         # Inicializace nových systémů (async, error handling, plugins)
         self._init_new_systems()
@@ -47,6 +46,7 @@ class JarvisApp:
             self.stt  = STTEngine(CONFIG)
             self.tts  = TTSEngine(CONFIG)
             self.llm  = LLMEngine(CONFIG)
+            self.llm.load_history()
             self.cmds = CommandExecutor(CONFIG)
         except Exception as e:
             logger.error(f"Chyba inicializace: {e}")
@@ -142,7 +142,7 @@ class JarvisApp:
             self._global_hotkey = None
             logger.debug(f"GlobalHotkey init selhal (normální pokud chybí pynput): {e}")
 
-        logger.info("Systémy v4.4 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord)")
+        logger.info("Systémy v4.6 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord)")
 
     def _load_plugins(self):
         """Načte plugin systém a pluginy"""
@@ -353,7 +353,7 @@ class JarvisApp:
             except Exception:
                 pass
             lang_name = CONFIG.get("available_languages", {}).get(language, language)
-            self._gui(lambda l=lang_name: self.gui.add_message(f"Jazyk STT: {l}", "jarvis"))
+            self._gui(lambda ln=lang_name: self.gui.add_message(f"Jazyk STT: {ln}", "jarvis"))
         else:
             self._gui(lambda: self.gui.add_message("Jazyk není dostupný.", "jarvis"))
 
@@ -545,33 +545,56 @@ class JarvisApp:
         except Exception as e:
             logger.debug(f"Memory setup skip: {e}")
 
-    def _check_ollama(self):
-        def _chk():
-            import requests as _req
+    def _check_ollama(self) -> None:
+        """Zkontroluje dostupnost Ollama a informuje uživatele."""
+        try:
+            import requests
+            r = requests.get("http://localhost:11434/api/tags", timeout=2)
+            ollama_ok = r.status_code == 200
+        except Exception:
+            ollama_ok = False
+
+        if not ollama_ok:
+            # Nezablokovit GUI — jen zobrazit varování
+            msg = "⚠️ Ollama není dostupná. Lokální příkazy fungují, AI konverzace ne."
+            self._gui(lambda: self.gui._add_sys(msg))
+            logger.warning("Ollama nedostupná — degraded mode (pouze lokální příkazy)")
+            # Nastav flag pro LLM
+            if hasattr(self, 'llm'):
+                self.llm._ollama_available = False
+        else:
+            if hasattr(self, 'llm'):
+                self.llm._ollama_available = True
+            # Aktualizuj seznam modelů
             try:
-                r = _req.get(self.llm.url.replace("/api/chat", "/api/tags"), timeout=4)
-                if r.status_code == 200:
-                    models = [m["name"] for m in r.json().get("models", [])]
+                import requests as _req
+                r2 = _req.get("http://localhost:11434/api/tags", timeout=2)
+                if r2.status_code == 200:
+                    models = [m["name"] for m in r2.json().get("models", [])]
                     current = CONFIG["ollama_model"]
-                    # Aktualizuj dropdown v GUI
                     if models:
                         self._gui(lambda ml=models, c=current:
                                   self.gui.update_model_list(ml, c))
                     self._gui(lambda: self.gui.add_message(
                         f"Připojen [{CONFIG['ollama_model']}]. Jak ti mohu pomoci?", "jarvis"))
                     self._gui(lambda: self.gui.set_status(f"● {CONFIG['ollama_model']}"))
-                else:
-                    raise ConnectionError()
             except Exception:
-                self._gui(lambda: self.gui.add_message(
-                    "Ollama není dostupná. Spusť: ollama serve", "jarvis"))
-        threading.Thread(target=_chk, daemon=True).start()
+                pass
+
+        # Opakovaná kontrola každých 30s
+        self.gui.root.after(30000, self._check_ollama)
 
     def _sig(self, *_):
         self._shutdown()
 
     def _shutdown(self):
         logger.info("Ukončuji JARVIS...")
+
+        # Ulož konverzační historii
+        try:
+            self.llm.save_history()
+        except Exception as e:
+            logger.warning(f"Uložení historie selhalo: {e}")
 
         # Zastav nové systémy
         try:

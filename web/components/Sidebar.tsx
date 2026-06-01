@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useJarvis } from '@/store/jarvis'
 import { Icons } from './Icons'
 
-export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD'
+export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS'
 
 interface NavItem { id: Tab; label: string; icon: React.ReactNode; key: string; hint: string }
 interface NavGroup { label: string | null; items: NavItem[] }
@@ -24,6 +24,7 @@ const NAV_GROUPS: NavGroup[] = [
   ]},
   { label: 'MONITOR', items: [
     { id: 'DASHBOARD', label: 'Dashboard', icon: Icons.dash,     key: '8', hint: 'Přehled systému' },
+    { id: 'SETTINGS',  label: 'Nastavení', icon: Icons.settings, key: '9', hint: 'Konfigurace JARVIS' },
   ]},
 ]
 

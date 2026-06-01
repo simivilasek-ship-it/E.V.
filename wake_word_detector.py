@@ -71,7 +71,7 @@ class WakeWordDetector:
                 logger.warning(f"porpoise selhal: {e}")
         
         if HAS_SR:
-            logger.info(f"Wake word detektor: SpeechRecognition fallback")
+            logger.info("Wake word detektor: SpeechRecognition fallback")
             return
         
         logger.warning("Wake word detektor není k dispozici. Instaluj: pip install porpoise")

@@ -313,7 +313,7 @@ def cmd_weather(city: str = "") -> str:
             result += f"  🌧️ {precip} mm"
         return result
 
-    except Exception as e:
+    except Exception:
         # Rychlý fallback na wttr.in (3s timeout)
         try:
             r = requests.get(
@@ -324,7 +324,7 @@ def cmd_weather(city: str = "") -> str:
                 return text
         except Exception:
             pass
-        return f"⚠️ Počasí dočasně nedostupné (zkus znovu za chvíli)"
+        return "⚠️ Počasí dočasně nedostupné (zkus znovu za chvíli)"
 
 
 def cmd_wiki_search(query: str) -> str:

@@ -593,7 +593,7 @@ class AsyncTask(Generic[T]):
             except TimeoutError:
                 self._status = TaskStatus.TIMEOUT
                 raise
-            except Exception as e:
+            except Exception:
                 self._status = TaskStatus.FAILED
                 raise
         return self._result

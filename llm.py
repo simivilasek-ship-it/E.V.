@@ -1,5 +1,5 @@
 """
-JARVIS v4.4 — LLM Engine (Ollama HTTP klient)
+JARVIS v4.6 — LLM Engine (Ollama HTTP klient)
 Lokální router je v local_router.py.
 
 OllamaClient — sdílený HTTP klient pro agenty (agent_graph, agent_react).
@@ -7,20 +7,28 @@ OllamaClient — sdílený HTTP klient pro agenty (agent_graph, agent_react).
 
 import re
 import json
+import time
+import json as _json
 import requests
 import logging
-from typing import Dict, Tuple
 from collections import deque
+from collections import deque as _deque
+from pathlib import Path as _Path
+from threading import Lock as _Lock
+from typing import Dict, Tuple
 
 from memory import JarvisMemory
 
 # Re-export router symbols for backward compatibility
-from local_router import (
+# POZOR: záměrné re-exporty pro test_jarvis.py — nemazat!
+from local_router import (  # noqa: F401
     LocalRouter, _router,
     _parse_args,
     _HAS_FUZZY, _FUZZY_THRESHOLD, _FUZZY_COMMANDS,
     _HOME, _USER,
 )
+# Potlač ruff F401 pro re-exporty
+__all__ = [*(globals().get("__all__", [])), "LocalRouter"]
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +67,51 @@ PAMĚŤ:
 Máš přístup k relevantnímu kontextu z předchozích konverzací (viz sekce níže).
 Využij ho pro osobnější odpovědi."""
 
+
+
+# ══════════════════════════════════════════════════════
+#  RATE LIMITER — ochrana před zahlcením Ollama
+# ══════════════════════════════════════════════════════
+
+class LLMRateLimiter:
+    """Token bucket rate limiter — max N dotazů za minutu.
+
+    Zabrání zahltění Ollama při rychlém opakovaném volání.
+    Thread-safe pomocí Lock.
+    """
+
+    def __init__(self, max_per_minute: int = 30):
+        self._max = max_per_minute
+        self._times: _deque = _deque(maxlen=max_per_minute)
+        self._lock = _Lock()
+
+    def is_allowed(self) -> bool:
+        """True pokud je dotaz povolen (nevyčerpal limit)."""
+        with self._lock:
+            now = time.monotonic()
+            # Odstraň starší než 60s
+            cutoff = now - 60.0
+            while self._times and self._times[0] < cutoff:
+                self._times.popleft()
+            if len(self._times) >= self._max:
+                return False
+            self._times.append(now)
+            return True
+
+    def wait_if_needed(self) -> None:
+        """Počká pokud je překročen limit (max 2s)."""
+        if not self.is_allowed():
+            logger.warning(f"LLM rate limit dosažen ({self._max}/min) — čekám 1s")
+            time.sleep(1.0)
+            self.is_allowed()  # Zaloguje ale pokračuje
+
+    def stats(self) -> dict:
+        with self._lock:
+            return {"calls_last_minute": len(self._times), "limit": self._max}
+
+
+# Globální rate limiter
+_rate_limiter = LLMRateLimiter(max_per_minute=30)
 
 # ══════════════════════════════════════════════════════
 #  OLLAMA CLIENT — sdílený HTTP klient pro agenty
@@ -268,6 +321,8 @@ class LLMEngine:
     # ── ASK (non-streaming) ──────────────────────────
 
     def ask(self, user_text: str) -> Tuple[str, Dict]:
+        if not getattr(self, '_ollama_available', True):
+            return "Ollama není dostupná. Řekni mi lokální příkaz (otevři, nastav, screenshot...).", {"action": "answer", "params": {}}
         msg, action = self.quick_match(user_text)
         if action is not None:
             # Do LLM history ukládáme jen informační odpovědi, ne akce (otevři, zavři…)
@@ -287,6 +342,9 @@ class LLMEngine:
             self.history.append({"role": "user",      "content": user_text})
             self.history.append({"role": "assistant",  "content": raw})
             return raw, action
+
+        # Rate limiting — pouze pro LLM volání (local router prošel výše)
+        _rate_limiter.wait_if_needed()
 
         self.history.append({"role": "user", "content": user_text})
         messages, routed_model, temperature, max_tokens = self._build_messages(user_text)
@@ -319,6 +377,9 @@ class LLMEngine:
     # ── STREAM ASK ───────────────────────────────────
 
     def stream_ask(self, user_text: str):
+        if not getattr(self, '_ollama_available', True):
+            yield "Ollama není dostupná. Řekni mi lokální příkaz (otevři, nastav, screenshot...)."
+            return
         msg, action = self.quick_match(user_text)
         if action is not None:
             if action.get("action") == "answer" and msg:
@@ -331,6 +392,9 @@ class LLMEngine:
             # Vždy yield string — nikdy nekončit generátor bez yield (frontend by dostal prázdný stream)
             yield msg or ""
             return
+
+        # Rate limiting — pouze pro LLM volání (local router prošel výše)
+        _rate_limiter.wait_if_needed()
 
         self.history.append({"role": "user", "content": user_text})
         self._stream_resp = None
@@ -429,6 +493,33 @@ class LLMEngine:
             "set_brightness": f"Jas: {args}%.",
         }
         return msgs.get(command, f"Akce: {command}")
+
+    def save_history(self, path: str = None) -> None:
+        """Uloží konverzační historii do JSON souboru."""
+        try:
+            p = _Path(path or _Path.home() / ".jarvis" / "history.json")
+            p.parent.mkdir(parents=True, exist_ok=True)
+            data = list(self.history)
+            p.write_text(_json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            logger.debug(f"Historie uložena: {len(data)} zpráv → {p}")
+        except Exception as e:
+            logger.warning(f"Uložení historie selhalo: {e}")
+
+    def load_history(self, path: str = None) -> int:
+        """Načte historii ze souboru. Vrátí počet načtených zpráv."""
+        try:
+            p = _Path(path or _Path.home() / ".jarvis" / "history.json")
+            if not p.exists():
+                return 0
+            data = _json.loads(p.read_text(encoding="utf-8"))
+            # Validace: každá zpráva musí mít role a content
+            valid = [m for m in data if isinstance(m, dict) and "role" in m and "content" in m]
+            self.history.extend(valid[-self.history.maxlen:])
+            logger.info(f"Historie načtena: {len(valid)} zpráv z {p}")
+            return len(valid)
+        except Exception as e:
+            logger.warning(f"Načtení historie selhalo: {e}")
+            return 0
 
     def clear_history(self):
         self.history.clear()

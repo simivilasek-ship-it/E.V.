@@ -7,9 +7,9 @@ import logging
 import os
 import shutil
 from collections import deque
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from .apps   import (APP_MAP, find_app, cmd_open_app, cmd_kill_process,
+from .apps   import (APP_MAP, find_app, cmd_open_app, cmd_kill_process,  # noqa: F401
                      cmd_install_app, cmd_uninstall_app, cmd_run_script,
                      cmd_vscode_open)
 from .files  import (cmd_open_url, cmd_search_web, cmd_open_file,
@@ -33,7 +33,7 @@ from .utils  import (cmd_calculate, cmd_translate, cmd_note_add, cmd_note_list,
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["CommandExecutor", "APP_MAP"]
+__all__ = ["CommandExecutor", "APP_MAP", "find_app"]
 
 
 # Akce, pro které ukládáme snapshot před provedením
@@ -43,7 +43,9 @@ _UNDOABLE = {"create_folder", "create_file", "delete_file", "move_file", "clipbo
 class UndoEntry:
     __slots__ = ("action", "params", "snapshot")
     def __init__(self, action: str, params: dict, snapshot: dict):
-        self.action = action; self.params = params; self.snapshot = snapshot
+        self.action = action
+        self.params = params
+        self.snapshot = snapshot
 
 
 class CommandExecutor:
@@ -126,24 +128,30 @@ class CommandExecutor:
         if a == "create_folder":
             p = snap.get("path", "")
             if not snap.get("existed") and os.path.isdir(p):
-                shutil.rmtree(p); return f"Undo: složka {p} smazána."
+                shutil.rmtree(p)
+                return f"Undo: složka {p} smazána."
         elif a == "create_file":
             p = snap.get("path", "")
             if not snap.get("existed") and os.path.isfile(p):
-                os.remove(p); return f"Undo: soubor {p} smazán."
+                os.remove(p)
+                return f"Undo: soubor {p} smazán."
             elif "content" in snap:
-                open(p, "wb").write(snap["content"]); return f"Undo: soubor {p} obnoven."
+                open(p, "wb").write(snap["content"])
+                return f"Undo: soubor {p} obnoven."
         elif a == "delete_file":
             p = snap.get("path", "")
             if "content" in snap and not os.path.exists(p):
-                open(p, "wb").write(snap["content"]); return f"Undo: {p} obnoven."
+                open(p, "wb").write(snap["content"])
+                return f"Undo: {p} obnoven."
         elif a == "move_file":
             src, dst = snap.get("src", ""), snap.get("dst", "")
             if dst and os.path.exists(dst):
-                shutil.move(dst, src); return f"Undo: {dst} → {src}."
+                shutil.move(dst, src)
+                return f"Undo: {dst} → {src}."
         elif a == "clipboard_set":
             try:
-                import pyperclip; pyperclip.copy(snap.get("previous", ""))
+                import pyperclip
+                pyperclip.copy(snap.get("previous", ""))
                 return "Undo: schránka obnovena."
             except Exception:
                 pass

@@ -168,7 +168,7 @@ def run():
     ]
 
     if ollama_ok:
-        print(f"\n  Dostupné modely:")
+        print("\n  Dostupné modely:")
         for i, (name, desc) in enumerate(models_available, 1):
             marker = " ◀ aktuální" if name == current_model else ""
             print(f"    {i}. {name:<32} {desc}{marker}")

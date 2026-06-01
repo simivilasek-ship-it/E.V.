@@ -121,7 +121,7 @@ def _handle_forget(text: str):
     entity = m.group(2).strip()
 
     if not _available():
-        return f"MCP Memory není dostupný.", {"action": "answer", "params": {}}
+        return "MCP Memory není dostupný.", {"action": "answer", "params": {}}
 
     result = _call("delete_entities", {"entityNames": [entity]})
     return f"Zapomenuto: {entity}", {"action": "answer", "params": {}}

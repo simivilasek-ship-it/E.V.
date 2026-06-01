@@ -22,7 +22,6 @@ except Exception:
 
 def cmd_screenshot() -> str:
     import subprocess, shutil
-    from datetime import datetime
     ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
     home = Path.home()
     desk = home / "Plocha"

@@ -63,7 +63,7 @@ def _handle_read(text: str):
     path = os.path.expanduser(m.group(2).strip())
     bridge = _get_bridge()
     if not bridge or not bridge.is_available("filesystem"):
-        return f"MCP filesystem není dostupný.", {"action": "answer", "params": {}}
+        return "MCP filesystem není dostupný.", {"action": "answer", "params": {}}
     result = bridge.call_tool("filesystem", "read_file", {"path": path})
     # Zkrať na 2000 znaků pro chat
     if len(result) > 2000:
