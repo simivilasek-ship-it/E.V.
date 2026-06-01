@@ -366,6 +366,25 @@ if HAS_FASTAPI:
         except Exception as e:
             return {"nodes": [], "links": [], "error": str(e)}
 
+    @app.get("/api/profile")
+    async def get_profile():
+        """Vrátí základní user profile pro Hero panel (jméno, fakta)."""
+        try:
+            from user_profile import get_user_profile
+            from config import CONFIG, __version__
+            profile = get_user_profile()
+            name  = profile.get("jméno") or profile.get("name") or ""
+            facts = {f.key: f.value for f in profile.all_facts()} if hasattr(profile, "all_facts") else {}
+            model = CONFIG.get("ollama_model", "?")
+            return {
+                "name":    name,
+                "facts":   facts,
+                "model":   model,
+                "version": __version__,
+            }
+        except Exception as e:
+            return {"name": "", "facts": {}, "model": "?", "version": "4.5"}
+
     @app.get("/api/config")
     async def get_config():
         """Vrátí aktuální konfiguraci (bez secrets)."""

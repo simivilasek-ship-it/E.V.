@@ -14,16 +14,15 @@
 
 | Změna | Detail |
 |---|---|
-| **Global Hotkey** | `Alt+Space` kdekoliv v OS → Spotlight okno s widgets (počasí, sport, systém) |
-| **Memory Pruning** | Auto-sumarizace starých konverzací → kondenzovaná fakta v user_profile |
-| **VRAM Management** | LLaVA se uvolní z VRAM automaticky po vision analýze (`ollama unload`) |
-| **Plugin Security Review** | `security_warnings()` — varování před uložením LLM-generovaného pluginu |
-| **ContextOrchestrator v2** | Aktivní okno přes ewmh (bez xdotool), seznam všech oken |
-| **MCP +6 serverů** | GitHub, Maps, Slack, YouTube Transcript, SQLite, Everything |
-| **Spotlight Widgets** | Mini-widgets v Alt+Space okně (počasí, sport výsledky, systém) |
-| **DailySummarizer retry** | 3 pokusy s exponential backoff při selhání Ollama |
-| **Validace action parametru** | CommandExecutor odmítne `_shutdown`, injection pokusy |
-| **519 testů** | Pokrytí memory, security, global hotkey, commands |
+| **Hero Panel** | Prázdný chat = dashboard: pozdrav, hodiny, CPU/RAM/model, 8 quick akcí, agenti |
+| **Alt+Space Spotlight** | Inline widgets — počasí, sport, systém, hodiny, kalkulačka bez otevření chatu |
+| **ContextOrchestrator v2** | JARVIS vidí okna přes ewmh (python-xlib) — bez xdotool/wmctrl |
+| **MCP +6 serverů** | GitHub, Google Maps, Slack, YouTube Transcript, SQLite, Everything |
+| **Grid opacity fix** | Mřížka v pozadí snížena na opacity 0.015 — méně dominantní |
+| **System prompt fix** | Model ví že vidí okna/clipboard, nepíše "nemám přístup" |
+| **LLM cache** | LRU cache TTL 10 min — opakované dotazy okamžitě |
+| **Paralelní agenti** | `run_parallel()` — kroky ve 2 vlnách přes ThreadPoolExecutor |
+| **519 testů** | 0 failed, TypeScript build OK |
 
 ---
 

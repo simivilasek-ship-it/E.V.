@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useJarvis, type Message } from '@/store/jarvis'
 import { Icons } from './Icons'
+import HeroPanel from './HeroPanel'
 
 const PLACEHOLDERS = [
   { text: 'Otevři Spotify…',           tag: 'ovládání PC' },
@@ -181,34 +182,10 @@ export default function ChatPanel() {
         </button>
       </div>
 
-      {/* Messages */}
+      {/* Messages or Hero Panel */}
       <div className="flex-1 overflow-y-auto flex flex-col items-center">
         {messages.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8 pointer-events-none">
-            {/* Pulsing orb */}
-            <div className="relative w-36 h-36 flex items-center justify-center">
-              <div className="absolute w-36 h-36 rounded-full anim-orb-outer"
-                style={{ border: '1px solid rgba(78,205,196,.35)' }}/>
-              <div className="absolute w-28 h-28 rounded-full anim-orb-ring"
-                style={{ border: '1.5px solid rgba(78,205,196,.5)', background: 'radial-gradient(circle,rgba(78,205,196,.04) 0%,transparent 70%)' }}/>
-              <div className="w-20 h-20 rounded-full flex items-center justify-center anim-orb-inner relative z-10"
-                style={{
-                  background: 'radial-gradient(circle at 35% 35%,rgba(78,205,196,.22),rgba(0,200,255,.08) 60%,rgba(99,102,241,.06))',
-                  border: '1.5px solid rgba(78,205,196,.45)',
-                }}>
-                <span className="font-hud font-black text-3xl leading-none anim-orb-logo"
-                  style={{ color: '#4ecdc4', textShadow: '0 0 16px rgba(78,205,196,.9),0 0 32px rgba(78,205,196,.4)' }}>J</span>
-              </div>
-            </div>
-
-            <div className="text-center">
-              <div className="font-hud font-bold tracking-[.3em] text-base"
-                style={{ background: 'linear-gradient(135deg,#4ecdc4,#00c8ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                JARVIS
-              </div>
-              <div className="text-sm mt-1" style={{ color: 'var(--muted)' }}>Jak ti mohu pomoct?</div>
-            </div>
-          </div>
+          <HeroPanel onSend={(cmd) => { sendCmd(cmd) }} />
         ) : (
           <div className="w-full max-w-[760px] flex flex-col justify-end min-h-full px-5 pt-6 pb-2">
             {messages.map(m => <MessageBubble key={m.id} msg={m} />)}
@@ -217,8 +194,8 @@ export default function ChatPanel() {
         )}
       </div>
 
-      {/* Suggestions */}
-      {messages.length === 0 && (
+      {/* Suggestions — jen při prázdném chatu (pod hero) */}
+      {messages.length === 0 && false && (
         <div className="flex flex-wrap gap-1.5 px-4 pb-2 justify-center">
           {SUGGESTIONS.map(s => (
             <button key={s} onClick={() => sendCmd(s)}
