@@ -45,7 +45,8 @@ def test_format_minimal(orch):
 def test_format_with_window(orch):
     ctx = {
         "time": "12:00, Monday 01.01.2024",
-        "window": "Firefox — Google",
+        "active": "Firefox — Google",
+        "windows": ["Firefox — Google"],
         "clipboard": "",
         "system": {},
     }

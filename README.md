@@ -5,8 +5,7 @@
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/tests-519%20passing-brightgreen)]()
-[![Next.js](https://img.shields.io/badge/frontend-Next.js%2016%20%2B%20TypeScript-black)](https://nextjs.org/)
-[![Version](https://img.shields.io/badge/version-4.5.0-orange)]()
+[![Version](https://img.shields.io/badge/version-4.6.0-orange)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
@@ -15,387 +14,404 @@
 
 | Změna | Detail |
 |---|---|
-| **Global Hotkey** | `Alt+Space` kdekoliv v OS → quick input (Spotlight styl) |
+| **Global Hotkey** | `Alt+Space` kdekoliv v OS → Spotlight okno s widgets (počasí, sport, systém) |
 | **Memory Pruning** | Auto-sumarizace starých konverzací → kondenzovaná fakta v user_profile |
-| **VRAM management** | LLaVA se uvolní z VRAM po dokončení vision analýzy (`ollama unload`) |
-| **Plugin Security Review** | `ManifestValidator.security_warnings()` — varování před uložením LLM pluginu |
-| **Validace action parametru** | CommandExecutor odmítne `_shutdown`, `__init__` a injection pokusy |
+| **VRAM Management** | LLaVA se uvolní z VRAM automaticky po vision analýze (`ollama unload`) |
+| **Plugin Security Review** | `security_warnings()` — varování před uložením LLM-generovaného pluginu |
+| **ContextOrchestrator v2** | Aktivní okno přes ewmh (bez xdotool), seznam všech oken |
+| **MCP +6 serverů** | GitHub, Maps, Slack, YouTube Transcript, SQLite, Everything |
+| **Spotlight Widgets** | Mini-widgets v Alt+Space okně (počasí, sport výsledky, systém) |
 | **DailySummarizer retry** | 3 pokusy s exponential backoff při selhání Ollama |
-| **VSCode trigger deduplikace** | Odstraněna duplicitní logika v local_router.py |
-| **Version consistency** | `/health` endpoint načítá verzi z `config.__version__` |
-| **519 testů** | +37 nových testů (security, memory, global hotkey, memory pruning) |
+| **Validace action parametru** | CommandExecutor odmítne `_shutdown`, injection pokusy |
+| **519 testů** | Pokrytí memory, security, global hotkey, commands |
 
 ---
 
-## Co je nového v v4.5
+## Quickstart
 
-| Změna | Detail |
-|---|---|
-| **Next.js + TypeScript + Tailwind** | Kompletní přepis frontendu — App Router, typed store, tailwind utility třídy |
-| **Dark/light theme** | Toggle ☀️/🌙 v sidebar, persists v localStorage |
-| **LLM response cache** | LRU cache (TTL 10 min) — opakované dotazy okamžitě bez Ollama |
-| **React Error Boundary** | White screen crash → hezká error UI s retry |
-| **Paralelní agenti** | `run_parallel()` — kroky plánu běží ve 2 vlnách přes ThreadPoolExecutor |
-| **Sport v chatu** | ESPN API — živé skóre Premier League, NHL, NBA, Champions League bez API klíče |
-| **Pulsující orb** | 3-vrstvá CSS animace na prázdné chat stránce (orbInner/Ring/Outer) |
-| **Chat redesign** | Centrovaný max-width 760px styl, zprávy od spodu, streaming cursor |
-| **Open-Meteo počasí** | WMO emoji, bez API klíče — nahrazuje broken wttr.in |
-| **Hardware info** | CPU, RAM, disk, GPU ze systémových příkazů (`lscpu`, `lspci`, `nvidia-smi`) |
-| **CriticAgent plausibility** | Heuristická detekce halucinovaných čísel před LLM voláním |
-| **Silero VAD** | Opt-in voice activity detection (torch) — přesné zachycení řeči v hluku |
-| **Memory conflict resolution** | Detekce protichůdných vzpomínek, automatická degradace starých |
-| **Undo stack** | `CommandExecutor` pamatuje 20 posledních souborových akcí |
-| **System tray** | `python jarvis.py --tray` nebo `desktop/tray.py` |
-| **Web-first launcher** | `python jarvis.py` → backend + prohlížeč, `--gui` = Tkinter |
-
----
-
-## Quickstart — 3 kroky
-
+### Desktop app (doporučeno)
 ```bash
 git clone https://github.com/simivilasek-ship-it/Jarvis.git && cd Jarvis
 chmod +x install.sh && ./install.sh
-bash start_jarvis.sh          # → http://localhost:8002/app
+bash start_desktop.sh   # pywebview okno
 ```
 
-### Způsoby spuštění
-
+### Web UI — Next.js (localhost:3000)
 ```bash
-python jarvis.py               # backend + prohlížeč (výchozí)
-python jarvis.py --webview     # nativní pywebview okno
-python jarvis.py --tray        # systémový tray
-python jarvis.py --gui         # klasické Tkinter okno
-python jarvis.py --dashboard   # jen backend
+# Terminál 1 — Python backend
+source ~/Stažené/jarvis-env/bin/activate && python dashboard.py
 
-# Dev mode (Next.js + hot-reload)
-bash scripts/dev.sh            # backend + Next.js HMR → localhost:3000
-cd web && npm run dev          # jen frontend (backend musí běžet)
-bash scripts/build.sh          # produkční build → web_dist/
+# Terminál 2 — Next.js frontend
+cd web && npm install && npm run dev
+```
+
+### Klasická Tkinter GUI
+```bash
+source ~/Stažené/jarvis-env/bin/activate
+bash start_jarvis.sh
 ```
 
 ### Volitelné závislosti
-
 ```bash
-pip install vosk                   # Offline STT — Czech model ~50 MB
-pip install faster-whisper         # Whisper STT — přesnější, offline
-pip install sentence-transformers  # Sémantická paměť — embeddingy ~400 MB
-pip install rapidfuzz              # Fuzzy matching překlepů
-pip install torch                  # Silero VAD — detekce řeči v hluku
-pip install pystray pillow         # Systémový tray (--tray mód)
-ollama pull llava:7b               # Vision — popis obrazovky, webcam
-sudo apt install tesseract-ocr tesseract-ocr-ces  # OCR
+pip install vosk              # Offline STT (~50 MB model)
+pip install faster-whisper    # Přesnější offline STT (GPU)
+pip install pynput            # Global Hotkey (Alt+Space)
+pip install sentence-transformers  # Lepší paměť (embeddingy)
+pip install pytesseract opencv-python  # OCR + webcam
+ollama pull llava:7b          # Vision — popis obrazovky
 ```
 
 ---
 
-## Web UI — Next.js + TypeScript + Tailwind (`localhost:3000` / `localhost:8002/app`)
+## Rozhraní
 
+### Next.js Web UI — `http://localhost:3000`
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ J JARVIS  Lokální AI asistent          ⌘K   ● Připojeno    │
-├─────────────────┬───────────────────────────────────────────┤
-│ + Nový chat     │                                           │
-│                 │                                           │
-│ ─ NÁSTROJE ─    │           [pulsující orb]                 │
-│   Systém        │                                           │
-│   Pluginy       │    Co pro tebe mohu udělat?               │
-│   Skill Gen     │                                           │
-│                 │   [sport výsledky] [zprávy] [počasí]      │
-│ ─ INTELIGENCE ─ │   [screenshot] [kalkulačka] [překlad]     │
-│   Agent         │                                           │
-│   Timeline      │   ┌─────────────────────────────────┐    │
-│   Paměť         │   │ Napiš příkaz nebo otázku...   ↑ │    │
-│                 │   └─────────────────────────────────┘    │
-│ ─ MONITOR ─     │                                           │
-│   Dashboard     │                                           │
-└─────────────────┴───────────────────────────────────────────┘
+Sidebar        │  Main panel
+─────────────  │  ──────────────────────────────────────
+KOMUNIKACE     │  Chat s JARVIS (streaming, markdown)
+System         │  SystemPanel (CPU/RAM arc rings, sparklines)
+Pluginy        │  Plugin marketplace + health check
+Agent          │  AgentGraph vizualizace
+Timeline       │  Agent kroky v čase
+Paměť          │  MemoryGraph — znalostní graf
+Skill Gen      │  AI generátor pluginů
+Dashboard      │  Monitoring, logy, audit
 ```
 
-### Taby a jejich funkce
+### Global Hotkey — `Alt+Space`
+Kdekoliv v OS → minimalistické okno (Spotlight styl):
+- Přímý chat s JARVIS
+- Mini-widgets: počasí, sport výsledky, systém info
+- Rychlé akce: screenshot, timer, poznámka
 
-| Tab | Popis |
+### API backend — `http://localhost:8002`
+```
+GET  /health              → {"status":"healthy","ws":"running","version":"4.6.0"}
+GET  /api/system          → CPU, RAM, disk, temp, síť, GPU
+GET  /api/plugins         → 15 skills s health statusem
+POST /api/command         → {"command": "..."} → {"response": "..."}
+POST /api/config          → {"ollama_model": "..."} → uloží do config.json
+GET  /ws/logs             → WebSocket live logy
+GET  /ws/agents           → WebSocket CPU/RAM každé 2s
+GET  /ws/chat             → WebSocket streaming chat
+```
+
+---
+
+## Co umí
+
+### Ovládání PC
+| Příkaz | Akce |
 |---|---|
-| **Chat** | Hlavní konverzace, streaming, markdown, historie |
-| **Systém** | CPU / RAM / disk arc ringly, sparklines, Ollama status |
-| **Pluginy** | Plugin marketplace — instalace, stav, rating |
-| **Skill Gen** | Prompt → LLM → vygenerovaný plugin, uložení jedním kliknutím |
-| **Agent** | SVG vizualizace Planner→Router→Executor→Critic pipeline |
-| **Timeline** | Historie agentních runů — kroky, výsledky, timing |
-| **Paměť** | Force-directed SVG knowledge graph, hledání, detail uzlu |
-| **Dashboard** | CPU / RAM / disk, Ollama, agenti, scheduler, audit log, logy |
+| „Otevři Chrome / Discord / Spotify" | Spustí aplikaci |
+| „Zavři Chrome" | Ukončí proces |
+| „Nainstaluj vlc" | `apt install` |
+| „Smaž soubor test.txt" | Přesune do koše |
+| „Vytvoř soubor notes.md" | `touch` |
+| „Přesuň a.txt do b.txt" | `mv` |
+| „Spusť skript setup.py" | `python/bash` |
+| „Otevři ve VS Code ~/projekt" | `code .` |
+| „Klikni na 500 300" | Computer Control MCP |
+| „Vypni / Restartuj počítač" | Shutdown / Restart |
 
-### Klávesové zkratky
+### Hardware & systém
+| Příkaz | Akce |
+|---|---|
+| „Jaký mám hardware" | CPU, RAM, GPU, disk, OS |
+| „Kolik mám místa na disku" | Přehled všech oddílů |
+| „Co mám na ploše" | Obsah ~/Plocha s velikostmi |
+| „Obsah složky ~/Dokumenty" | Libovolná cesta |
+| „Info o systému" | CPU/RAM/Disk využití real-time |
 
+### Vision — Multi-modalita
+| Příkaz | Akce |
+|---|---|
+| „Co vidíš / Popiš obrazovku" | Screenshot + LLaVA (uvolní VRAM po analýze) |
+| „Přečti text / OCR" | pytesseract OCR |
+| „Zapni kameru" | cv2 záběr + LLaVA |
+
+### Sport & novinky (DuckDuckGo inline)
+| Příkaz | Akce |
+|---|---|
+| „PSG vs Arsenal výsledek" | Výsledek přímo v chatu |
+| „Tabulka premier league" | Živá tabulka |
+| „Bitcoin cena" | Aktuální kurz |
+| „Kdo vyhrál ligu mistrů" | DuckDuckGo odpověď |
+
+### Informace a AI
+| Příkaz | Akce |
+|---|---|
+| „Kolik je hodin v Tokiu" | MCP Time server |
+| „Počasí Praha" | Open-Meteo (offline) |
+| „Co je Python?" | Wikipedia |
+| „Přelož hello world" | Ollama překlad |
+| „Vypočítej 15% z 200" | AST sandbox |
+| „100 USD na CZK" | Měnový konvertor |
+| „Zapamatuj si X" | SQLite memory (TTL/priority) |
+
+### ReAct & Multi-agent
+```
+„Najdi cenu RTX 4090 a ulož do poznámky"
+→ PlannerAgent → ResearcherAgent → ExecutorAgent → CriticAgent → Done
+```
+
+### GUI zkratky
 | Zkratka | Akce |
 |---|---|
-| `Enter` | Odeslat zprávu |
-| `Shift+Enter` | Nový řádek |
-| `Ctrl+K` | Command palette |
+| `Alt+Space` | Global Spotlight (kdekoliv v OS) |
+| `Ctrl+K` | Command Palette v web UI |
 | `↑ ↓` | Historie příkazů |
-| `Alt+1`–`Alt+8` | Přejít na tab (Chat/Systém/Pluginy/Skill/Agent/Timeline/Paměť/Dashboard) |
+| `Enter` | Odeslat |
+| `Shift+Enter` | Nový řádek |
 
 ---
 
-## Co JARVIS umí
+## LLM Router v2 — automatický výběr modelu
 
-### Ovládání PC (bez LLM — okamžitě)
-
-```
-"Otevři Chrome / Discord / Spotify"   → spustí aplikaci
-"Zavři Discord"                        → ukončí proces
-"Hlasitost na 60 / Ztlum"             → zvuk
-"Jas na 70"                           → jas obrazovky
-"Screenshot"                           → PNG na plochu
-"Vytvoř / Smaž složku X"              → souborové operace + undo stack
-"Vrať poslední akci"                   → undo (20 kroků)
-"Jaké máš komponenty"                  → CPU, RAM, GPU, disk
-"Vypni / Restartuj počítač"            → shutdown / restart
-```
-
-### Sport & zprávy přímo v chatu
-
-```
-"Fotbal výsledky"           → ESPN API, živé skóre
-"Premier League"            → tabulka + výsledky
-"Champions League dnes"     → dnešní zápasy
-"Hokej NHL"                 → výsledky ze zámoří
-"Zprávy tech"               → DuckDuckGo novinky bez prohlížeče
-"Kurzy bitcoin"             → kryptoměny
-"Novinky Česko"             → aktuální zprávy
-```
-
-### Počasí (Open-Meteo, bez API klíče)
-
-```
-"Počasí Praha"     → 🌧️ Praha: Slabý déšť 🌡️ 15°C 💧 80% 💨 6 km/h
-"Počasí Brno"      → WMO emoji + teplota + vlhkost + vítr
-"Počasí"           → automatická geolokace
-```
-
-### Vision & AI
-
-```
-"Co vidíš na obrazovce?"   → Screenshot + LLaVA popis
-"Přečti text z okna"       → OCR (pytesseract)
-"Zapni kameru"             → webcam + LLaVA
-"Přelož hello world"       → Ollama překlad
-"Vypočítej 15 % z 3 400"   → AST sandbox kalkulátor
-"Co je strojové učení?"    → Wikipedia + Ollama
-"100 USD na CZK"           → měnový konvertor
-```
-
-### ReAct & Graf agent
-
-```
-"Najdi cenu RTX 4090 a ulož ji do poznámky"
-→ Thought → Action: web_search → Observation → note_add → Answer
-
-"Sestav report o cenách GPU"
-→ Planner → Router → Executor → Critic (×N) → Answer
-```
+| Typ úkolu | Detekce | Model |
+|---|---|---|
+| FAST | překlad, čas, datum | qwen2.5:1.5b |
+| STANDARD | obecné dotazy | qwen2.5:3b |
+| CODE | python, funkce, bug | deepseek-coder, qwen2.5:7b |
+| MATH | integrál, rovnice | qwen2.5:7b |
+| REASONING | analyzuj, porovnej | llama3.1:8b |
+| VISION | obrazovka, kamera | llava:7b |
+| AGENT | „najdi a ulož" | llama3.1:8b |
 
 ---
 
-## MCP integrace (9 serverů)
+## MCP integrace (10 serverů)
 
-> `node --version` ≥ 18 · `pip install mcp`
+> Požadavky: Node.js 18+ · `pip install mcp`
 
 | Server | Příkaz | API klíč |
 |---|---|---|
-| Filesystem | „přečti soubor X", „strom ~/Projekty" | ❌ |
-| Fetch | „načti stránku github.com" | ❌ |
-| Git | „git log", „git status" | ❌ |
-| Memory Graph | „zapamatuj si X", „co víš o X" | ❌ |
-| Time | „kolik je hodin v Tokiu" | ❌ |
-| Sequential Thinking | „rozmysli jak X" | ❌ |
-| Puppeteer | „screenshot webu X" | ❌ |
-| Computer Control | klikání, psaní, okna | ❌ |
-| Brave Search | „vyhledej novinky o X" | ✅ `BRAVE_API_KEY` |
+| **Filesystem** | „přečti soubor X", „strom ~/Projekty" | ❌ |
+| **Fetch** | „načti stránku github.com" | ❌ |
+| **Git** | „git log", „git status", „git diff" | ❌ |
+| **Memory Graph** | „zapamatuj si X", „co víš o X" | ❌ |
+| **Time** | „kolik je hodin v Tokiu" | ❌ |
+| **Sequential Thinking** | „rozlož na kroky X" | ❌ |
+| **Puppeteer** | „screenshot webu X" | ❌ |
+| **Computer Control** | klikání, psaní, okna | ❌ |
+| **YouTube Transcript** | „titulky z videa X" | ❌ |
+| **Brave Search** | „vyhledej X", „novinky o X" | ✅ BRAVE_API_KEY |
 
 ---
 
-## Plugin systém
+## Plugin systém — 15 skills
 
 ```
-plugins/custom/muj_plugin/
-  ├── manifest.json    ← metadata + permissions
-  └── skill.py         ← handler (sandbox: AST kontrola importů)
+plugins/custom/
+├── calculator/              — AST sandbox kalkulačka
+├── clipboard/               — xclip / pyperclip
+├── greeting/                — pozdravy dle denní doby
+├── marketplace/             — GitHub marketplace + rating
+├── timer/                   — odpočet + hlasová notifikace
+├── mcp_brave/               — Brave Search
+├── mcp_computer_control/    — klikání, psaní, okna
+├── mcp_fetch/               — DuckDuckGo + URL fetch
+├── mcp_filesystem/          — čtení souborů, strom
+├── mcp_git/                 — git log/status/diff
+├── mcp_memory/              — knowledge graph
+├── mcp_puppeteer/           — browser automation
+├── mcp_sequential_thinking/ — krok-za-krokem plánování
+├── mcp_time/                — časová pásma (40+ měst)
+└── [system]                 — vestavěný systémový plugin
 ```
 
-### Rychlé vytvoření pluginu — Skill Gen tab
+### Plugin permissions (sandbox v2)
 
-1. Otevři tab **Skill Gen** v web UI
-2. Napiš co má plugin dělat (nebo vyber příklad)
-3. Klikni **Generovat** → LLM vygeneruje `skill.py` + `manifest.json`
-4. Klikni **Uložit plugin** → uloží do `plugins/custom/`
+| Permission | Co povoluje |
+|---|---|
+| `answer` | Jen stdlib |
+| `safe_eval` | AST-sandboxed eval |
+| `files.read` | os.path, pathlib, glob |
+| `files.write` | shutil, tempfile |
+| `network.fetch` | requests.get |
+| `system.exec` | subprocess ⚠️ |
+| `vision.capture` | cv2, screenshot |
+| `mcp` | mcp_bridge |
 
-### Ručně
+---
 
+## Smart Memory
+
+### SQLite Memory + TTL/Priority
+```python
+mem.store("dočasná info", ttl_seconds=3600)   # expiruje za 1h
+mem.store("kritická info", priority=2)         # 0=normal, 2=critical
+mem.run_maintenance()                          # smaže expirované
+```
+
+### Context Orchestrator
+```
+Každý LLM dotaz obsahuje:
+  Aktivní okno: Firefox — GitHub
+  Otevřená okna: [VS Code, Terminal]
+  Systém: CPU 12%, RAM 38%
+  Čas: 15:43, Monday 02.06.2026
+```
+
+### Memory Pruning
+- Automaticky při >40 konverzacích
+- Ollama zkondenzuje staré → fakta do user_profile
+- Spouští se v DailySummarizer (každou půlnoc)
+
+---
+
+## Architektura
+
+```
+jarvis.py               — bootstrap + CLI
+app_core.py             — orchestrátor (EventBus, Agents, MCP, GUI)
+config.py               — __version__ = "4.6.0"
+
+# AI
+llm.py                  — LLMEngine + OllamaClient + LRU cache
+local_router.py         — LocalRouter (95% příkazů bez LLM)
+llm_router.py           — FAST/CODE/MATH/REASONING/VISION/AGENT routing
+router_dsl.py           — mini DSL pro patterns
+context_orchestrator.py — ewmh okna + clipboard → system prompt
+
+# Agenti
+agent_react.py          — ReAct smyčka
+agent_graph.py          — Graf agent (Planner→Router→Executor→Critic)
+agent_roles.py          — Multi-agent role
+global_hotkey.py        — Alt+Space Spotlight (pynput)
+
+# Vision
+vision.py               — OCR + LLaVA + webcam (VRAM auto-uvolnění)
+
+# Web — Next.js 16 + TypeScript
+web/app/                — Next.js App Router
+web/components/         — 14 TypeScript komponent
+  JarvisApp.tsx         — hlavní layout + sidebar
+  ChatPanel.tsx         — streaming, markdown, history
+  SystemPanel.tsx       — arc rings, sparklines, metrics
+  AgentGraph.tsx        — SVG pipeline vizualizace
+  Spotlight.tsx         — Alt+Space overlay + widgets
+  PluginStore.tsx       — marketplace s health check
+web/store/jarvis.ts     — Zustand (WS backoff, toasts, model)
+dashboard.py            — FastAPI backend (port 8002)
+app_desktop.py          — pywebview nativní okno
+
+# Commands
+commands/
+  system.py    — hardware_info, disk_space, list_directory, volume
+  apps.py      — open/kill/install aplikace
+  media.py     — YouTube, screenshot (5 fallbacků), klávesnice
+  files.py     — soubory, clipboard, web
+  utils.py     — kalkulačka, překlad, počasí, memory
+
+# Infrastructure
+tts.py                  — edge-tts streaming + pyttsx3
+stt.py                  — Google STT + VoskSTT + WhisperSTT
+memory.py               — SQLite + EmbeddingEngine + TTL + pruning
+plugin_system.py        — ManifestValidator + sandbox v2 + health_check
+mcp_bridge.py           — MCPBridge (10 serverů)
+security_v2.py          — SAFE/STANDARD/ELEVATED + audit log
+```
+
+---
+
+## Konfigurace
+
+### config.json
 ```json
 {
-  "name": "muj_skill", "version": "1.0.0",
-  "description": "Co dělá", "permissions": ["answer"],
-  "triggers": ["klíčové slovo"]
+  "ollama_url":             "http://localhost:11434/api/chat",
+  "ollama_model":           "qwen2.5:3b",
+  "tts_enabled":            true,
+  "tts_voice":              "cs-CZ-AntoninNeural",
+  "tts_streaming":          true,
+  "stt_language":           "cs-CZ",
+  "whisper_model":          "small",
+  "wake_word":              "jarvis",
+  "plugin_handler_timeout": 5.0
 }
 ```
 
-```python
-import re
-_RE = re.compile(r"\b(klicove\s+slovo)\b", re.IGNORECASE)
-def _handle(text): return "Odpověď!", {"action": "answer", "params": {}}
-def get_routes():   return [{"pattern": _RE, "handler": _handle}]
-def get_actions():  return {}
-```
-
-### Sandbox permissions
-
-| Permission | Odemkne |
-|---|---|
-| `answer` | stdlib — jen text odpovědi |
-| `system` | os, subprocess, psutil, pyautogui |
-| `files` | os.path, shutil, glob, pathlib |
-| `media` | subprocess, webbrowser, yt_dlp |
-| `mcp` | mcp_bridge, config, memory |
-| `internal` | interní JARVIS moduly |
-
----
-
-## Docker (headless server / NAS)
-
-```bash
-# Spuštění
-docker compose up -d
-
-# Web UI dostupné na
-http://localhost:8002/app
-```
-
-`docker-compose.yml` spustí dvě služby:
-- **ollama** — Ollama server s health checkem
-- **jarvis** — FastAPI backend + React web UI (port 8002)
-
----
-
-## Architektura souborů
-
-```
-jarvis.py               — vstupní bod (výchozí: web launcher)
-config.py               — konfigurace, __version__ = "4.5.0"
-dashboard.py            — FastAPI backend (port 8002, /app, /api/*, /ws/*)
-routing.py              — CommandRouter — routing pipeline
-
-# AI Engine
-llm.py                  — LLMEngine + OllamaClient (+ call_json)
-local_router.py         — LocalRouter — 95%+ příkazů bez LLM
-llm_router.py           — výběr modelu dle typu úkolu
-context_orchestrator.py — aktivní okno, clipboard → system prompt
-
-# Agenti
-agent_react.py          — ReAct (Thought→Action→Observation)
-agent_graph.py          — Graf agent (Planner→Router→Executor→Critic)
-agent_roles.py          — Multi-agent role + CriticAgent
-agent_tools.py          — ToolRegistry (16+ nástrojů)
-
-# Vstup/Výstup
-tts.py                  — edge-tts streaming + pyttsx3
-stt.py                  — Google STT + VoskSTT + WhisperSTT + Silero VAD
-vision.py               — OCR, screen describe, webcam + LLaVA
-
-# Paměť
-memory.py               — SQLite + EmbeddingEngine + TTL/priority + conflict
-user_profile.py         — permanentní fakta o uživateli
-
-# Pluginy
-plugin_system.py        — sandbox (AST) + health_check
-plugin_marketplace.py   — REGISTRY + GitHub ZIP + auto-update
-
-# Infrastruktura
-security_v2.py          — AuditLog, 5 úrovní, confirmation
-mcp_bridge.py           — MCP klient (9 serverů)
-health_check.py         — monitoring Ollama, RAM, disk, CPU
-event_bus.py            — PUB/SUB, daemon callbacky s 5s timeoutem
-scheduler.py            — at/after/every (formát: 1d/1h/5m)
-offline_mode.py         — fronta příkazů + fallback KB
-
-# Commands (54 akcí)
-commands/system.py      — čas, datum, hlasitost, jas, hardware, shutdown
-commands/apps.py        — open/kill/install aplikace
-commands/files.py       — soubory, web, clipboard, undo stack
-commands/media.py       — screenshot, youtube, timer, klávesnice, vision
-commands/utils.py       — kalkulačka, překlad, počasí, wiki, sport, zprávy
-
-# Web (Next.js 16 + TypeScript + Tailwind CSS)
-web/app/layout.tsx           — root layout, Google Fonts v <head>
-web/app/page.tsx             — entry → <JarvisApp />
-web/app/globals.css          — CSS variables, animace, glassmorphism
-web/store/jarvis.ts          — Zustand store s plnými TypeScript typy
-web/components/
-  JarvisApp.tsx             — orchestrátor, lazy dynamic imports
-  Sidebar.tsx               — skupiny, live CPU, New Chat, theme toggle
-  ChatPanel.tsx             — pulsující orb, streaming cursor, feature tags
-  SystemPanel.tsx           — arc ringly, sparklines, advanced metriky
-  AgentGraph.tsx            — SVG pipeline vizualizace
-  AgentTimeline.tsx         — unified agent timeline
-  MemoryGraph.tsx           — force-directed SVG knowledge graph
-  SkillGenerator.tsx        — auto-skill gen UI
-  DashboardPanel.tsx        — full monitoring panel
-  PluginStore.tsx           — marketplace UI
-  ErrorBoundary.tsx         — class component, retry UI
-  Toast.tsx                 — typed toast notifikace
-web/next.config.ts           — proxy /api/* + /ws/* → :8002
-web/tailwind.config.ts       — JARVIS design tokeny + keyframes
-```
+### Modely Ollama
+| Model | RAM | Použití |
+|---|---|---|
+| `qwen2.5:1.5b` | ~1 GB | Rychlé (FAST) |
+| `qwen2.5:3b` | ~3 GB | Výchozí |
+| `qwen2.5:7b` | ~5 GB | Code, Math |
+| `llama3.1:8b` | ~8 GB | Reasoning, Agent |
+| `llava:7b` | ~8 GB | Vision |
 
 ---
 
 ## Vývoj a testy
 
 ```bash
-source venv/bin/activate
-python -m pytest tests/ -v        # 399 testů, 0 failed
-cd web && npm run build           # TypeScript build check
+source ~/Stažené/jarvis-env/bin/activate
+python -m pytest tests/ test_jarvis.py -v
+# 519 testů, 0 failed
 ```
 
-### Přidání nové akce
+### Linter
+```bash
+ruff check . --select F,E7
+# All checks passed!
+```
 
+### Plugin health check
 ```python
-# 1. Pattern v local_router.py
-re.compile(r"\b(muj\s+prikaz)\b") → ("muj_akce", args)
-
-# 2. Handler v commands/utils.py
-def cmd_muj_prikaz(param: str) -> str: ...
-
-# 3. Export z commands/__init__.py
-from .utils import cmd_muj_prikaz
-
-# 4. Security level v security_v2.py
-# 5. Test v tests/test_commands.py
+from plugin_system import create_plugin_manager
+pm = create_plugin_manager(); pm.load_all_plugins()
+print(pm.health_check())  # 15/15 healthy
 ```
 
 ---
 
 ## Troubleshooting
 
-| Problém | Řešení |
-|---|---|
-| Backend neodpovídá | `curl http://localhost:8002/health` → `python dashboard.py` |
-| Ollama nespustí | `ollama serve && ollama pull qwen2.5:3b` |
-| Agent tab OFFLINE | Backend musí běžet (`python dashboard.py`) |
-| TTS nefunguje | `sudo apt install ffmpeg && pip install edge-tts` |
-| JARVIS neslyší | `sudo usermod -a -G audio $USER` + logout |
-| MCP nefunguje | `node --version` ≥ 18, `pip install mcp` |
-| OCR nefunguje | `sudo apt install tesseract-ocr tesseract-ocr-ces` |
-| Embeddingy | `pip install sentence-transformers` |
-| Whisper STT | `pip install faster-whisper` |
+### WebSocket ECONNREFUSED
+```bash
+# Backend musí běžet!
+source ~/Stažené/jarvis-env/bin/activate && python dashboard.py
+# Pak v druhém terminálu:
+cd web && npm run dev
+```
+
+### Screenshot selže
+```bash
+sudo apt install gnome-screenshot  # automatický fallback
+```
+
+### Ollama
+```bash
+ollama serve && ollama pull qwen2.5:3b
+```
+
+### Vision / OCR
+```bash
+ollama pull llava:7b
+sudo apt install tesseract-ocr tesseract-ocr-ces
+pip install pytesseract opencv-python
+```
 
 ---
 
 ## Požadavky
 
-- Python 3.11+
-- Node.js 18+ (web frontend)
-- [Ollama](https://ollama.com) — `ollama pull qwen2.5:3b`
-- ffmpeg — `sudo apt install ffmpeg`
+- **Python** 3.11+
+- **Node.js** 18+ (web, MCP servery)
+- **[Ollama](https://ollama.com)** — `ollama pull qwen2.5:3b`
+- **ffmpeg** — `sudo apt install ffmpeg`
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Přispívání
+
+Viz [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
