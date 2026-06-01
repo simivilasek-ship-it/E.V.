@@ -1,18 +1,28 @@
 """
-JARVIS Context Orchestrator
+JARVIS Context Orchestrator v2
 Sbírá kontext prostředí a vkládá ho do system promptu.
-Kontext = aktivní okno + clipboard + systém + čas + nedávná aktivita.
+Kontext = aktivní okno + seznam oken + clipboard + systém + čas.
 """
 
+import os
 import time
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+# Ignorovaná okna (panel, plocha...) při sestavování seznamu
+_IGNORE_NAMES = {
+    "horní panel", "spodní panel", "pracovní plocha", "desktop",
+    "top panel", "bottom panel", "panel",
+}
 
 
 class ContextOrchestrator:
     def __init__(self, config: dict):
         self.config = config
         self._cache: dict = {}
-        self._cache_ttl: float = 5.0  # sekundy
+        self._cache_ttl: float = 4.0  # sekundy
         self._last_update: float = 0
 
     def get_context(self) -> str:
@@ -21,9 +31,10 @@ class ContextOrchestrator:
         if now - self._last_update < self._cache_ttl:
             return self._cache.get("formatted", "")
 
-        ctx = {}
+        ctx: dict = {}
         ctx["time"]      = self._get_time()
-        ctx["window"]    = self._get_active_window()
+        ctx["active"]    = self._get_active_window()
+        ctx["windows"]   = self._get_open_windows()
         ctx["clipboard"] = self._get_clipboard()
         ctx["system"]    = self._get_system_quick()
 
@@ -32,43 +43,135 @@ class ContextOrchestrator:
         self._last_update = now
         return formatted
 
+    # ── Čas ───────────────────────────────────────────
+
     def _get_time(self) -> str:
         from datetime import datetime
         return datetime.now().strftime("%H:%M, %A %d.%m.%Y")
 
+    # ── Okna (ewmh → xdotool → wmctrl → ps) ──────────
+
+    def _decode_wm_name(self, raw) -> str:
+        if isinstance(raw, bytes):
+            try:
+                return raw.decode("utf-8").strip()
+            except UnicodeDecodeError:
+                return raw.decode("latin-1", errors="replace").strip()
+        return str(raw or "").strip()
+
     def _get_active_window(self) -> str:
-        """Zjistí aktivní okno přes xdotool nebo wmctrl."""
+        # 1. ewmh — DISPLAY musí být v os.environ (ignoruje display= kwarg)
+        for disp in [os.environ.get("DISPLAY", ""), ":0.0", ":0", ":1"]:
+            if not disp:
+                continue
+            try:
+                import ewmh as _ewmh
+                old = os.environ.get("DISPLAY")
+                os.environ["DISPLAY"] = disp
+                try:
+                    e = _ewmh.EWMH()
+                    w = e.getActiveWindow()
+                    if w:
+                        name = self._decode_wm_name(e.getWmName(w))
+                        if name:
+                            return name[:100]
+                finally:
+                    if old is not None:
+                        os.environ["DISPLAY"] = old
+                    elif "DISPLAY" in os.environ:
+                        del os.environ["DISPLAY"]
+            except Exception:
+                pass
+
+        # 2. xdotool
         try:
             import subprocess
             r = subprocess.run(
                 ["xdotool", "getactivewindow", "getwindowname"],
-                capture_output=True, text=True, timeout=1
+                capture_output=True, text=True, timeout=1,
+                env={**os.environ, "DISPLAY": os.environ.get("DISPLAY", ":0")},
             )
             if r.returncode == 0:
-                return r.stdout.strip()[:80]
+                return r.stdout.strip()[:100]
         except Exception:
             pass
+
+        # 3. wmctrl
         try:
             import subprocess
             r = subprocess.run(
-                ["wmctrl", "-l"],
-                capture_output=True, text=True, timeout=1
+                ["wmctrl", "-l"], capture_output=True, text=True, timeout=1,
+                env={**os.environ, "DISPLAY": os.environ.get("DISPLAY", ":0")},
             )
             if r.returncode == 0:
-                lines = r.stdout.strip().split("\n")
-                if lines:
-                    return lines[0].split(None, 3)[-1][:80] if len(lines[0].split()) >= 4 else ""
+                for line in r.stdout.strip().splitlines():
+                    parts = line.split(None, 3)
+                    if len(parts) >= 4:
+                        return parts[3][:100]
         except Exception:
             pass
+
         return ""
 
+    def _get_open_windows(self) -> list[str]:
+        """Vrátí seznam názvů otevřených oken (bez systémových panelů)."""
+        names: list[str] = []
+
+        # 1. ewmh
+        for disp in [os.environ.get("DISPLAY", ""), ":0.0", ":0", ":1"]:
+            if not disp:
+                continue
+            try:
+                import ewmh as _ewmh
+                old = os.environ.get("DISPLAY")
+                os.environ["DISPLAY"] = disp
+                try:
+                    e = _ewmh.EWMH()
+                    for w in e.getClientList():
+                        try:
+                            name = self._decode_wm_name(e.getWmName(w))
+                            if name and name.lower() not in _IGNORE_NAMES:
+                                names.append(name[:80])
+                        except Exception:
+                            pass
+                finally:
+                    if old is not None:
+                        os.environ["DISPLAY"] = old
+                    elif "DISPLAY" in os.environ:
+                        del os.environ["DISPLAY"]
+                if names:
+                    return names
+            except Exception:
+                pass
+
+        # 2. wmctrl -l fallback
+        try:
+            import subprocess
+            r = subprocess.run(
+                ["wmctrl", "-l"], capture_output=True, text=True, timeout=1,
+                env={**os.environ, "DISPLAY": os.environ.get("DISPLAY", ":0")},
+            )
+            if r.returncode == 0:
+                for line in r.stdout.strip().splitlines():
+                    parts = line.split(None, 3)
+                    if len(parts) >= 4:
+                        name = parts[3].strip()
+                        if name.lower() not in _IGNORE_NAMES:
+                            names.append(name[:80])
+        except Exception:
+            pass
+
+        return names
+
+    # ── Clipboard ─────────────────────────────────────
+
     def _get_clipboard(self) -> str:
-        """Přečte obsah clipboardu (max 200 znaků)."""
         try:
             import subprocess
             r = subprocess.run(
                 ["xclip", "-o", "-selection", "clipboard"],
-                capture_output=True, text=True, timeout=1
+                capture_output=True, text=True, timeout=1,
+                env={**os.environ, "DISPLAY": os.environ.get("DISPLAY", ":0")},
             )
             if r.returncode == 0:
                 text = r.stdout.strip()
@@ -85,8 +188,9 @@ class ContextOrchestrator:
             pass
         return ""
 
+    # ── Systém ────────────────────────────────────────
+
     def _get_system_quick(self) -> dict:
-        """CPU, RAM rychle (bez interval čekání)."""
         try:
             import psutil
             return {
@@ -96,16 +200,34 @@ class ContextOrchestrator:
         except Exception:
             return {}
 
+    # ── Formátování ───────────────────────────────────
+
     def _format(self, ctx: dict) -> str:
-        """Naformátuje kontext pro system prompt."""
         parts = [f"Aktuální čas: {ctx['time']}"]
-        if ctx.get("window"):
-            parts.append(f"Aktivní okno: {ctx['window']}")
+
+        if ctx.get("active"):
+            parts.append(f"Aktivní okno: {ctx['active']}")
+
+        windows = [w for w in ctx.get("windows", []) if w != ctx.get("active")]
+        if windows:
+            # Deduplikuj a zobraz max 8 oken
+            seen: set[str] = set()
+            unique = []
+            for w in windows:
+                if w not in seen:
+                    seen.add(w)
+                    unique.append(w)
+            shown = unique[:8]
+            parts.append("Otevřená okna: " + ", ".join(shown))
+
         if ctx.get("clipboard"):
-            parts.append(f"Obsah schránky: {ctx['clipboard'][:100]}{'...' if len(ctx['clipboard'])>100 else ''}")
+            clip = ctx["clipboard"][:120]
+            parts.append(f"Schránka: {clip}{'…' if len(ctx['clipboard']) > 120 else ''}")
+
         sys_info = ctx.get("system", {})
         if sys_info:
-            parts.append(f"Systém: CPU {sys_info.get('cpu',0)}%, RAM {sys_info.get('ram',0)}%")
+            parts.append(f"Systém: CPU {sys_info.get('cpu', 0)}%, RAM {sys_info.get('ram', 0)}%")
+
         return "\n".join(parts)
 
 
