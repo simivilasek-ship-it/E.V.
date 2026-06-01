@@ -147,8 +147,9 @@ class _LLMCache:
         if self._NO_CACHE.search(text):
             return None
         k = self._key(model, text)
+        import time as _t
         entry = self._store.get(k)
-        if entry and (time.time() - entry[2]) < self._ttl:
+        if entry and (_t.time() - entry[2]) < self._ttl:
             logger.debug(f"LLM cache hit: {text[:50]}")
             return entry[0], entry[1]
         if entry:
@@ -162,7 +163,8 @@ class _LLMCache:
             # Vyhoď nejstarší
             oldest = min(self._store, key=lambda k: self._store[k][2])
             del self._store[oldest]
-        self._store[self._key(model, text)] = (response, action, time.time())
+        import time as _t
+        self._store[self._key(model, text)] = (response, action, _t.time())
 
     def clear(self):
         self._store.clear()
