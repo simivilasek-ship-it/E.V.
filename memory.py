@@ -561,6 +561,21 @@ class DailySummarizer:
         if not force and not self.should_run():
             return ""
 
+        # Memory pruning — kondenzuj staré konverzace před extrakcí faktů
+        try:
+            from memory import get_conversation_summarizer
+            from user_profile import get_user_profile
+            from config import CONFIG
+            pruner = get_conversation_summarizer(CONFIG)
+            result = pruner.prune_and_save(
+                self.memory._store, get_user_profile(),
+                CONFIG.get("ollama_url", "http://localhost:11434/api/chat"),
+                CONFIG.get("ollama_model", "qwen2.5:3b")
+            )
+            logger.info(f"Memory pruning: {result}")
+        except Exception as e:
+            logger.warning(f"Memory pruning selhal: {e}")
+
         with self._lock:
             try:
                 return self._do_summarize()
@@ -659,3 +674,100 @@ Konverzace:
         """Naplánuje spuštění denního shrnutí každou půlnoc."""
         scheduler.every_day_at(0, 5, lambda: self.run())
         logger.info("DailySummarizer naplánován na 00:05")
+
+
+# ══════════════════════════════════════════════════════
+#  CONVERSATION SUMMARIZER (context-aware memory pruning)
+# ══════════════════════════════════════════════════════
+
+class ConversationSummarizer:
+    """Automaticky kondenzuje staré konverzační vlákna do faktů o uživateli.
+
+    Logika:
+    - Spustí se když je počet zpráv v historii > max_history
+    - Vezme nejstarší blok zpráv (první third) a požádá LLM o sumarizaci
+    - Výsledek uloží do user_profile jako kondenzovaná fakta
+    - Staré zprávy smaže z paměti
+    """
+
+    def __init__(self, config: dict, max_history: int = 40):
+        self.config = config
+        self.max_history = max_history
+
+    def should_prune(self, conversation_count: int) -> bool:
+        """True pokud je čas na pruning."""
+        return conversation_count >= self.max_history
+
+    def summarize_and_prune(self, memories: list, ollama_url: str, model: str):
+        """Vezme seznam vzpomínek, zkondenzuje staré, vrátí (pruned_list, summary).
+
+        memories — seznam dict {"content": str, "created_at": float, ...}
+        Vrátí (nový_kratší_seznam, textový_souhrn)
+        """
+        if len(memories) < self.max_history:
+            return memories, ""
+
+        # Vezmi první třetinu jako "staré"
+        split = len(memories) // 3
+        old_memories = memories[:split]
+        recent_memories = memories[split:]
+
+        # Sestav kontext pro sumarizaci
+        context = "\n".join(m.get("content", "")[:200] for m in old_memories)
+
+        prompt = f"""Toto jsou starší konverzace s uživatelem JARVIS asistenta.
+Vytvoř stručný souhrn klíčových faktů o uživateli (max 5 vět):
+
+{context}
+
+Souhrn (jen fakta o uživateli, jeho preferencích a zvyklostech):"""
+
+        summary = ""
+        try:
+            import requests
+            r = requests.post(
+                ollama_url,
+                json={"model": model, "messages": [{"role": "user", "content": prompt}],
+                      "stream": False, "options": {"temperature": 0.1, "num_predict": 300}},
+                timeout=30,
+            )
+            if r.ok:
+                summary = r.json().get("message", {}).get("content", "").strip()
+        except Exception as e:
+            logger.warning(f"ConversationSummarizer LLM chyba: {e}")
+            # Fallback: simple concatenation
+            summary = f"Souhrn {len(old_memories)} starších konverzací: " + context[:500]
+
+        return recent_memories, summary
+
+    def prune_and_save(self, memory_store, user_profile, ollama_url: str, model: str) -> str:
+        """Hlavní metoda — pruneuje paměť a ukládá souhrn do user_profile."""
+        try:
+            # Získej všechny konverzační vzpomínky
+            memories = memory_store.recall("", top_k=200, min_importance=0.0)
+            conv_memories = [m for m in memories if "conversation" in str(m.get("tags", []))]
+
+            if not self.should_prune(len(conv_memories)):
+                return f"Pruning nepotřebný ({len(conv_memories)} zpráv < {self.max_history})"
+
+            pruned, summary = self.summarize_and_prune(conv_memories, ollama_url, model)
+
+            if summary:
+                # Ulož souhrn jako poznámku do user_profile
+                # set() volá _save() interně, takže explicitní save() není potřeba
+                user_profile.set("conversation_summary", summary, confidence=0.9)
+
+            return f"Zkondenzováno {len(conv_memories) - len(pruned)} starých konverzací. Souhrn uložen do profilu."
+        except Exception as e:
+            return f"Pruning selhal: {e}"
+
+
+_summarizer: "ConversationSummarizer | None" = None
+
+
+def get_conversation_summarizer(config: dict = None) -> ConversationSummarizer:
+    global _summarizer
+    if _summarizer is None:
+        from config import CONFIG
+        _summarizer = ConversationSummarizer(config or CONFIG)
+    return _summarizer

@@ -89,6 +89,9 @@ MANIFEST_SCHEMA = {
 }
 
 
+# Permissions vyžadující explicitní schválení uživatelem (rizikové)
+DANGEROUS_PERMISSIONS = {"system.exec", "system", "network.full", "internal"}
+
 class ManifestValidator:
     @staticmethod
     def validate(manifest: dict) -> tuple:
@@ -103,6 +106,29 @@ class ManifestValidator:
             if perm not in MANIFEST_SCHEMA["valid_permissions"]:
                 return False, f"Neplatné oprávnění: '{perm}'"
         return True, ""
+
+    @staticmethod
+    def security_warnings(manifest: dict) -> list[str]:
+        """Vrátí seznam bezpečnostních varování pro uživatele.
+        Volej před uložením LLM-generovaného pluginu — zobraz v UI jako review dialog.
+        """
+        warnings = []
+        perms = set(manifest.get("permissions", []))
+        risky = perms & DANGEROUS_PERMISSIONS
+        if risky:
+            warnings.append(
+                f"⚠️ Plugin požaduje nebezpečná oprávnění: {', '.join(risky)}. "
+                f"Tyto permissions umožňují spouštět systémové příkazy. "
+                f"Zkontroluj kód pluginu před uložením!"
+            )
+        if "network.full" in perms or "network.fetch" in perms:
+            warnings.append("🌐 Plugin má přístup k síti — může posílat data na internet.")
+        if manifest.get("_generated_by_llm"):
+            warnings.append(
+                "🤖 Tento plugin byl vygenerován AI. "
+                "Před aktivací zkontroluj kód a přidělená oprávnění."
+            )
+        return warnings
 
 
 _PERMISSION_MODULES: Dict[str, Set[str]] = {

@@ -10,10 +10,28 @@ import tempfile
 logger = logging.getLogger(__name__)
 
 
+def _ollama_unload(model: str = "llava:7b") -> None:
+    """Uvolní model z VRAM po dokončení inference (ollama unload)."""
+    try:
+        import requests as _req
+        # Ollama API: POST /api/generate s keep_alive=0 uvolní model
+        _req.post(
+            "http://localhost:11434/api/generate",
+            json={"model": model, "keep_alive": 0},
+            timeout=5,
+        )
+        logger.debug(f"Uvolněn model z VRAM: {model}")
+    except Exception:
+        pass  # Unload je best-effort, nesmí selhat
+
+
 def _ask_vision(image_path: str, prompt: str) -> str:
     try:
         from llm import ask_vision
-        return ask_vision(prompt, image_path, model="llava:7b")
+        result = ask_vision(prompt, image_path, model="llava:7b")
+        # Po dokončení inference uvolni LLaVA z VRAM
+        _ollama_unload("llava:7b")
+        return result
     except Exception as e:
         return f"Vision model nedostupný: {e}"
 

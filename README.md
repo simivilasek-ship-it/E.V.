@@ -1,13 +1,25 @@
-# JARVIS v4.5 — Lokální AI asistent
+# JARVIS v4.6 — Lokální AI asistent
 
 > Ovládej celý počítač hlasem nebo textem. Běží **100 % lokálně** — žádný cloud, žádný API klíč.
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-399%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-513%20passing-brightgreen)]()
 [![Next.js](https://img.shields.io/badge/frontend-Next.js%2016%20%2B%20TypeScript-black)](https://nextjs.org/)
 [![Version](https://img.shields.io/badge/version-4.5.0-orange)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+---
+
+## Co je nového v v4.6
+
+| Změna | Detail |
+|---|---|
+| **Global Hotkey** | `Alt+Space` kdekoliv v OS → quick input (Spotlight styl) |
+| **Memory Pruning** | Auto-sumarizace starých konverzací → kondenzovaná fakta v user_profile |
+| **VRAM management** | LLaVA se uvolní z VRAM po dokončení vision analýzy (`ollama unload`) |
+| **Plugin Security Review** | `ManifestValidator.security_warnings()` — varování před uložením LLM pluginu |
+| **513 testů** | +31 nových testů (global hotkey, memory pruning, commands coverage) |
 
 ---
 

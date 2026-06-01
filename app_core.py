@@ -129,6 +129,19 @@ class JarvisApp:
         if CONFIG.get("wake_word_enabled", True):
             self.wake_word.start()
 
+        # Global Hotkey (Alt+Space) — opt-in, tiše selže bez pynput
+        try:
+            from global_hotkey import start_global_hotkey
+            self._global_hotkey = start_global_hotkey(
+                callback=self._on_hotkey_input,
+                hotkey="<alt>+<space>"
+            )
+            if self._global_hotkey.available:
+                logger.info("GlobalHotkey: Alt+Space aktivní")
+        except Exception as e:
+            self._global_hotkey = None
+            logger.debug(f"GlobalHotkey init selhal (normální pokud chybí pynput): {e}")
+
         logger.info("Systémy v4.4 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord)")
 
     def _load_plugins(self):
@@ -290,6 +303,11 @@ class JarvisApp:
         logger.info("Wake word detekován, spouštím naslouchání")
         self._gui(lambda: self.gui.set_status("Wake word detekován..."))
         self._on_mic_click()
+
+    def _on_hotkey_input(self, text: str) -> None:
+        """Zpracuje vstup z global hotkey okna."""
+        if text and hasattr(self, "_process_command"):
+            self._process_command(text)
 
     def _on_mic_click(self):
         if not self.stt.is_available():
@@ -570,6 +588,13 @@ class JarvisApp:
         # Zastav wake word
         try:
             self.wake_word.stop()
+        except Exception:
+            pass
+
+        # Zastav global hotkey
+        try:
+            if getattr(self, "_global_hotkey", None):
+                self._global_hotkey.stop()
         except Exception:
             pass
 
