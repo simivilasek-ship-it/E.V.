@@ -21,16 +21,62 @@ except Exception:
 
 
 def cmd_screenshot() -> str:
-    if not HAS_PYAUTOGUI:
-        return "pyautogui není nainstalován"
+    import subprocess, shutil
+    from datetime import datetime
     ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
     home = Path.home()
     desk = home / "Plocha"
     if not desk.is_dir():
         desk = home / "Desktop"
-    dest = (desk if desk.is_dir() else home) / f"screenshot_{ts}.png"
-    pyautogui.screenshot().save(dest)
-    return f"Uloženo: {dest}"
+    dest = str((desk if desk.is_dir() else home) / f"screenshot_{ts}.png")
+
+    # 1. pyautogui (nejrychlejší)
+    if HAS_PYAUTOGUI:
+        try:
+            pyautogui.screenshot().save(dest)
+            return f"Uloženo: {dest}"
+        except Exception:
+            pass
+
+    # 2. gnome-screenshot
+    if shutil.which("gnome-screenshot"):
+        try:
+            r = subprocess.run(["gnome-screenshot", "-f", dest],
+                               capture_output=True, timeout=8)
+            if r.returncode == 0:
+                return f"Uloženo: {dest}"
+        except Exception:
+            pass
+
+    # 3. scrot
+    if shutil.which("scrot"):
+        try:
+            r = subprocess.run(["scrot", dest], capture_output=True, timeout=8)
+            if r.returncode == 0:
+                return f"Uloženo: {dest}"
+        except Exception:
+            pass
+
+    # 4. import (ImageMagick)
+    if shutil.which("import"):
+        try:
+            r = subprocess.run(["import", "-window", "root", dest],
+                               capture_output=True, timeout=8)
+            if r.returncode == 0:
+                return f"Uloženo: {dest}"
+        except Exception:
+            pass
+
+    # 5. PIL/Pillow přes Xlib
+    try:
+        from PIL import ImageGrab
+        img = ImageGrab.grab()
+        img.save(dest)
+        return f"Uloženo: {dest}"
+    except Exception:
+        pass
+
+    return "Screenshot selhal. Nainstaluj: sudo apt install gnome-screenshot"
 
 
 def cmd_type_key(key: str) -> str:
