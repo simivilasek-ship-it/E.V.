@@ -783,6 +783,35 @@ class LocalRouter:
                 return "Nastavuji připomínku.", {
                     "action": "reminder_set", "params": {"text": reminder, "time_str": "1 minuta"}}
 
+        # ── YOUTUBE TITULKY (MCP) ────────────────────
+        if re.search(r"\b(titulky|subtitles?|transcript|prepis\s+videa|titulky\s+z)\b", t):
+            query = re.sub(r"\b(titulky|subtitles?|transcript|prepis\s+videa|titulky\s+z)\b\s*",
+                           "", text, flags=re.IGNORECASE).strip()
+            if query:
+                return f"Načítám titulky: {query}", {
+                    "action": "mcp_tool",
+                    "params": {"server": "youtube-transcript", "tool": "get_transcript", "arguments": {"url": query}}}
+
+        # ── GITHUB (MCP) ──────────────────────────────
+        if re.search(r"\b(github|issue|pull\s*request|pr\b|commit|repo\b)\b", t) and \
+           re.search(r"\b(vytvor|otevri|zobraz|najdi|seznam|search|create|list|get)\b", t):
+            query = re.sub(r"\b(github|issue|pull\s*request|pr|commit|repo)\b\s*", "", text,
+                           flags=re.IGNORECASE).strip()
+            return f"GitHub: {text}", {
+                "action": "mcp_tool",
+                "params": {"server": "github", "tool": "search_issues",
+                           "arguments": {"query": query or text}}}
+
+        # ── GOOGLE MAPS (MCP) ─────────────────────────
+        if re.search(r"\b(naviguj|trasa|vzdalenost|jak\s+se\s+dostat|kde\s+je|mapa|maps)\b", t):
+            query = re.sub(r"\b(naviguj|trasa|vzdalenost|jak\s+se\s+dostat|kde\s+je|mapa|maps)\b\s*",
+                           "", text, flags=re.IGNORECASE).strip()
+            if query:
+                return f"Google Maps: {query}", {
+                    "action": "mcp_tool",
+                    "params": {"server": "google-maps", "tool": "geocode",
+                               "arguments": {"address": query}}}
+
         # ── WIKIPEDIE ────────────────────────────────
         if re.search(r"\b(wiki|wikipedia|co\s+je)\b", t):
             query = re.sub(r"\b(wiki|wikipedia|co\s+je)\b\s*", "", text,

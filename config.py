@@ -75,6 +75,13 @@ DEFAULT_CONFIG = {
     "mcp_fetch_enabled": True,
     "mcp_playwright_enabled": False,
     "mcp_result_limit": 32_000,   # max znaků z MCP nástroje před zkrácením
+    # Nové MCP servery v4.5
+    "mcp_github_enabled": True,             # vyžaduje GITHUB_TOKEN v .env
+    "mcp_sqlite_enabled": False,            # opt-in (JARVIS má vlastní memory API)
+    "mcp_youtube_transcript_enabled": True, # bez API klíče
+    "mcp_everything_enabled": False,        # opt-in desktop search
+    "mcp_google_maps_enabled": True,        # vyžaduje GOOGLE_MAPS_API_KEY v .env
+    "mcp_slack_enabled": True,              # vyžaduje SLACK_BOT_TOKEN v .env
     # Agent graph
     "agent_max_steps": 8,         # max Executor volání celkem
     "agent_max_retries": 2,       # max opakování jednoho kroku při chybě

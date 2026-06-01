@@ -327,6 +327,76 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
         enabled=config.get("mcp_computer_control_enabled", True),
     ))
 
+    # ── GitHub MCP — issues, PRs, code search, commits ──
+    # Vyžaduje GITHUB_TOKEN (Settings → Developer → Personal access tokens)
+    github_token = config.get("github_token") or os.environ.get("GITHUB_TOKEN") or ""
+    bridge.register(MCPServerConfig(
+        name="github",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-github"],
+        env={"GITHUB_PERSONAL_ACCESS_TOKEN": github_token} if github_token else {},
+        enabled=bool(github_token) and config.get("mcp_github_enabled", True),
+    ))
+    if not github_token:
+        logger.info("GitHub MCP: GITHUB_TOKEN není nastaven → zakázáno. Přidej do .env: GITHUB_TOKEN=...")
+
+    # ── SQLite MCP — dotazy do libovolné SQLite databáze ─
+    # Výchozí: JARVIS vlastní paměť DB. Lze přepsat přes config.
+    sqlite_db = config.get("mcp_sqlite_db", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "memory_data", "memories.db"))
+    bridge.register(MCPServerConfig(
+        name="sqlite",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-sqlite", "--db-path", sqlite_db],
+        enabled=config.get("mcp_sqlite_enabled", False),  # opt-in (JARVIS má vlastní memory API)
+    ))
+
+    # ── YouTube Transcript MCP — titulky bez stahování ──
+    bridge.register(MCPServerConfig(
+        name="youtube-transcript",
+        command="npx",
+        args=["-y", "@kimtaeyoon83/mcp-server-youtube-transcript"],
+        enabled=config.get("mcp_youtube_transcript_enabled", True),
+    ))
+
+    # ── Everything Search MCP — rychlé hledání souborů ──
+    # Windows: uses Everything app. Linux: použije find/fd fallback.
+    bridge.register(MCPServerConfig(
+        name="everything-search",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-everything"],
+        enabled=config.get("mcp_everything_enabled", False),  # opt-in
+    ))
+
+    # ── Google Maps MCP — geocoding, routing, places ────
+    # Vyžaduje GOOGLE_MAPS_API_KEY (Google Cloud Console → Maps API)
+    gmaps_key = config.get("google_maps_api_key") or os.environ.get("GOOGLE_MAPS_API_KEY") or ""
+    bridge.register(MCPServerConfig(
+        name="google-maps",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-google-maps"],
+        env={"GOOGLE_MAPS_API_KEY": gmaps_key} if gmaps_key else {},
+        enabled=bool(gmaps_key) and config.get("mcp_google_maps_enabled", True),
+    ))
+    if not gmaps_key:
+        logger.info("Google Maps MCP: GOOGLE_MAPS_API_KEY není nastaven → zakázáno. Přidej do .env.")
+
+    # ── Slack MCP — čtení kanálů, posílání zpráv ────────
+    # Vyžaduje SLACK_BOT_TOKEN + SLACK_TEAM_ID
+    slack_token = config.get("slack_bot_token") or os.environ.get("SLACK_BOT_TOKEN") or ""
+    bridge.register(MCPServerConfig(
+        name="slack",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-slack"],
+        env={
+            "SLACK_BOT_TOKEN": slack_token,
+            "SLACK_TEAM_ID": config.get("slack_team_id") or os.environ.get("SLACK_TEAM_ID", ""),
+        } if slack_token else {},
+        enabled=bool(slack_token) and config.get("mcp_slack_enabled", True),
+    ))
+    if not slack_token:
+        logger.debug("Slack MCP: SLACK_BOT_TOKEN není nastaven → zakázáno")
+
     _warn_missing_commands(bridge)
     return bridge
 
