@@ -4,6 +4,43 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Light theme ──────────────────────────────────── */
+[data-theme="light"] {
+  --bg:        #f0f4f8;
+  --bg-card:   rgba(255,255,255,.85);
+  --bg-card2:  rgba(248,250,252,.95);
+  --bg-hover:  rgba(0,160,200,.06);
+  --cyan:      #0284c7;
+  --cyan-dim:  rgba(2,132,199,.1);
+  --cyan-glow: rgba(2,132,199,.2);
+  --text:      #0f172a;
+  --text2:     #64748b;
+  --text3:     #94a3b8;
+  --border:    rgba(0,0,0,.08);
+  --border2:   rgba(0,0,0,.05);
+  --card-shadow: 0 2px 16px rgba(0,0,0,.08), 0 1px 0 rgba(255,255,255,.9) inset;
+}
+
+[data-theme="light"] body::before {
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 20%, rgba(186,230,253,.4) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 85% 80%, rgba(196,181,253,.2) 0%, transparent 60%);
+}
+
+[data-theme="light"] body::after {
+  background-image:
+    linear-gradient(rgba(0,130,180,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,130,180,.04) 1px, transparent 1px);
+}
+
+[data-theme="light"] .sidebar {
+  background: rgba(248,250,252,.96);
+  border-right-color: rgba(0,0,0,.08);
+}
+
+[data-theme="light"] .brand-name { text-shadow: none; }
+[data-theme="light"] .new-chat-btn { color: #0284c7; background: rgba(2,132,199,.07); border-color: rgba(2,132,199,.2); }
+
 :root {
   /* Base */
   --bg:        #040910;

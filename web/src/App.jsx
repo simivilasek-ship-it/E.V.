@@ -1,5 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useJarvis } from './store/jarvis'
+
+function useTheme() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('jarvis-theme') || 'dark')
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('jarvis-theme', theme)
+  }, [theme])
+  const toggle = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), [])
+  return [theme, toggle]
+}
 import ChatPanel from './components/ChatPanel'
 import SystemPanel from './components/SystemPanel'
 import PluginStore from './components/PluginStore'
@@ -73,7 +83,7 @@ const ORB_CFG = {
 }
 
 // ── Sidebar ─────────────────────────────────────────
-function Sidebar({ tab, setTab, setPaletteOpen, clearMessages }) {
+function Sidebar({ tab, setTab, setPaletteOpen, clearMessages, theme, toggleTheme }) {
   const connStatus = useJarvis(s => s.connStatus)
   const retry      = useJarvis(s => s.retry)
   const orbState   = useJarvis(s => s.orbState)
@@ -193,6 +203,20 @@ function Sidebar({ tab, setTab, setPaletteOpen, clearMessages }) {
           <kbd>⌘K</kbd>
           <span>Command palette</span>
         </button>
+        <button onClick={toggleTheme} style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          width: '100%', padding: '6px 8px', marginTop: 4,
+          background: 'none', border: '1px solid transparent',
+          borderRadius: 6, cursor: 'pointer', transition: 'all .18s',
+          fontFamily: 'var(--font-mono)', fontSize: 10,
+          color: 'var(--text2)', letterSpacing: '.04em',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'rgba(255,255,255,.02)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'none' }}
+        >
+          <span style={{ fontSize: 13 }}>{theme === 'dark' ? '☀️' : '🌙'}</span>
+          <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+        </button>
       </div>
     </aside>
   )
@@ -200,6 +224,7 @@ function Sidebar({ tab, setTab, setPaletteOpen, clearMessages }) {
 
 // ── App ─────────────────────────────────────────────
 export default function App() {
+  const [theme, toggleTheme] = useTheme()
   const connect        = useJarvis(s => s.connect)
   const connectMetrics = useJarvis(s => s.connectMetrics)
   const connectChat    = useJarvis(s => s.connectChat)
@@ -243,6 +268,7 @@ export default function App() {
         tab={tab} setTab={setTab}
         setPaletteOpen={setPaletteOpen}
         clearMessages={clearMessages}
+        theme={theme} toggleTheme={toggleTheme}
       />
 
       <div className="main-content">

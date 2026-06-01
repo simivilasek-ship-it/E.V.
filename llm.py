@@ -127,6 +127,60 @@ class OllamaClient:
 #  LLM ENGINE
 # ══════════════════════════════════════════════════════
 
+class _LLMCache:
+    """LRU cache pro LLM odpovědi — opakované dotazy nevytěžují Ollama.
+
+    Cache key = (model, normalized_text). TTL 10 minut, max 200 záznamů.
+    Vyřazuje faktické/real-time dotazy (počasí, čas, sport).
+    """
+    _NO_CACHE = re.compile(
+        r"\b(pocasi|weather|cas|hodin|sport|zapas|live|dnes|ted|nyni"
+        r"|aktualni|kurz|bitcoin|ethereum|cena\s+\w+)\b", re.I)
+
+    def __init__(self, maxsize: int = 200, ttl: int = 600):
+        self._store: dict = {}   # key → (response, action, timestamp)
+        self._maxsize = maxsize
+        self._ttl     = ttl
+
+    def _key(self, model: str, text: str) -> str:
+        normalized = re.sub(r"\s+", " ", text.strip().lower())
+        return f"{model}::{normalized}"
+
+    def get(self, model: str, text: str):
+        if self._NO_CACHE.search(text):
+            return None
+        k = self._key(model, text)
+        entry = self._store.get(k)
+        if entry and (time.time() - entry[2]) < self._ttl:
+            logger.debug(f"LLM cache hit: {text[:50]}")
+            return entry[0], entry[1]
+        if entry:
+            del self._store[k]
+        return None
+
+    def set(self, model: str, text: str, response: str, action: dict):
+        if self._NO_CACHE.search(text):
+            return
+        if len(self._store) >= self._maxsize:
+            # Vyhoď nejstarší
+            oldest = min(self._store, key=lambda k: self._store[k][2])
+            del self._store[oldest]
+        self._store[self._key(model, text)] = (response, action, time.time())
+
+    def clear(self):
+        self._store.clear()
+
+    def stats(self) -> dict:
+        import time as _t
+        now = _t.time()
+        valid = sum(1 for v in self._store.values() if now - v[2] < self._ttl)
+        return {"total": len(self._store), "valid": valid, "ttl": self._ttl}
+
+
+# Globální cache sdílená napříč instancemi LLMEngine
+_llm_cache = _LLMCache()
+
+
 class LLMEngine:
 
     def __init__(self, config: dict, memory: JarvisMemory = None):
@@ -137,10 +191,11 @@ class LLMEngine:
         self.memory  = memory or JarvisMemory(config)
         self._stream_resp = None
         self._profile_context = ""   # injektovaný souhrn UserProfile
+        self._cache  = _llm_cache    # sdílená instance
 
         from llm_router import LLMRouter
         self._llm_router = LLMRouter(self.url, self.model)
-        logger.info(f"LLM: {self.model} @ {self.url} + Neural Memory + LLMRouter")
+        logger.info(f"LLM: {self.model} @ {self.url} + Neural Memory + LLMRouter + Cache")
 
     def _extract_user_facts(self, text: str) -> None:
         """Zkusí extrahovat fakta o uživateli z jeho zprávy do UserProfile."""
@@ -218,6 +273,14 @@ class LLMEngine:
                     logger.warning(f"Memory store selhalo (ignorováno): {_mem_err}")
             return msg or "", action
 
+        # Cache hit — vrátí okamžitě bez Ollama
+        cached = self._cache.get(self.model, user_text)
+        if cached:
+            raw, action = cached
+            self.history.append({"role": "user",      "content": user_text})
+            self.history.append({"role": "assistant",  "content": raw})
+            return raw, action
+
         self.history.append({"role": "user", "content": user_text})
         messages, routed_model, temperature, max_tokens = self._build_messages(user_text)
         payload = {
@@ -231,6 +294,9 @@ class LLMEngine:
             resp.raise_for_status()
             raw  = resp.json().get("message", {}).get("content", "").strip()
             self.history.append({"role": "assistant", "content": raw})
+            # Ulož do cache (faktické dotazy se nevyřadí automaticky uvnitř .set())
+            answer_action = {"action": "answer", "params": {}}
+            self._cache.set(self.model, user_text, raw, answer_action)
             try:
                 self.memory.store_conversation(user_text, raw, importance=0.6)
             except Exception as _me:
