@@ -28,7 +28,7 @@ echo ""
 echo "  Ctrl+C pro zastavení obou serverů."
 
 cleanup() {
-  kill $BACKEND_PID $VITE_PID 2>/dev/null || true
+  kill $BACKEND_PID $NEXT_PID 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 wait
