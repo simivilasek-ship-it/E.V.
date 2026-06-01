@@ -665,12 +665,7 @@ class LocalRouter:
                     "action": "search_web", "params": {"query": query}}
 
         # ── VSCODE ────────────────────────────────────
-        if re.search(r"\b(otevři\s+ve?\s+vscode|vscode\s+open|code\s+\.)\b", t):
-            path = re.sub(r"\b(otevři\s+ve?\s+vscode|vscode\s+open|code)\b", "", text,
-                          flags=re.IGNORECASE).strip()
-            return "Otevírám ve VSCode.", {
-                "action": "vscode_open",
-                "params": {"path": os.path.expanduser(path) if path else _HOME}}
+        # VSCode trigger je výše (řádky ~325)
 
         # ── VYTVOŘ SLOŽKU ─────────────────────────────
         m = re.search(r"\b(vytvor|vytvorit|mkdir)\s+slozku\s+(.+)", t)

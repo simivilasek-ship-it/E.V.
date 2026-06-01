@@ -577,11 +577,23 @@ class DailySummarizer:
             logger.warning(f"Memory pruning selhal: {e}")
 
         with self._lock:
-            try:
-                return self._do_summarize()
-            except Exception as e:
-                logger.error(f"DailySummarizer chyba: {e}")
-                return ""
+            # Retry až 3× s exponential backoff (Ollama může být dočasně zahlcena)
+            import time as _time
+            for attempt in range(3):
+                try:
+                    result = self._do_summarize()
+                    if result:
+                        return result
+                    return ""
+                except Exception as e:
+                    if attempt < 2:
+                        wait = 2 ** attempt  # 1s, 2s
+                        logger.warning(f"DailySummarizer pokus {attempt+1}/3 selhal: {e} — retry za {wait}s")
+                        _time.sleep(wait)
+                    else:
+                        logger.error(f"DailySummarizer selhalo po 3 pokusech: {e}")
+                        return ""
+            return ""
 
     def _do_summarize(self) -> str:
         from user_profile import get_user_profile

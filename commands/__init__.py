@@ -60,6 +60,12 @@ class CommandExecutor:
         self._undo_stack: deque = deque(maxlen=self._UNDO_LIMIT)
 
     def execute(self, action: str, params: Dict[str, Any]) -> str:
+        # Validace: action musí být slug (jen písmena, číslice, podtržítko)
+        # Zabrání volání privátních metod jako _shutdown nebo __init__
+        import re as _re
+        if not _re.match(r'^[a-z][a-z0-9_]*$', action):
+            logger.warning(f"Neplatná akce (odmítnuto): {action!r}")
+            return f"Neplatná akce: {action}"
         try:
             method = getattr(self, f"_cmd_{action}", None)
             if method is None:

@@ -249,3 +249,52 @@ def test_currency_convert_unsupported():
     result = cmd_currency_convert(100, "XYZ", "ABC")
     assert isinstance(result, str)
     assert "Nepodporované" in result or "nepodporované" in result.lower()
+
+
+# ── Testy pro memory akce přes CommandExecutor ──────────────────────────────
+
+class TestMemoryActions:
+    """Testy pro memory_recall, memory_store, memory_maintenance přes execute()."""
+
+    def test_memory_store_returns_string(self, tmp_path):
+        from commands import CommandExecutor
+        cfg = {"memory_dir": str(tmp_path), "ollama_url": "http://localhost:11434/api/chat",
+               "ollama_model": "qwen2.5:3b"}
+        cmds = CommandExecutor(cfg)
+        result = cmds.execute("memory_store", {"content": "test paměť", "importance": 0.5})
+        assert isinstance(result, str)
+
+    def test_memory_stats_returns_string(self, tmp_path):
+        from commands import CommandExecutor
+        cfg = {"memory_dir": str(tmp_path), "ollama_url": "http://localhost:11434/api/chat",
+               "ollama_model": "qwen2.5:3b"}
+        cmds = CommandExecutor(cfg)
+        result = cmds.execute("memory_stats", {})
+        assert isinstance(result, str)
+
+    def test_memory_maintenance_no_crash(self, tmp_path):
+        from commands import CommandExecutor
+        cfg = {"memory_dir": str(tmp_path), "ollama_url": "http://localhost:11434/api/chat",
+               "ollama_model": "qwen2.5:3b"}
+        cmds = CommandExecutor(cfg)
+        result = cmds.execute("memory_maintenance", {})
+        assert isinstance(result, str)
+
+    def test_execute_rejects_invalid_action(self):
+        from commands import CommandExecutor
+        cmds = CommandExecutor({})
+        # Privátní metody musí být odmítnuty
+        result = cmds.execute("_shutdown", {})
+        assert "Neplatná" in result or "Neznámá" in result
+
+    def test_execute_rejects_injection(self):
+        from commands import CommandExecutor
+        cmds = CommandExecutor({})
+        result = cmds.execute("__init__", {})
+        assert "Neplatná" in result
+
+    def test_execute_rejects_dunder(self):
+        from commands import CommandExecutor
+        cmds = CommandExecutor({})
+        result = cmds.execute("undo; rm -rf /", {})
+        assert "Neplatná" in result

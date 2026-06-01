@@ -67,7 +67,7 @@ class OllamaClient:
         self.url   = url
         self.model = model
 
-    def call(self, messages: list, temperature: float = 0.1,
+    def call(self, messages: list[dict], temperature: float = 0.1,
              max_tokens: int = 500, timeout: int = 60) -> str:
         payload = {
             "model":    self.model,
@@ -83,7 +83,7 @@ class OllamaClient:
             logger.error(f"OllamaClient chyba: {e}")
             return ""
 
-    def call_json(self, messages: list, schema: dict = None,
+    def call_json(self, messages: list[dict], schema: dict | None = None,
                   temperature: float = 0.0, max_tokens: int = 500,
                   timeout: int = 60) -> dict:
         """Vynutí JSON výstup přes Ollama format:'json'. Vrátí dict nebo {} při chybě.

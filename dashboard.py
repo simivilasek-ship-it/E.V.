@@ -52,7 +52,7 @@ try:
     from scheduler import get_scheduler
     from security_v2 import get_security_manager
     from agents import AgentManager
-    from config import CONFIG
+    from config import CONFIG, __version__
     logger_module_available = True
 except ImportError:
     pass
@@ -106,7 +106,7 @@ if HAS_FASTAPI:
             "ws": "running",                 # WebSocket server běží
             "uptime_s": uptime,
             "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "version": "4.4.0",
+            "version": __version__,
             "port": 8002,
             "checks": {
                 "ollama": {"ok": ollama_ok},
@@ -187,7 +187,7 @@ if HAS_FASTAPI:
     @app.get("/api/status")
     async def status():
         if logger_module_available:
-            from config import CONFIG
+            from config import CONFIG, __version__
             import requests as _r
             try:
                 r = _r.get("http://localhost:11434/api/tags", timeout=2)
@@ -248,7 +248,7 @@ if HAS_FASTAPI:
             return {"error": "Prázdný příkaz"}
         try:
             from llm import LLMEngine, LocalRouter
-            from config import CONFIG
+            from config import CONFIG, __version__
             router = LocalRouter()
             msg, action = router.route(cmd)
             if action:
@@ -268,7 +268,7 @@ if HAS_FASTAPI:
         """Seznam načtených pluginů s health statusem."""
         try:
             from plugin_system import create_plugin_manager
-            from config import CONFIG
+            from config import CONFIG, __version__
             pm = create_plugin_manager(CONFIG)
             pm.load_all_plugins()
             health   = pm.health_check()
@@ -299,7 +299,7 @@ if HAS_FASTAPI:
         """Dotaz do JARVIS paměti."""
         try:
             from memory import JarvisMemory
-            from config import CONFIG
+            from config import CONFIG, __version__
             mem = JarvisMemory(CONFIG)
             results = mem.recall(q, top_k=5) if q else []
             stats   = mem.stats()
@@ -312,7 +312,7 @@ if HAS_FASTAPI:
         """Vrátí paměť jako force-directed graf (nodes + links)."""
         try:
             from memory import JarvisMemory
-            from config import CONFIG
+            from config import CONFIG, __version__
             mem   = JarvisMemory(CONFIG)
             items = mem.recall("", top_k=60, min_importance=0.0)
 
@@ -370,7 +370,7 @@ if HAS_FASTAPI:
     async def get_config():
         """Vrátí aktuální konfiguraci (bez secrets)."""
         try:
-            from config import CONFIG
+            from config import CONFIG, __version__
             safe = {k: v for k, v in CONFIG.items()
                     if k not in ("brave_api_key",) and "key" not in k.lower()}
             return safe
@@ -383,7 +383,7 @@ if HAS_FASTAPI:
         ALLOWED = {"ollama_model", "tts_rate", "tts_voice", "stt_language",
                    "wake_word_enabled", "tts_enabled", "tts_streaming"}
         try:
-            from config import CONFIG, save_config
+            from config import CONFIG, __version__, save_config
             changed = {}
             for k, v in body.items():
                 if k in ALLOWED:
@@ -469,7 +469,7 @@ if HAS_FASTAPI:
             return {"error": "Prázdný prompt"}
         try:
             from llm import OllamaClient
-            from config import CONFIG
+            from config import CONFIG, __version__
             client = OllamaClient(CONFIG["ollama_url"], CONFIG["ollama_model"])
 
             system = """\
@@ -579,7 +579,7 @@ Pravidla pro skill.py:
             return {"error": "Chybí task"}
         max_steps = min(int(body.get("max_steps", 5)), 8)
         try:
-            from config import CONFIG
+            from config import CONFIG, __version__
             from commands import CommandExecutor
             from agent_roles import MultiAgentOrchestrator
             url   = CONFIG.get("ollama_url",   "http://localhost:11434/api/chat")
@@ -599,7 +599,7 @@ Pravidla pro skill.py:
             return {"response": "Prázdná zpráva"}
         try:
             from local_router import LocalRouter
-            from config import CONFIG
+            from config import CONFIG, __version__
             msg, action = LocalRouter().route(text)
             if action and action.get("action") not in ("answer", None):
                 from commands import CommandExecutor
@@ -633,7 +633,7 @@ Pravidla pro skill.py:
 
                 try:
                     from llm import LocalRouter, LLMEngine
-                    from config import CONFIG
+                    from config import CONFIG, __version__
 
                     msg, action = LocalRouter().route(text)
 
@@ -704,7 +704,7 @@ Pravidla pro skill.py:
         """Vrátí dostupné Ollama modely."""
         try:
             import requests as _r
-            from config import CONFIG
+            from config import CONFIG, __version__
             base = CONFIG.get("ollama_url", "http://localhost:11434/api/chat")
             r = _r.get(base.replace("/api/chat", "/api/tags"), timeout=4)
             if r.status_code == 200:
@@ -724,7 +724,7 @@ Pravidla pro skill.py:
             return {"error": f"Soubor nenalezen: {image_path}"}
         try:
             from llm import ask_vision
-            from config import CONFIG
+            from config import CONFIG, __version__
             url    = CONFIG.get("ollama_url", "http://localhost:11434/api/chat")
             answer = ask_vision(prompt, image_path, model, url)
             return {"answer": answer}
