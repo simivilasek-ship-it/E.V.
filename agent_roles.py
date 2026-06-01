@@ -233,9 +233,86 @@ class MultiAgentOrchestrator:
 
         return "\n\n".join(results)
 
+    def run_parallel(self, task: str, max_steps: int = 5,
+                     on_step=None) -> str:
+        """Paralelní pipeline — nezávislé kroky běží souběžně.
+
+        Kroky jsou rozděleny do vln (waves):
+          - Vlna 1: kroky bez závislostí (odd-indexed nebo výslovně nezávislé)
+          - Vlna 2: kroky závislé na výsledcích vlny 1
+
+        on_step(step_idx, step, result) — volitelný callback pro streaming UI.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import time as _t
+
+        steps = self.planner.plan(task)
+        if not steps:
+            return "Nepodařilo se sestavit plán."
+
+        steps = steps[:max_steps]
+        results: list[str] = [""] * len(steps)
+        timings: list[float] = [0.0] * len(steps)
+
+        # Rozdělení do vln: sudé indexy = vlna 0, liché = vlna 1
+        # (jednoduché heuristické schéma — bez explicitního dependency grafu)
+        wave0 = [i for i in range(len(steps)) if i % 2 == 0]
+        wave1 = [i for i in range(len(steps)) if i % 2 != 0]
+
+        def _run(idx: int) -> tuple[int, str, float]:
+            t0  = _t.monotonic()
+            res = self._execute_step(steps[idx])
+            ok, feedback = self.critic.evaluate(steps[idx], res)
+            if not ok:
+                res2 = self._execute_step(f"{steps[idx]} (oprava: {feedback})")
+                res  = res2
+            elapsed = _t.monotonic() - t0
+            if on_step:
+                try:
+                    on_step(idx, steps[idx], res)
+                except Exception:
+                    pass
+            return idx, res, elapsed
+
+        def _run_wave(indices: list[int], workers: int = 4):
+            with ThreadPoolExecutor(max_workers=min(workers, len(indices))) as pool:
+                futures = {pool.submit(_run, i): i for i in indices}
+                for fut in as_completed(futures):
+                    idx, res, elapsed = fut.result()
+                    results[idx]  = res
+                    timings[idx]  = elapsed
+                    logger.info(f"ParallelAgent: krok {idx+1} hotov ({elapsed:.1f}s)")
+
+        # Vlna 0 — paralelně
+        if wave0:
+            _run_wave(wave0)
+
+        # Vlna 1 — paralelně (po dokončení vlny 0)
+        if wave1:
+            _run_wave(wave1)
+
+        # Sestavení výstupu
+        lines = []
+        for i, (step, res, t) in enumerate(zip(steps, results, timings)):
+            lines.append(f"**Krok {i+1}** ({t:.1f}s): {step}\n{res}")
+
+        total = sum(timings)
+        sequential = total
+        actual = max(
+            sum(timings[i] for i in wave0) if wave0 else 0,
+            sum(timings[i] for i in wave1) if wave1 else 0,
+        ) + min(
+            sum(timings[i] for i in wave0) if wave0 else 0,
+            sum(timings[i] for i in wave1) if wave1 else 0,
+        )
+        lines.append(
+            f"\n*Paralelní: {actual:.1f}s vs sekvenční ~{sequential:.1f}s "
+            f"({int((1 - actual/sequential)*100) if sequential else 0}% rychleji)*"
+        )
+        return "\n\n".join(lines)
+
     def _execute_step(self, step: str) -> str:
         """Provede jeden krok — přes CommandExecutor nebo LLM."""
-        # Pokud krok vypadá jako příkaz (vyhledej, otevři, spočítej)
         if self._cmd_executor:
             try:
                 from local_router import LocalRouter

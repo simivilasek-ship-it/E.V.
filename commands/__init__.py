@@ -225,6 +225,17 @@ class CommandExecutor:
     # ── sports ───────────────────────────────────────
     def _cmd_sports(self, query="", **_):            return cmd_sports(query)
 
+    # ── parallel agents ───────────────────────────────
+    def _cmd_agent_parallel_task(self, task="", max_steps=5, **_):
+        try:
+            from agent_roles import MultiAgentOrchestrator
+            url   = self.config.get("ollama_url",   "http://localhost:11434/api/chat")
+            model = self.config.get("ollama_model", "qwen2.5:3b")
+            orch  = MultiAgentOrchestrator(url, model, executor=self)
+            return orch.run_parallel(task, max_steps=int(max_steps))
+        except Exception as e:
+            return f"Paralelní agenti selhali: {e}"
+
     # ── undo ─────────────────────────────────────────
     def _cmd_undo(self, **_):                        return self.undo()
     def _cmd_undo_history(self, **_):                return "\n".join(self.undo_history()) or "Prázdná historie."

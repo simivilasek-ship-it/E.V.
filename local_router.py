@@ -314,6 +314,38 @@ class LocalRouter:
                 return f"Ukončuji {app_name}.", {
                     "action": "kill_process", "params": {"name": proc}}
 
+        # ── VSCODE (před open_app, jinak matchuje 'otevři code') ────────
+        if re.search(r"\b(otevri|open)\s+(ve?\s+)?(vscode|code|editor)\b", t):
+            rest = re.sub(r"\b(otevri|open)\s+(ve?\s+)?(vscode|code|editor)\b\s*", "", text,
+                          flags=re.IGNORECASE).strip()
+            path = os.path.expanduser(rest) if rest else _HOME
+            return f"Otevírám ve VSCode: {rest or '~'}.", {
+                "action": "vscode_open", "params": {"path": path}}
+
+        # ── SPUSŤ SKRIPT (před open_app, jinak matchuje 'spusť X') ─────
+        m = re.search(r"\b(spust|spusti|spusť|run|execute)\s+(\S+\.(sh|py|bash|zsh|rb|pl))\b", t)
+        if m:
+            name = m.group(2).strip()
+            path = name if name.startswith("/") or name.startswith("~") else os.path.join(_HOME, name)
+            return f"Spouštím skript {name}.", {
+                "action": "run_script", "params": {"path": os.path.expanduser(path)}}
+        m = re.search(r"\b(spust|spusti|spusť|run|execute|bash)\s+skript\s+(\S+)", t)
+        if m:
+            name = m.group(2).strip()
+            path = name if name.startswith("/") or name.startswith("~") else os.path.join(_HOME, name)
+            return f"Spouštím skript {name}.", {
+                "action": "run_script", "params": {"path": os.path.expanduser(path)}}
+
+        # ── PŘEJMENUJ (před move_file a open_app) ───────────────────────
+        m = re.search(r"\b(prejmenuj|prejmenu(j)?|rename)\s+(?:soubor\s+)?(\S+)\s+(na|to)\s+(\S+)", t)
+        if m:
+            src = m.group(3).strip()
+            dst = m.group(5).strip()
+            src_p = os.path.expanduser(src if "/" in src else os.path.join(_HOME, src))
+            dst_p = os.path.expanduser(dst if "/" in dst else os.path.join(_HOME, dst))
+            return f"Přejmenovávám {src} → {dst}.", {
+                "action": "move_file", "params": {"src": src_p, "dst": dst_p}}
+
         # ── PŘESNÁ SHODA (substring) — vyšší priorita než fuzzy ────────
         for phrase, action, params_fn in _FUZZY_COMMANDS:
             if phrase in t:
@@ -640,6 +672,55 @@ class LocalRouter:
             return f"Vytvářím složku {name}.", {
                 "action": "create_folder", "params": {"path": path}}
 
+        # ── VYTVOŘ SOUBOR ─────────────────────────────
+        m = re.search(r"\b(vytvor|vytvorit|touch|new)\s+soubor\s+(\S+)", t)
+        if m:
+            name = m.group(2).strip()
+            path = name if name.startswith("/") or name.startswith("~") else os.path.join(_HOME, name)
+            return f"Vytvářím soubor {name}.", {
+                "action": "create_file", "params": {"path": os.path.expanduser(path)}}
+
+        # ── SMAŽ / ODSTRAŇ SOUBOR ─────────────────────
+        m = re.search(r"\b(smaz|smazat|odstra(n|ň)|delete|rm)\s+soubor\s+(\S+)", t)
+        if not m:
+            m = re.search(r"\b(smaz|smazat|odstra(n|ň)|delete)\s+(\S+\.\w+)\b", t)
+        if m:
+            # Vezmi poslední skupinu — samotný název souboru
+            name = m.group(m.lastindex).strip()
+            path = name if name.startswith("/") or name.startswith("~") else os.path.join(_HOME, name)
+            return f"Mažu soubor {name}.", {
+                "action": "delete_file", "params": {"path": os.path.expanduser(path)}}
+
+        # ── PŘESUŇ / PŘEJMENUJ SOUBOR ──────────────────
+        m = re.search(r"\b(presun|přesuň|presuv|přejmenuj|mv|rename)\s+(.+?)\s+(do|na|->|→|to)\s+(.+)", t)
+        if m:
+            src = m.group(2).strip()
+            dst = m.group(4).strip()
+            src_p = src if src.startswith("/") or src.startswith("~") else os.path.join(_HOME, src)
+            dst_p = dst if dst.startswith("/") or dst.startswith("~") else os.path.join(_HOME, dst)
+            return f"Přesouvám {src} → {dst}.", {
+                "action": "move_file", "params": {
+                    "src": os.path.expanduser(src_p),
+                    "dst": os.path.expanduser(dst_p)}}
+
+        # ── SPUSŤ SKRIPT ────────────────────────────────
+        m = re.search(r"\b(spust|spusti|spusť|run|execute|bash|sh)\s+skript\s+(\S+)", t)
+        if not m:
+            m = re.search(r"\b(spust|spusti|spusť|run)\s+(\S+\.(sh|py|bash))\b", t)
+        if m:
+            name = m.group(m.lastindex).strip()
+            path = name if name.startswith("/") or name.startswith("~") else os.path.join(_HOME, name)
+            return f"Spouštím skript {name}.", {
+                "action": "run_script", "params": {"path": os.path.expanduser(path)}}
+
+        # ── OTEVŘI VE VSCODE ────────────────────────────
+        m = re.search(r"\b(otevri|open)\s+(ve?\s+)?(vscode|code|editor)\s*(.+)?", t)
+        if m:
+            path_raw = (m.group(4) or "").strip()
+            path = os.path.expanduser(path_raw) if path_raw else _HOME
+            return f"Otevírám ve VSCode: {path_raw or '~'}.", {
+                "action": "vscode_open", "params": {"path": path}}
+
         # ── NAJDI SOUBOR ──────────────────────────────
         m = re.search(r"\b(najdi|hledej)\s+soubor\s+(.+)", t)
         if m:
@@ -714,6 +795,18 @@ class LocalRouter:
             if curr:
                 return f"Převádím měnu: {curr}", {
                     "action": "currency_convert", "params": _parse_currency(curr)}
+
+        # ── PARALELNÍ AGENTI ─────────────────────────
+        if re.search(
+            r"\b(paraleln[eě]|soubehn[eě]|vsechny\s+agenty|spust\s+agenty"
+            r"|multi.?agent|vice\s+agentu?|parallel\s+agent)\b", t):
+            task = re.sub(
+                r"\b(paraleln[eě]|soubehn[eě]|vsechny\s+agenty|spust\s+agenty"
+                r"|multi.?agent|vice\s+agentu?|parallel\s+agent)\b\s*",
+                "", text, flags=re.IGNORECASE).strip()
+            if task:
+                return f"Spouštím paralelní agenty: {task}", {
+                    "action": "agent_parallel_task", "params": {"task": task}}
 
         # ── NEURAL MEMORY ────────────────────────────
         if re.search(r"\b(vyhledej\s+v\s+paměti|recall\s+memory|co\s+si\s+pamatuješ)\b", t):

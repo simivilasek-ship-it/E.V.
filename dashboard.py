@@ -544,24 +544,43 @@ if HAS_FASTAPI:
                 tags = item.get("tags", [])
                 nodes.append({
                     "id": nid, "label": text,
+                    "full": item["content"][:200],
                     "importance": round(imp, 2), "tags": tags,
                     "group": tags[0] if tags else "memory",
+                    "ts": item.get("created_at", 0),
                 })
                 seen_ids.add(nid)
 
-                # Hrany mezi uzly se stejným tagem
-                for other in items:
-                    other_id = str(other["id"])
-                    if other_id == nid or other_id not in seen_ids:
-                        continue
-                    common = set(tags) & set(other.get("tags", []))
-                    if common:
-                        links.append({
-                            "source": nid, "target": other_id,
-                            "label": list(common)[0],
-                        })
+            # Hrany: 1) sdílený tag, 2) překrývající slova, 3) časová blízkost
+            node_list = list(nodes)
+            for i, a in enumerate(node_list):
+                for b in node_list[i+1:]:
+                    label = None
+                    # 1. Sdílený tag
+                    common_tags = set(a["tags"]) & set(b["tags"])
+                    if common_tags:
+                        label = list(common_tags)[0]
+                    else:
+                        # 2. Sdílená klíčová slova (3+ znaky, mimo stop-slova)
+                        stop = {"the","and","for","that","this","jsou","bylo","není","nebo"}
+                        wa = {w for w in a["full"].lower().split() if len(w) > 3 and w not in stop}
+                        wb = {w for w in b["full"].lower().split() if len(w) > 3 and w not in stop}
+                        common_words = wa & wb
+                        if len(common_words) >= 2:
+                            label = list(common_words)[0]
+                        # 3. Časová blízkost (< 60 minut)
+                        elif a["ts"] and b["ts"] and abs(a["ts"] - b["ts"]) < 3600:
+                            label = "časově blízké"
+                    if label:
+                        links.append({"source": a["id"], "target": b["id"], "label": label})
+                        if len(links) >= 120:
+                            break
+                if len(links) >= 120:
+                    break
 
-            return {"nodes": nodes[:50], "links": links[:80]}
+            # Limit s total_count
+            total = len(nodes)
+            return {"nodes": nodes[:80], "links": links[:120], "total": total}
         except Exception as e:
             return {"nodes": [], "links": [], "error": str(e)}
 
@@ -595,11 +614,68 @@ if HAS_FASTAPI:
             return {"error": str(e), "ok": False}
 
     # ── Agent Timeline ────────────────────────────────
-    _agent_timeline: list = []   # in-memory buffer posledních runů
+    # ── Agent Timeline — SQLite persistence ──────────
+    import sqlite3 as _sqlite3
+    from pathlib import Path as _TLPath
+
+    _TL_DB = _TLPath(__file__).parent / "memory_data" / "agent_runs.db"
+    _TL_DB.parent.mkdir(parents=True, exist_ok=True)
+
+    def _tl_init():
+        with _sqlite3.connect(_TL_DB) as con:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS agent_runs (
+                    id       TEXT PRIMARY KEY,
+                    task     TEXT,
+                    steps    TEXT,
+                    result   TEXT,
+                    status   TEXT,
+                    duration REAL,
+                    ts       REAL
+                )
+            """)
+    _tl_init()
+
+    def _tl_save(run: dict):
+        import json as _j, time as _t
+        with _sqlite3.connect(_TL_DB) as con:
+            con.execute(
+                "INSERT OR REPLACE INTO agent_runs VALUES (?,?,?,?,?,?,?)",
+                (run.get("id", str(_t.time())),
+                 run.get("task", ""),
+                 _j.dumps(run.get("steps", []), ensure_ascii=False),
+                 run.get("result", ""),
+                 run.get("status", "done"),
+                 run.get("duration", 0),
+                 _t.time()))
 
     @app.get("/api/agent/timeline")
-    async def agent_timeline():
-        return {"runs": _agent_timeline[-20:]}
+    async def agent_timeline(limit: int = 30):
+        import json as _j
+        try:
+            with _sqlite3.connect(_TL_DB) as con:
+                con.row_factory = _sqlite3.Row
+                rows = con.execute(
+                    "SELECT * FROM agent_runs ORDER BY ts DESC LIMIT ?", (limit,)
+                ).fetchall()
+            runs = [{
+                "id": r["id"], "task": r["task"],
+                "steps": _j.loads(r["steps"]),
+                "result": r["result"], "status": r["status"],
+                "duration": r["duration"], "ts": r["ts"],
+            } for r in rows]
+            return {"runs": runs, "total": len(runs)}
+        except Exception as e:
+            return {"runs": [], "error": str(e)}
+
+    @app.post("/api/agent/timeline")
+    async def agent_timeline_save(body: dict):
+        """Uloží agentský run do SQLite."""
+        try:
+            _tl_save(body)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     # ── Skill Generator ───────────────────────────────
 
@@ -646,6 +722,22 @@ Pravidla pro skill.py:
             )
             if not result or "skill_py" not in result:
                 return {"error": "LLM nevrátil validní JSON — zkus znovu nebo uprosti prompt"}
+            # Validace syntaxe vygenerovaného kódu
+            import ast as _ast
+            try:
+                _ast.parse(result["skill_py"])
+            except SyntaxError as se:
+                return {
+                    "error": f"Syntaktická chyba v generovaném kódu (řádek {se.lineno}): {se.msg}",
+                    "hint": "Zkus prompt přeformulovat nebo zjednodušit",
+                    "raw": result,
+                }
+            # Ověř přítomnost povinných funkcí
+            tree = _ast.parse(result["skill_py"])
+            fns = {n.name for n in _ast.walk(tree) if isinstance(n, _ast.FunctionDef)}
+            missing = {"get_routes", "get_actions"} - fns
+            if missing:
+                result["warning"] = f"Chybí funkce: {', '.join(missing)} — plugin nemusí fungovat"
             return result
         except Exception as e:
             return {"error": str(e)}
@@ -668,6 +760,52 @@ Pravidla pro skill.py:
                 (dest / "manifest.json").write_text(
                     _json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
             return {"saved": str(dest), "name": name}
+        except Exception as e:
+            return {"error": str(e)}
+
+    @app.get("/api/skill/download/{name}")
+    async def skill_download(name: str):
+        """Stáhne plugin jako ZIP archiv."""
+        import zipfile, io, json as _json
+        from fastapi.responses import StreamingResponse
+        from pathlib import Path as _Path
+        dest = _Path(__file__).parent / "plugins" / "custom" / name
+        if not dest.exists():
+            from fastapi import HTTPException
+            raise HTTPException(404, f"Plugin '{name}' nenalezen")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in dest.rglob("*"):
+                if f.is_file():
+                    zf.write(f, f.relative_to(dest.parent))
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={name}.zip"},
+        )
+
+    @app.post("/api/agent/parallel")
+    async def agent_parallel(body: dict):
+        """Spustí MultiAgentOrchestrator v paralelním režimu.
+
+        Body: {"task": "...", "max_steps": 5}
+        Vrátí výsledky kroků s časováním.
+        """
+        task = body.get("task", "").strip()
+        if not task:
+            return {"error": "Chybí task"}
+        max_steps = min(int(body.get("max_steps", 5)), 8)
+        try:
+            from config import CONFIG
+            from commands import CommandExecutor
+            from agent_roles import MultiAgentOrchestrator
+            url   = CONFIG.get("ollama_url",   "http://localhost:11434/api/chat")
+            model = CONFIG.get("ollama_model", "qwen2.5:3b")
+            orch  = MultiAgentOrchestrator(url, model, executor=CommandExecutor(CONFIG))
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: orch.run_parallel(task, max_steps=max_steps))
+            return {"result": result, "task": task}
         except Exception as e:
             return {"error": str(e)}
 
