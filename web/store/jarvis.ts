@@ -71,17 +71,25 @@ interface JarvisState {
 const MAX_ATTEMPTS = 5
 const backoff = (n: number) => Math.min(1000 * Math.pow(2, n), 16000)
 
+const BACKEND_WS   = 'ws://127.0.0.1:8002'
+const BACKEND_HTTP = 'http://127.0.0.1:8002'
+
 const getWsBase = () => {
-  if (typeof window === 'undefined') return 'ws://localhost:8002'
-  const { hostname, port, protocol } = window.location
+  if (typeof window === 'undefined') return BACKEND_WS
+  const { hostname, protocol } = window.location
   const wsProto = protocol === 'https:' ? 'wss' : 'ws'
-  if (process.env.NODE_ENV === 'production') return `${wsProto}://${hostname}${port ? ':' + port : ''}`
-  return `ws://${hostname}:${port || 3000}`
+  // V produkci FastAPI servíruje web — WS jde na stejný host/port
+  if (process.env.NODE_ENV === 'production') {
+    const prodPort = window.location.port ? ':' + window.location.port : ''
+    return `${wsProto}://${hostname}${prodPort}`
+  }
+  // Dev: Next.js rewrites NEFUNGUJÍ pro WS → připoj se přímo na backend
+  return BACKEND_WS
 }
 
 const getApiBase = () => {
   if (process.env.NODE_ENV === 'production') return ''
-  return ''  // Next.js rewrites handle /api/*
+  return BACKEND_HTTP  // Dev: jdi přímo na backend (CORS povolen)
 }
 
 export const useJarvis = create<JarvisState>((set, get) => ({
