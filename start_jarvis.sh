@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # JARVIS — spustí backend a otevře UI v prohlížeči
-# Volby: --webview (nativní okno), --tray (tray ikona), --gui (Tkinter)
+# Volby: --webview (nativní pywebview okno), --tray (tray ikona)
+# Poznámka: --gui (Tkinter) byl odebrán; primární UI je Next.js / pywebview.
 
 JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$JARVIS_DIR"

@@ -67,6 +67,37 @@ class ToolRegistry:
                 lines.append(f"    Příklad: {ex}")
         return "\n".join(lines)
 
+    def ollama_tools_schema(self) -> list:
+        """Vrátí Ollama-kompatibilní tool schema pro nativní tool-calling.
+
+        Formát dle Ollama /api/chat docs:
+        https://ollama.com/blog/tool-support
+        """
+        tools = []
+        for t in self._tools.values():
+            properties = {}
+            required = []
+            for p in t.params:
+                prop: dict = {"type": p.type if p.type in ("string", "number", "boolean", "integer") else "string"}
+                if hasattr(p, "description") and p.description:
+                    prop["description"] = p.description
+                properties[p.name] = prop
+                if p.required:
+                    required.append(p.name)
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": {
+                        "type": "object",
+                        "properties": properties,
+                        "required": required,
+                    },
+                },
+            })
+        return tools
+
 
 def build_registry(executor, mcp_bridge=None) -> ToolRegistry:
     """
