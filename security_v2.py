@@ -268,6 +268,10 @@ def confirm_action(action: str, params: Dict[str, Any], parent=None) -> bool:
     """Zobrazí dialog pro potvrzení nebezpečné akce.
 
     V headless/web módu (bez Tkinter okna) se pokusí o konzolové potvrzení.
+
+    Poznámka: implicitní chování bylo zpřísněno — headless režim nyní NEAUTO-APROVUJE
+    ELEVATED akce. Pro vývoj/controlled nasazení lze povolit automatické schválení
+    nastavením env var JARVIS_HEADLESS_APPROVE_ELEVATED=1 (NEPOUŽÍVAT na veřejných serverech).
     """
     level = ACTION_PERMISSIONS.get(action, PermissionLevel.RESTRICTED)
     if level not in (PermissionLevel.ELEVATED, PermissionLevel.RESTRICTED):
@@ -287,10 +291,19 @@ def confirm_action(action: str, params: Dict[str, Any], parent=None) -> bool:
     except Exception:
         pass
 
-    # Headless fallback — konzolové potvrzení (API / web mód automaticky schvaluje ELEVATED)
+    # Headless fallback — konzolové potvrzení
+    import os
+    approve_env = str(os.environ.get("JARVIS_HEADLESS_APPROVE_ELEVATED", "")).lower() in ("1", "true", "yes")
+
     if level == PermissionLevel.ELEVATED:
-        logger.warning(f"Headless confirm_action: auto-approve ELEVATED '{action}'")
-        return True
+        if approve_env:
+            logger.warning(f"Headless confirm_action: auto-approve ELEVATED '{action}' (enabled via JARVIS_HEADLESS_APPROVE_ELEVATED)")
+            return True
+        logger.warning(
+            f"Headless confirm_action: zamítám ELEVATED '{action}' — headless auto-approve je vypnuto. "
+            f"(Pokud rozumíte riziku, povolte JARVIS_HEADLESS_APPROVE_ELEVATED=1)"
+        )
+        return False
 
     # RESTRICTED v headless — loguj a zamítni (bezpečný výchozí stav)
     logger.warning(f"Headless confirm_action: zamítám RESTRICTED '{action}' (žádné UI pro dialog)")
