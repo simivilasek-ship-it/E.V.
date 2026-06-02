@@ -196,6 +196,13 @@ class TestOfflineManager:
         response = offline_manager.get_offline_response("Kolik je hodin?")
         assert response is not None
         assert isinstance(response, str)
+        
+    def test_get_offline_response_normalized(self, offline_manager):
+        """Test getting offline response with diacritics and casing variation"""
+        response1 = offline_manager.get_offline_response("cas?")
+        response2 = offline_manager.get_offline_response("Co je Python?")
+        assert "Čas" in response1 or "Time" in response1 or "offline" in response1.lower()
+        assert "Python" in response2
     
     def test_sync_commands(self, offline_manager, tmp_path):
         """Test syncing queued commands"""

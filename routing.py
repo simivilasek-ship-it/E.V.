@@ -87,6 +87,24 @@ class CommandRouter:
             app._execute_result(msg, action_data)
             return True
 
+        # 2b. Hierarchický agent
+        from agent_hierarchical import should_handle as _hierarchical_should
+        if getattr(app, "hierarchical_agent", None) and _hierarchical_should(text):
+            import time as _t, uuid as _uuid
+            app._gui(lambda: app.gui.set_status("Supervisor plánuje…"))
+            steps: list = []
+            t0 = _t.time()
+            answer = app.hierarchical_agent.run(
+                text,
+                on_step=lambda s: (
+                    steps.append({"type": "hierarchical", "text": s, "ts": _t.time()}),
+                    app._gui(lambda m=s: app.gui.set_status(m)),
+                ))
+            self._save_run(str(_uuid.uuid4())[:8], text, steps, answer,
+                           "done", round(_t.time() - t0, 2))
+            app._execute_result(answer, {"action": "answer", "params": {}})
+            return True
+
         # 3. Grafový agent
         from agent_graph import should_handle as _graph_should
         if getattr(app, "graph_agent", None) and _graph_should(text):

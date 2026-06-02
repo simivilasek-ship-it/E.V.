@@ -297,6 +297,16 @@ class JarvisApp:
             self.multi_agent = None
             logger.warning(f"MultiAgent init selhal: {e}")
 
+        try:
+            from agent_hierarchical import get_hierarchical_agent
+            self.hierarchical_agent = get_hierarchical_agent(
+                executor=self.cmds, mcp_bridge=mcp,
+                ollama_url=url, model=model)
+            logger.info("HierarchicalAgent připraven")
+        except Exception as e:
+            self.hierarchical_agent = None
+            logger.warning(f"HierarchicalAgent init selhal: {e}")
+
     def _wire_skill_callbacks(self):
         """Naváže callbacks do skill modulů po jejich načtení."""
         import sys as _sys

@@ -95,29 +95,34 @@ def _parse_action(line: str):
 
 class ReactAgent:
     """
-    ReAct agent — Thought → Action → Observation smyčka.
-    Volá Ollama LLM pro Thought, pak spustí příslušný nástroj.
+    ReAct 2.0 agent — Thought → Action → Observation loop with planning,
+    introspection, step check, and checkpoint rollback capabilities.
     """
 
-    SYSTEM_PROMPT = """\
+    SYSTEM_PROMPT_V2 = """\
 Jsi JARVIS, inteligentní AI asistent. Pro splnění úkolu používáš nástroje.
+Před každou akcí nejprve proveď introspekci ohledně dosavadního postupu vzhledem k plánu.
+
+Plán, který máš následovat:
+{plan}
 
 Formát odpovědi (opakuj dokud úkol není hotov):
-  Thought: [co si myslíš o dalším kroku]
+  Introspection: [tvá krátká introspekce a zhodnocení dosavadního pokroku - co bylo splněno, co zbývá]
+  Thought: [co si myslíš o dalším kroku a proč volíš tento nástroj]
   Action: název_nástroje(parametr="hodnota")
   Observation: [výsledek — doplní systém]
-  Thought: [co dál]
   ...
   Answer: [finální odpověď uživateli česky]
 
 Pravidla:
-- Vždy začni Thought:
+- Vždy začni s Introspection: následovaným Thought: a Action:
 - Každý Action: musí být na samostatném řádku v přesném formátu tool(param="hodnota")
-- Po Observation: pokračuj dalším Thought:
+- Po Observation: pokračuj dalším Introspection:
 - Když máš vše potřebné, ukonči Answer:
 - Nikdy nevymýšlej výsledky — použij nástroj
 - Maximálně {max_steps} kroků
 
+Dostupné nástroje:
 {tools}
 """
 
@@ -126,28 +131,95 @@ Pravidla:
         self.ollama_url  = ollama_url
         self.model       = model
         self._client     = OllamaClient(ollama_url, model)
-        self._system     = self.SYSTEM_PROMPT.format(
-            max_steps=MAX_STEPS,
-            tools=registry.schema_block(),
+
+    def _generate_plan(self, user_text: str) -> List[str]:
+        """Vygeneruje plán kroků pro zadaný úkol."""
+        prompt = (
+            f"Jsi JARVIS Plánovač. Rozděl úkol: '{user_text}' na 2 až 4 konkrétní kroky pro nástroje.\n"
+            "Vrať pouze JSON pole řetězců, např. [\"krok 1\", \"krok 2\"]. Nic jiného nevypisuj."
         )
+        try:
+            raw = self._client.call([{"role": "user", "content": prompt}], temperature=0.1, max_tokens=200)
+            import json as _json
+            m = re.search(r"\[.*?\]", raw, re.DOTALL)
+            if m:
+                data = _json.loads(m.group(0))
+                if isinstance(data, list):
+                    return [str(x).strip() for x in data if x]
+        except Exception as e:
+            logger.warning(f"Chyba při plánování ReAct 2.0: {e}")
+        return [f"Vyřeš úkol: {user_text}"]
+
+    def _check_step(self, tool_name: str, args: dict, observation: str) -> tuple[bool, str]:
+        """Kontrola kroku (Step check / Critic). Vrátí (ok, důvod)."""
+        obs_lower = observation.lower()
+        if "chyba:" in obs_lower or "error:" in obs_lower or "nástroj neexistuje" in obs_lower:
+            return False, "Nástroj vrátil chybu"
+        if not observation.strip() or observation.strip() == "…[zkráceno]":
+            return False, "Nástroj vrátil prázdný výsledek"
+        
+        # Heuristická kontrola plausibility čísel
+        import re
+        ctx = (tool_name + " " + str(args) + " " + observation).lower()
+        numbers = [float(n.replace(",", "."))
+                   for n in re.findall(r"\b\d{1,9}(?:[.,]\d+)?\b", observation)]
+        if numbers:
+            rules = [
+                ("cena GPU",   r"(rtx|gtx|radeon|gpu|grafick)",   100,   5_000),
+                ("cena CPU",   r"(ryzen|intel|core\s*i\d|cpu)",    50,   2_000),
+                ("teplota CPU",   r"(teplota|temp|°c|stupeň)",         0,     110),
+                ("procento",         r"(procent|%|percent)",               0,     100),
+            ]
+            for desc, pattern, lo, hi in rules:
+                if re.search(pattern, ctx):
+                    for n in numbers:
+                        if not (lo <= n <= hi):
+                            return False, f"Podezřelá hodnota {n} pro {desc} (očekáváno {lo}-{hi})"
+        return True, "OK"
 
     def run(self, user_text: str, on_step: Optional[Callable] = None) -> str:
         """
-        Spustí ReAct smyčku a vrátí finální odpověď.
-        on_step(step_text) je voláno po každém Observation pro live feedback.
+        Spustí ReAct 2.0 smyčku a vrátí finální odpověď.
         """
+        plan = self._generate_plan(user_text)
+        plan_text = "\n".join(f"- {step}" for step in plan)
+        if on_step:
+            on_step(f"[Plan] Plán: " + " → ".join(plan))
+
+        system_prompt = self.SYSTEM_PROMPT_V2.format(
+            plan=plan_text,
+            max_steps=MAX_STEPS,
+            tools=self.registry.schema_block(),
+        )
+
         messages = [
-            {"role": "system",  "content": self._system},
+            {"role": "system",  "content": system_prompt},
             {"role": "user",    "content": user_text},
         ]
         trace: List[str] = []
+        rollback_count = 0
+        MAX_ROLLBACKS = 2
+        step = 0
 
-        for step in range(MAX_STEPS):
+        while step < MAX_STEPS:
+            checkpoint = {
+                "messages": list(messages),
+                "trace_len": len(trace),
+                "step": step
+            }
+
             raw = self._llm(messages)
             if not raw:
                 break
 
             logger.debug(f"ReAct step {step}: {raw[:120]}")
+
+            # Zpracuj introspekci pokud existuje
+            intro_match = re.search(r"Introspection:\s*(.+)", raw, re.IGNORECASE)
+            if intro_match:
+                intro_text = intro_match.group(1).strip()
+                if on_step:
+                    on_step(f"[Introspekce] {intro_text[:100]}…")
 
             # Zkontroluj Answer: — hotovo
             ans_m = _ANSWER_RE.search(raw)
@@ -164,18 +236,55 @@ Pravidla:
 
             tool_name = action_m.group(1).strip()
             parsed    = _parse_action(raw)
+            check_ok  = True
+            check_reason = "OK"
+            kwargs = {}
+
             if not parsed:
                 observation = f"Chyba: nepodařilo se parsovat Action: {action_m.group(0)}"
+                check_ok = False
+                check_reason = "Parsovací chyba"
             else:
                 _, kwargs  = parsed
                 tool       = self.registry.get(tool_name)
                 if tool is None:
                     observation = f"Chyba: nástroj '{tool_name}' neexistuje. Dostupné: {[t.name for t in self.registry.all()]}"
+                    check_ok = False
+                    check_reason = "Neexistující nástroj"
                 else:
-                    observation = tool.call(**kwargs)
-                    # Zkrať dlouhé výsledky
-                    if len(observation) > 1200:
-                        observation = observation[:1200] + "…[zkráceno]"
+                    try:
+                        observation = tool.call(**kwargs)
+                        if len(observation) > 1200:
+                            observation = observation[:1200] + "…[zkráceno]"
+                        # Kontrola kroku (Step check)
+                        check_ok, check_reason = self._check_step(tool_name, kwargs, observation)
+                    except Exception as e:
+                        observation = f"Chyba při volání nástroje: {e}"
+                        check_ok = False
+                        check_reason = str(e)
+
+            if not check_ok:
+                if rollback_count < MAX_ROLLBACKS:
+                    rollback_count += 1
+                    logger.warning(f"ReAct 2.0: Krok {step} selhal ({check_reason}). Provádím rollback ({rollback_count}/{MAX_ROLLBACKS}).")
+                    if on_step:
+                        on_step(f"[Rollback] Selhání ({check_reason}). Návrat k předchozímu stavu.")
+
+                    messages = list(checkpoint["messages"])
+                    trace = trace[:checkpoint["trace_len"]]
+
+                    guidance = (
+                        f"Upozornění systému: Spuštění nástroje '{tool_name}' s parametry {kwargs} "
+                        f"selhalo nebo vrátilo neplatný výsledek ({check_reason}). "
+                        f"Zvol prosím jinou akci nebo uprav parametry a pokračuj v plnění plánu."
+                    )
+                    messages.append({"role": "user", "content": guidance})
+                    # Zkusíme znovu ze stejného stavu, nezvyšujeme krok
+                    continue
+                else:
+                    logger.warning("ReAct 2.0: Překročen limit rollbacků. Pokračuji i přes selhání.")
+                    if on_step:
+                        on_step("[Warning] Limit rollbacků vyčerpán. Pokračuji.")
 
             step_text = f"[{tool_name}] → {observation[:80]}…" if len(observation) > 80 else f"[{tool_name}] → {observation}"
             trace.append(step_text)
@@ -185,6 +294,7 @@ Pravidla:
             # Přidej do kontextu
             messages.append({"role": "assistant",  "content": raw})
             messages.append({"role": "user",       "content": f"Observation: {observation}"})
+            step += 1
 
         logger.warning(f"ReAct: dosažen limit {MAX_STEPS} kroků nebo žádná Answer")
         return "Nepodařilo se dokončit úkol v časovém limitu. " + (
@@ -197,12 +307,7 @@ Pravidla:
     def run_with_tool_calling(self, user_text: str,
                               on_step: Optional[Callable] = None) -> str:
         """Ollama nativní tool-calling — JSON místo regex parsování.
-
-        Používá Ollama /api/chat s `tools` polem. Model vrátí
-        structured `tool_calls` místo textu Action: format(...).
-        Robustnější — žádné regex falešné alarmy, přesné argumenty.
-
-        Fallback na klasický run() pokud model tool-calling nepodporuje.
+        S ReAct 2.0 plánováním, introspekcí, step checky a rollbacky.
         """
         import json as _json
 
@@ -210,16 +315,36 @@ Pravidla:
         if not tools_schema:
             return self.run(user_text, on_step)
 
+        plan = self._generate_plan(user_text)
+        plan_text = "\n".join(f"- {step}" for step in plan)
+        if on_step:
+            on_step(f"[Plan] Plán: " + " → ".join(plan))
+
+        system_msg = (
+            "Jsi JARVIS, AI asistent. Používáš nástroje k splnění úkolů. "
+            "Komunikuješ česky. Když máš výsledek, odpověz přímo.\n"
+            f"Plán, který máš následovat:\n{plan_text}\n"
+            "Před každým voláním nástroje (tool call) nejprve napiš do textového obsahu (content) zprávu ve formátu:\n"
+            "Introspection: [tvá krátká introspekce a zhodnocení dosavadního pokroku - co bylo splněno, co zbývá]\n"
+            "Thought: [tvá úvaha a zdůvodnění dalšího kroku]\n"
+        )
+
         messages = [
-            {"role": "system", "content": (
-                "Jsi JARVIS, AI asistent. Používáš nástroje k splnění úkolů. "
-                "Komunikuješ česky. Když máš výsledek, odpověz přímo."
-            )},
+            {"role": "system", "content": system_msg},
             {"role": "user", "content": user_text},
         ]
         trace: List[str] = []
+        rollback_count = 0
+        MAX_ROLLBACKS = 2
+        step = 0
 
-        for step in range(MAX_STEPS):
+        while step < MAX_STEPS:
+            checkpoint = {
+                "messages": list(messages),
+                "trace_len": len(trace),
+                "step": step
+            }
+
             payload = {
                 "model":    self.model,
                 "messages": messages,
@@ -238,13 +363,19 @@ Pravidla:
             tool_calls = msg.get("tool_calls", [])
             content    = (msg.get("content") or "").strip()
 
+            # Zpracuj introspekci pokud existuje
+            if content:
+                intro_match = re.search(r"Introspection:\s*(.+)", content, re.IGNORECASE)
+                if intro_match and on_step:
+                    on_step(f"[Introspekce] {intro_match.group(1).strip()[:100]}…")
+
             # Model odpověděl textem bez tool call — to je finální odpověď
             if not tool_calls:
                 return content or "Hotovo."
 
-            # Zpracuj každý tool call
-            messages.append({"role": "assistant", "content": content or None,
-                              "tool_calls": tool_calls})
+            step_check_ok = True
+            step_check_reason = "OK"
+            temp_results = []
 
             for tc in tool_calls:
                 fn   = tc.get("function", {})
@@ -259,14 +390,51 @@ Pravidla:
                 tool = self.registry.get(name)
                 if tool is None:
                     observation = f"Nástroj '{name}' neexistuje"
+                    step_check_ok = False
+                    step_check_reason = "Neexistující nástroj"
                 else:
                     try:
                         observation = tool.call(**args)
                         if len(observation) > 1200:
                             observation = observation[:1200] + "…[zkráceno]"
+                        # Kontrola kroku (Step check)
+                        check_ok, check_reason = self._check_step(name, args, observation)
+                        if not check_ok:
+                            step_check_ok = False
+                            step_check_reason = check_reason
                     except Exception as e:
                         observation = f"Chyba nástroje {name}: {e}"
+                        step_check_ok = False
+                        step_check_reason = str(e)
 
+                temp_results.append((name, args, observation))
+
+            if not step_check_ok:
+                if rollback_count < MAX_ROLLBACKS:
+                    rollback_count += 1
+                    logger.warning(f"ReAct 2.0 (Tool Calling): Krok {step} selhal ({step_check_reason}). Provádím rollback ({rollback_count}/{MAX_ROLLBACKS}).")
+                    if on_step:
+                        on_step(f"[Rollback] Selhání ({step_check_reason}). Návrat k předchozímu stavu.")
+
+                    messages = list(checkpoint["messages"])
+                    trace = trace[:checkpoint["trace_len"]]
+
+                    failed_calls_desc = ", ".join(f"{n}({a})" for n, a, _ in temp_results)
+                    guidance = (
+                        f"Upozornění systému: Spuštění nástroje/nástrojů '{failed_calls_desc}' "
+                        f"selhalo nebo vrátilo neplatný výsledek ({step_check_reason}). "
+                        f"Zvol prosím jinou akci nebo uprav parametry a pokračuj v plnění plánu."
+                    )
+                    messages.append({"role": "user", "content": guidance})
+                    continue
+                else:
+                    logger.warning("ReAct 2.0: Překročen limit rollbacků v tool calling. Pokračuji.")
+                    if on_step:
+                        on_step("[Warning] Limit rollbacků vyčerpán. Pokračuji.")
+
+            # Úspěšně zpracované tool cally zapíšeme do zpráv
+            messages.append({"role": "assistant", "content": content or None, "tool_calls": tool_calls})
+            for name, args, observation in temp_results:
                 step_text = f"[{name}] → {observation[:80]}"
                 trace.append(step_text)
                 if on_step:
@@ -276,6 +444,7 @@ Pravidla:
                     "role": "tool",
                     "content": observation,
                 })
+            step += 1
 
         logger.warning("Tool-calling: dosažen limit kroků")
         return "Nepodařilo se dokončit úkol. Kroky: " + " → ".join(trace)

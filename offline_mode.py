@@ -142,20 +142,22 @@ class OfflineManager:
     
     def get_offline_response(self, query: str) -> str:
         """Vrátí offline response z knowledge base"""
-        # Jednoduchý keyword-based lookup
-        query_lower = query.lower()
+        from commands.utils import normalize_text as _norm
+        
+        # Jednoduchý keyword-based lookup s normalizací (odstraněním diakritiky)
+        query_norm = _norm(query)
         
         # Kontroluj common queries
-        if "čas" in query_lower or "kolik" in query_lower:
+        if "cas" in query_norm or "kolik" in query_norm:
             return f"Čas (offline): {time.strftime('%H:%M:%S')}"
         
-        elif "datum" in query_lower or "jaké je datum" in query_lower:
+        elif "datum" in query_norm:
             return f"Datum (offline): {time.strftime('%d.%m.%Y')}"
         
-        elif "co je" in query_lower or "definice" in query_lower:
+        elif "co je" in query_norm or "definice" in query_norm or "vysvetli" in query_norm:
             # Zkus knowledge base
             for key, value in self._knowledge_base.items():
-                if key.lower() in query_lower:
+                if _norm(key) in query_norm:
                     return f"(Offline) {value}"
         
         return "Offline: Nemohu odpovědět. Připoj se k internetu pro úplnější odpovědi."

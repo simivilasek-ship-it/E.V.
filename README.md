@@ -63,7 +63,7 @@ JARVIS
 │   ├── 15 Skills           Plugin sandbox · Health check · Marketplace
 │   ├── 10 MCP serverů      Filesystem · Git · Puppeteer · Computer Control · ...
 │   ├── Memory              SQLite + embeddingy · TTL/priority · auto-pruning
-│   ├── Agents              ReAct · Graph · Multi-role (Planner/Executor/Critic)
+│   ├── Agents              ReAct 2.0 (Rollback, Introspection) · Hierarchical (Supervisor) · Graph · Multi-role
 │   ├── Workflow Engine     Trigger-based automation (CPU · time · app)
 │   └── Notifications       Desktop alerts · CPU/RAM monitoring
 │
@@ -194,6 +194,27 @@ just docker-build
 ```
 
 **Přidání příkazu:** viz [CONTRIBUTING.md](CONTRIBUTING.md)
+
+---
+
+## Agentní inteligence (v4.7+)
+
+Jarvis nyní obsahuje pokročilé agentní architektury pro řešení komplexnějších úkolů:
+
+### 1. ReAct 2.0
+Nový a robustnější step-by-step agentní cyklus, který automaticky obsluhuje vícekrokové úkoly.
+- **Plánování (Planning)**: Před spuštěním kroků si agent vygeneruje plán a drží se ho.
+- **Introspekce (Introspection)**: V každém kroku se agent zamýšlí nad svým postupem a pokrokem.
+- **Kontrola kroků & Rollback**: Automaticky detekuje selhání nástrojů nebo podezřelé/halucinované výstupní hodnoty (např. nereálné ceny GPU) a provádí návrat (rollback) k předchozímu funkčnímu checkpointu s instruktáží pro nápravu.
+
+### 2. Hierarchický agent (Supervisor)
+Supervisor/koordinátor rozděluje komplexní zadání na pod-úkoly a deleguje je specializovaným sub-agentům s omezeným a bezpečným okruhem nástrojů:
+- **Researcher**: Internetové vyhledávání a stahování stránek (`web_search`, `fetch_url`).
+- **MemorySpecialist**: Práce s poznámkami a dlouhodobou pamětí (`note_add`, `memory_store`, ...).
+- **SystemSpecialist**: Systémový čas, výpočty a počasí (`calculate`, `get_weather`, ...).
+- **GenericAgent**: Obecný logický a kódovací asistent bez nástrojů.
+
+*Hierarchický agent se automaticky aktivuje, pokud zadání obsahuje slova jako `deleguj`, `hierarchicky` nebo `rozděl úkoly`.*
 
 ---
 

@@ -176,8 +176,9 @@ class TestReactLoop:
             tools={"web_search": lambda query="": "výsledek"},
         )
         agent.run("hledej test", on_step=lambda s: kroky.append(s))
-        assert len(kroky) == 1
-        assert "web_search" in kroky[0]
+        tool_kroky = [k for k in kroky if "[Plan]" not in k]
+        assert len(tool_kroky) == 1
+        assert "web_search" in tool_kroky[0]
 
     def test_llm_chyba_vrati_string(self):
         """Při selhání LLM (prázdná odpověď) agent skončí korektně."""
@@ -223,3 +224,55 @@ class TestToolRegistry:
         assert reg.get("web_search") is not None
         assert reg.get("note_add")   is not None
         assert reg.get("calculate")  is not None
+
+
+# ── ReAct 2.0 Features ────────────────────────────────────────────
+
+class TestReact2Features:
+
+    def test_react_2_introspection(self):
+        """Introspekce je detekována a předána do on_step."""
+        kroky = []
+        agent = _make_agent(
+            responses=[
+                'Introspection: Již jsem vyhledal informace, zbývá odpovědět.\nThought: vím odpověď\nAnswer: Výsledek je OK.'
+            ]
+        )
+        agent.run("test", on_step=lambda s: kroky.append(s))
+        intro_kroky = [k for k in kroky if "[Introspekce]" in k]
+        assert len(intro_kroky) == 1
+        assert "vyhledal informace" in intro_kroky[0]
+
+    def test_react_2_rollback_on_error(self):
+        """Chyba v nástroji vyvolá rollback a znovuspuštění ze stejného kroku."""
+        kroky = []
+        agent = _make_agent(
+            responses=[
+                'Thought: hledám\nAction: web_search(query="chyba")',
+                'Thought: zkusím odpovědět přímo\nAnswer: Nemám spojení.',
+            ],
+            tools={"web_search": lambda query="": "Chyba: připojení selhalo"}
+        )
+        result = agent.run("hledej", on_step=lambda s: kroky.append(s))
+        assert "Nemám spojení" in result
+        
+        rollback_kroky = [k for k in kroky if "[Rollback]" in k]
+        assert len(rollback_kroky) == 1
+        assert "Nástroj vrátil chybu" in rollback_kroky[0]
+
+    def test_react_2_rollback_on_implausible_value(self):
+        """Podezřelá hodnota (plausibility check) vyvolá rollback."""
+        kroky = []
+        agent = _make_agent(
+            responses=[
+                'Thought: hledám cenu RTX 4080\nAction: web_search(query="RTX 4080")',
+                'Thought: zkusím druhou rozumnou cenu\nAnswer: Cena RTX 4080 je 1200 USD.',
+            ],
+            tools={"web_search": lambda query="": "GPU stojí 999999 USD"}
+        )
+        result = agent.run("zjisti cenu GPU", on_step=lambda s: kroky.append(s))
+        assert "1200" in result
+        
+        rollback_kroky = [k for k in kroky if "[Rollback]" in k]
+        assert len(rollback_kroky) == 1
+        assert "Podezřelá hodnota" in rollback_kroky[0]
