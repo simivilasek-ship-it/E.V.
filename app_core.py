@@ -142,7 +142,23 @@ class JarvisApp:
             self._global_hotkey = None
             logger.debug(f"GlobalHotkey init selhal (normální pokud chybí pynput): {e}")
 
-        logger.info("Systémy v4.6 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord)")
+        # ── Workflow Engine ───────────────────────────
+        from workflow_engine import get_workflow_engine
+        self.workflow_engine = get_workflow_engine()
+        self.workflow_engine.start()
+
+        # ── Notification Engine ───────────────────────
+        try:
+            from notification_engine import get_notification_engine
+            from config import CONFIG as _cfg
+            self._notif_engine = get_notification_engine(_cfg)
+            self._notif_engine.start()
+            logger.info("NotificationEngine aktivní")
+        except Exception as e:
+            self._notif_engine = None
+            logger.debug(f"NotificationEngine init selhal: {e}")
+
+        logger.info("Systémy v4.6 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord, WorkflowEngine)")
 
     def _load_plugins(self):
         """Načte plugin systém a pluginy"""

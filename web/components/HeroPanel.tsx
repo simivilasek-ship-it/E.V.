@@ -1,6 +1,87 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useJarvis } from '@/store/jarvis'
+import CenterDashboard from './CenterDashboard'
+
+// ── Status Bar ────────────────────────────────────────
+interface StatusItem {
+  label: string
+  value: string
+  color?: string
+}
+
+export function JarvisStatusBar() {
+  const connStatus   = useJarvis(s => s.connStatus)
+  const currentModel = useJarvis(s => s.currentModel)
+  const plugins      = useJarvis(s => s.plugins) as Array<{ status?: string }>
+  const [mcpCount, setMcpCount] = useState('—')
+  const [agentStatus] = useState('Ready')
+
+  useEffect(() => {
+    fetch('/api/plugins')
+      .then(r => r.json())
+      .then((d: { healthy?: number; total?: number }) =>
+        setMcpCount(`${d.healthy ?? '?'}/${d.total ?? '?'}`)
+      )
+      .catch(() => setMcpCount('—'))
+  }, [])
+
+  const online = connStatus === 'connected'
+
+  const okPlugins = plugins.filter(p => p.status === 'ok').length
+  const items: StatusItem[] = [
+    { label: 'Model',   value: currentModel || 'qwen2.5:3b',                        color: '#00c8ff' },
+    { label: 'Memory',  value: 'Active',                                             color: '#22d3a5' },
+    { label: 'Plugins', value: `${okPlugins}/${plugins.length} OK`,                  color: '#a855f7' },
+    { label: 'MCP',     value: mcpCount,                                             color: '#f59e0b' },
+    { label: 'Agents',  value: agentStatus,                                          color: '#f59e0b' },
+  ]
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 20,
+      padding: '8px 18px',
+      background: 'rgba(0,200,255,.04)',
+      border: '1px solid rgba(0,200,255,.1)',
+      borderRadius: 10,
+      flexWrap: 'wrap',
+    }}>
+      {/* Online indicator */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{
+          width: 8, height: 8, borderRadius: '50%',
+          background: online ? '#22d3a5' : '#f43f5e',
+          boxShadow: online ? '0 0 8px #22d3a5' : 'none',
+          animation: online ? 'pulse 2s ease-in-out infinite' : 'none',
+          display: 'inline-block',
+          flexShrink: 0,
+        }} />
+        <span style={{
+          fontFamily: 'var(--font-hud)', fontSize: 11,
+          color: online ? '#22d3a5' : '#f43f5e',
+          letterSpacing: '.15em', fontWeight: 700,
+          whiteSpace: 'nowrap',
+        }}>
+          JARVIS {online ? 'ONLINE' : 'OFFLINE'}
+        </span>
+      </div>
+
+      <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,.08)', flexShrink: 0 }} />
+
+      {/* Status items */}
+      {items.map(item => (
+        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+            {item.label}:
+          </span>
+          <span style={{ fontSize: 11, color: item.color || 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            {item.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 // ── Hodiny živé ───────────────────────────────────────
 function LiveClock() {
@@ -174,6 +255,9 @@ export default function HeroPanel({ onSend }: { onSend: (cmd: string) => void })
           active={connStatus === 'connected'}
         />
       </div>
+
+      {/* Center Dashboard — agent status, commands, windows, conversations */}
+      <CenterDashboard />
     </div>
   )
 }

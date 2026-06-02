@@ -42,76 +42,83 @@ function OllamaStatus() {
   )
 }
 
-// SVG Arc Progress Ring
-function ArcRing({ value, color, label, size = 72 }: { value: number; color: string; label: string; size?: number }) {
-  const r    = 28
-  const cx   = size / 2
-  const cy   = size / 2
+// Circular Gauge — plný kruh s animovaným dasharray
+function CircularGauge({ value, max = 100, label, color, size = 80 }: {
+  value: number; max?: number; label: string; color: string; size?: number
+}) {
+  const r    = (size / 2) - 8
   const circ = 2 * Math.PI * r
-  // Arc from -220° to 40° (240° sweep)
-  const sweep   = 240
-  const startDeg = 150
-  const pct     = Math.min(Math.max(value, 0), 100) / 100
-  const dashArr = circ
-  const dashOff = circ * (1 - (pct * sweep / 360))
+  const pct  = Math.min(value / max, 1)
+  const dash = pct * circ
 
-  const warningCol = value >= 90 ? '#ff3366' : value >= 70 ? '#ffb300' : color
-
-  // Convert degrees to radians for arc endpoints
-  const toRad = (d: number) => (d - 90) * Math.PI / 180
-  const startR = toRad(startDeg)
-  const endR   = toRad(startDeg + sweep)
-  const trackD = `M ${cx + r * Math.cos(startR)} ${cy + r * Math.sin(startR)} A ${r} ${r} 0 1 1 ${cx + r * Math.cos(endR)} ${cy + r * Math.sin(endR)}`
-
-  const valueR  = toRad(startDeg + pct * sweep)
-  const valueD  = `M ${cx + r * Math.cos(startR)} ${cy + r * Math.sin(startR)} A ${r} ${r} 0 ${pct * sweep > 180 ? 1 : 0} 1 ${cx + r * Math.cos(valueR)} ${cy + r * Math.sin(valueR)}`
+  // Dynamická barva dle zatížení
+  const gaugeColor = value > 85 ? '#f43f5e' : value > 65 ? '#f59e0b' : color
 
   return (
-    <div className="arc-wrap">
-      <svg width={size} height={size} style={{ overflow:'visible' }}>
-        {/* Background track */}
-        <path d={trackD} fill="none" stroke="rgba(255,255,255,.06)" strokeWidth="4"
-          strokeLinecap="round" />
-        {/* Value arc */}
-        <path d={valueD} fill="none" stroke={warningCol} strokeWidth="4"
-          strokeLinecap="round"
-          style={{ filter:`drop-shadow(0 0 4px ${warningCol})`, transition:'all .6s ease' }} />
-        {/* Glow dot at end */}
-        {value > 2 && (
-          <circle
-            cx={cx + r * Math.cos(valueR)}
-            cy={cy + r * Math.sin(valueR)}
-            r="4"
-            fill={warningCol}
-            style={{ filter:`drop-shadow(0 0 6px ${warningCol})` }}
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
+      <div style={{ position:'relative', width:size, height:size }}>
+        <svg width={size} height={size} style={{ transform:'rotate(-90deg)' }}>
+          {/* Track */}
+          <circle cx={size/2} cy={size/2} r={r}
+            fill="none" stroke="rgba(255,255,255,.06)" strokeWidth={6} />
+          {/* Progress */}
+          <circle cx={size/2} cy={size/2} r={r}
+            fill="none" stroke={gaugeColor} strokeWidth={6}
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${circ}`}
+            style={{
+              filter:`drop-shadow(0 0 4px ${gaugeColor})`,
+              transition:'stroke-dasharray 0.6s ease, stroke 0.3s ease',
+            }}
           />
-        )}
+        </svg>
         {/* Center value */}
-        <text x={cx} y={cy + 2} textAnchor="middle" dominantBaseline="middle"
-          style={{ fontFamily:'var(--font-mono)', fontSize:14, fill: warningCol,
-                   filter:`drop-shadow(0 0 4px ${warningCol})` }}>
-          {value}
-        </text>
-        <text x={cx} y={cy + 16} textAnchor="middle" dominantBaseline="middle"
-          style={{ fontFamily:'var(--font-hud)', fontSize:7, fill:'var(--text2)', letterSpacing:'.1em' }}>
-          %
-        </text>
-      </svg>
-      <div className="arc-label">{label}</div>
-      {value >= 90 && <div style={{fontFamily:'var(--font-hud)',fontSize:7,color:'var(--red)',letterSpacing:'.1em',textAlign:'center'}}>HIGH</div>}
-      {value >= 70 && value < 90 && <div style={{fontFamily:'var(--font-hud)',fontSize:7,color:'var(--amber)',letterSpacing:'.1em',textAlign:'center'}}>WARN</div>}
+        <div style={{
+          position:'absolute', inset:0,
+          display:'flex', flexDirection:'column',
+          alignItems:'center', justifyContent:'center',
+        }}>
+          <span style={{ fontFamily:'var(--font-mono)', fontSize:15, fontWeight:700, color:gaugeColor,
+            transition:'color 0.3s ease', textShadow:`0 0 8px ${gaugeColor}` }}>
+            {Math.round(value)}
+          </span>
+          <span style={{ fontFamily:'var(--font-mono)', fontSize:8, color:'var(--muted,var(--text2))' }}>%</span>
+        </div>
+      </div>
+      <span style={{ fontFamily:'var(--font-hud)', fontSize:9, letterSpacing:'.12em', color:'var(--muted,var(--text2))' }}>
+        {label}
+      </span>
+      {value > 85 && (
+        <span style={{ fontFamily:'var(--font-hud)', fontSize:7, letterSpacing:'.1em', color:'#f43f5e', marginTop:-4 }}>
+          HIGH
+        </span>
+      )}
+      {value > 65 && value <= 85 && (
+        <span style={{ fontFamily:'var(--font-hud)', fontSize:7, letterSpacing:'.1em', color:'#f59e0b', marginTop:-4 }}>
+          WARN
+        </span>
+      )}
     </div>
   )
 }
 
-// Sparkline SVG
-function Sparkline({ data, color, height = 36, width = '100%' }: { data: number[]; color: string; height?: number; width?: string | number }) {
+// Sparkline SVG — 60s history chart s gradient fill a glow dot
+function Sparkline({ data, color, height = 36, width = '100%' }: {
+  data: number[]; color: string; height?: number; width?: string | number
+}) {
   const ref = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(220)
 
   useEffect(() => {
-    if (ref.current) setW(ref.current.clientWidth || 220)
+    const el = ref.current
+    if (!el) return
+    setW(el.clientWidth || 220)
+    const ro = new ResizeObserver(() => setW(el.clientWidth || 220))
+    ro.observe(el)
+    return () => ro.disconnect()
   }, [])
+
+  const gradId = `grad-${color.replace('#', '')}-${height}`
 
   if (!data || data.length < 2) return (
     <div ref={ref} style={{ height, opacity:.3, display:'flex', alignItems:'center',
@@ -128,26 +135,27 @@ function Sparkline({ data, color, height = 36, width = '100%' }: { data: number[
   }).join(' ')
 
   const fillPts = `0,${height} ${pts} ${w},${height}`
+  const lastX   = w
+  const lastY   = height - (data[data.length - 1] / max) * (height - 4) - 2
 
   return (
     <div ref={ref} style={{ width, position:'relative' }}>
-      <svg width="100%" height={height} preserveAspectRatio="none" style={{ display:'block' }}>
+      <svg width="100%" height={height} viewBox={`0 0 ${w} ${height}`}
+        preserveAspectRatio="none" style={{ display:'block', overflow:'visible' }}>
         <defs>
-          <linearGradient id={`grad-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity=".35"/>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor={color} stopOpacity=".35"/>
             <stop offset="100%" stopColor={color} stopOpacity="0"/>
           </linearGradient>
         </defs>
-        <polygon points={fillPts} fill={`url(#grad-${color.replace('#','')})`} />
+        {/* Fill area */}
+        <polygon points={fillPts} fill={`url(#${gradId})`} />
+        {/* Line */}
         <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5"
           style={{ filter:`drop-shadow(0 0 3px ${color})` }} />
-        {/* Last value dot */}
-        {data.length > 0 && (() => {
-          const lx = w
-          const ly = height - (data[data.length-1] / max) * (height - 4) - 2
-          return <circle cx={lx} cy={ly} r="3" fill={color}
-            style={{ filter:`drop-shadow(0 0 5px ${color})` }} />
-        })()}
+        {/* Live dot at current value */}
+        <circle cx={lastX} cy={lastY} r="3" fill={color}
+          style={{ filter:`drop-shadow(0 0 5px ${color})` }} />
       </svg>
     </div>
   )
@@ -269,9 +277,9 @@ export default function SystemPanel(_props: SystemPanelProps = {}) {
         </div>
         <OllamaStatus />
         <div className="arc-row" style={{ padding:'16px 12px 12px' }}>
-          <ArcRing value={cpu}  color="#00d4ff" label="CPU"  />
-          <ArcRing value={ram}  color="#0066ff" label="RAM"  />
-          <ArcRing value={disk} color="#8b5cf6" label="DISK" />
+          <CircularGauge value={cpu}  color="#00d4ff" label="CPU"  size={80} />
+          <CircularGauge value={ram}  color="#0066ff" label="RAM"  size={80} />
+          <CircularGauge value={disk} color="#8b5cf6" label="DISK" size={80} />
         </div>
       </div>
 

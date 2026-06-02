@@ -240,6 +240,17 @@ if HAS_FASTAPI:
     except Exception:
         pass
 
+    @app.post("/api/notify")
+    async def send_notification(body: dict):
+        """Odešle desktop notifikaci přes libnotify."""
+        from notification_engine import get_notification_engine
+        ok = get_notification_engine().send(
+            title=body.get("title", "JARVIS"),
+            body=body.get("body", ""),
+            urgent=body.get("urgent", False)
+        )
+        return {"ok": ok}
+
     @app.post("/api/command")
     async def run_command(body: dict):
         """Spustí příkaz přes JARVIS a vrátí odpověď."""
@@ -430,6 +441,33 @@ if HAS_FASTAPI:
             return {"updated": changed, "ok": True}
         except Exception as e:
             return {"error": str(e), "ok": False}
+
+    # ── Workflow Builder ──────────────────────────────
+    @app.get("/api/workflows")
+    async def list_workflows():
+        from workflow_engine import get_workflow_engine
+        return {"workflows": get_workflow_engine().list_all()}
+
+    @app.post("/api/workflows")
+    async def create_workflow(body: dict):
+        import uuid
+        from workflow_engine import get_workflow_engine, Workflow
+        wf = Workflow(
+            id=str(uuid.uuid4())[:8],
+            name=body.get("name", "Nový workflow"),
+            trigger_type=body.get("trigger_type", "manual"),
+            trigger_config=body.get("trigger_config", {}),
+            action=body.get("action", ""),
+            cooldown_seconds=body.get("cooldown_seconds", 300),
+        )
+        get_workflow_engine().add(wf)
+        return {"id": wf.id, "ok": True}
+
+    @app.delete("/api/workflows/{workflow_id}")
+    async def delete_workflow(workflow_id: str):
+        from workflow_engine import get_workflow_engine
+        ok = get_workflow_engine().remove(workflow_id)
+        return {"ok": ok}
 
     # ── Agent Timeline ────────────────────────────────
     # ── Agent Timeline — SQLite persistence ──────────

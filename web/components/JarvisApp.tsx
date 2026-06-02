@@ -7,6 +7,7 @@ import ToastContainer from './Toast'
 import ErrorBoundary from './ErrorBoundary'
 import Spotlight from './Spotlight'
 import dynamic from 'next/dynamic'
+import { JarvisStatusBar } from './HeroPanel'
 
 // Lazy load heavy panels
 const SystemPanel  = dynamic(() => import('./SystemPanel'),  { ssr: false })
@@ -86,6 +87,11 @@ export default function JarvisApp() {
         />
 
         <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Status Bar */}
+          <div className="shrink-0 px-4 pt-3 pb-0">
+            <JarvisStatusBar />
+          </div>
+
           {/* Error banner */}
           {connError && (
             <div className="flex items-center gap-3 px-5 py-2 shrink-0 font-mono text-[11px]"

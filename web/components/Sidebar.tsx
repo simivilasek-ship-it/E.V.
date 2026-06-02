@@ -65,22 +65,26 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
     <aside className="flex flex-col h-full relative z-20"
       style={{ width: 220, background: 'rgba(4,9,16,.92)', borderRight: '1px solid var(--border2)' }}>
 
-      {/* Brand */}
-      <div className="flex items-center gap-3 px-4 py-[18px] shrink-0"
+      {/* Brand — zvětšeno o 25% pro lepší brand identity */}
+      <div className="flex items-center gap-3.5 px-4 py-5 shrink-0"
         style={{ borderBottom: '1px solid var(--border2)' }}>
-        <div className="flex items-center justify-center shrink-0 rounded-[13px] anim-logo-pulse"
+        <div className="flex items-center justify-center shrink-0 rounded-2xl anim-logo-pulse"
           style={{
-            width: 44, height: 44,
-            background: 'linear-gradient(135deg,rgba(78,205,196,.18),rgba(0,200,255,.12),rgba(99,102,241,.1))',
-            border: '1px solid rgba(78,205,196,.4)',
+            width: 54, height: 54,
+            background: 'linear-gradient(135deg,rgba(78,205,196,.22),rgba(0,200,255,.16),rgba(99,102,241,.14))',
+            border: '1.5px solid rgba(78,205,196,.5)',
+            boxShadow: '0 0 20px rgba(78,205,196,.15), inset 0 0 12px rgba(0,200,255,.08)',
           }}>
-          <span className="font-hud font-black text-xl leading-none"
-            style={{ color: '#4ecdc4', textShadow: '0 0 12px rgba(78,205,196,.8)' }}>J</span>
+          <span className="font-hud font-black text-2xl leading-none"
+            style={{ color: '#4ecdc4', textShadow: '0 0 16px rgba(78,205,196,.9)' }}>J</span>
         </div>
         <div>
-          <div className="font-hud font-bold tracking-widest text-sm leading-tight"
-            style={{ color: 'var(--cyan)', letterSpacing: '.28em' }}>JARVIS</div>
-          <div className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>Lokální AI asistent</div>
+          <div className="font-hud font-black tracking-widest leading-tight"
+            style={{ color: 'var(--cyan)', letterSpacing: '.3em', fontSize: 17,
+                     textShadow: '0 0 20px rgba(0,200,255,.4)' }}>JARVIS</div>
+          <div className="text-[10px] mt-1 font-mono" style={{ color: 'var(--muted)', letterSpacing: '.08em' }}>
+            AI OPERATING SYSTEM
+          </div>
         </div>
       </div>
 
