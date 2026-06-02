@@ -337,17 +337,16 @@ class JarvisApp:
         self._gui(lambda: self.gui.add_message(message, "jarvis"))
 
     def _show_error_dialog(self, error_record):
-        """Zobrazí dialog s detaily chyby"""
-        import tkinter.messagebox as msgbox
-
+        """Loguje kritickou chybu (headless mód — Tkinter dialog se nepoužívá)."""
         title = f"Chyba: {error_record.category.value}"
-        message = f"{error_record.message}\n\n"
-        message += f"Čas: {error_record.timestamp.strftime('%H:%M:%S')}\n"
-        message += f"Zdroj: {error_record.source}\n"
+        message = (
+            f"{error_record.message}  "
+            f"[{error_record.timestamp.strftime('%H:%M:%S')}]  "
+            f"Zdroj: {error_record.source}"
+        )
         if error_record.recovery_action:
-            message += f"Oprava: {error_record.recovery_action}"
-
-        msgbox.showerror(title, message)
+            message += f"  Oprava: {error_record.recovery_action}"
+        logger.critical(f"[CRITICAL] {title} — {message}")
 
     # ── ASYNC CALLBACKS ──────────────────────────────
 
@@ -708,11 +707,9 @@ class JarvisApp:
         except Exception:
             pass
 
-        # Zastav GUI
-        self.gui.orb.stop()
+        # Zastav GUI (stub — Tkinter okno se nepoužívá)
         try:
-            self.gui.root.quit()
-            self.gui.root.destroy()
+            self.gui.orb.stop()
         except Exception:
             pass
 
