@@ -229,6 +229,15 @@ class JarvisApp:
             self._notif_engine = None
             logger.debug(f"NotificationEngine init selhal: {e}")
 
+        # ── Proactive Engine (context-aware triggers + daily reports)
+        try:
+            from proactive import ProactiveEngine
+            self.proactive = ProactiveEngine(CONFIG, bus=self.bus, scheduler=self.scheduler, notif=self._notif_engine)
+            logger.info("ProactiveEngine aktivní")
+        except Exception as e:
+            self.proactive = None
+            logger.debug(f"ProactiveEngine init selhal: {e}")
+
         logger.info("Systémy v4.6 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord, WorkflowEngine)")
 
     def _load_plugins(self):
