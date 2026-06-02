@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [4.6] - 2026-06-02
+
+### Added
+- ProactiveEngine: context-aware triggers that monitor active window (VS Code) and suggest continuation tasks (scan TODO/FIXME, recent failures, git summary).
+- Daily markdown summaries: automatic per-day report saved to ~/jarvis_reports/YYYY-MM-DD.md with commits and recent events.
+- Unit tests covering headless confirm behavior and proactive features.
+
+### Changed
+- Security: headless mode no longer auto-approves ELEVATED actions. Introduced env var JARVIS_HEADLESS_APPROVE_ELEVATED to allow explicit override.
+- README: documented headless security behavior and proactive feature notes.
+
+### Fixed
+- Integrations: ProactiveEngine integrated with EventBus, NotificationEngine and Scheduler.
+
+
 ## [4.2] - 2026-05-28
 
 ### Added
