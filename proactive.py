@@ -35,6 +35,10 @@ class ProactiveEngine:
         self._thread: Optional[threading.Thread] = None
         self._running = False
         self._poll_interval = float(self.config.get("proactive_poll_interval", 2.0))
+        self._last_notified: dict = {}
+        self._notify_interval: float = float(self.config.get("proactive_max_notify_interval", 3600))
+        self._retention_days: int = int(self.config.get("proactive_report_retention_days", 30))
+        self._require_permission: bool = bool(self.config.get("proactive_require_permission", False))
         # schedule daily report at configured time (default 18:00)
         t = str(self.config.get("proactive_daily_time", "18:00"))
         try:
@@ -47,6 +51,11 @@ class ProactiveEngine:
         except Exception as e:
             logger.debug(f"ProactiveEngine schedule fail: {e}")
 
+        # Only start if enabled in config
+        if not bool(self.config.get("proactive_enabled", True)):
+            logger.info("ProactiveEngine disabled via config")
+            return
+
         if start:
             self.start()
 
@@ -54,8 +63,15 @@ class ProactiveEngine:
         if self._running:
             return
         self._running = True
-        self._thread = threading.Thread(target=self._loop, daemon=True, name="ProactiveEngine")
-        self._thread.start()
+        # Subscribe to EventBus for active window changes
+        try:
+            self.bus.subscribe(EventType.ACTIVE_WINDOW_CHANGED, self._on_active_event)
+            logger.debug("ProactiveEngine subscribed to ACTIVE_WINDOW_CHANGED events")
+        except Exception:
+            logger.debug("ProactiveEngine could not subscribe to EventBus — falling back to polling")
+            # Start polling fallback
+            self._thread = threading.Thread(target=self._loop, daemon=True, name="ProactiveEngine")
+            self._thread.start()
         logger.info("ProactiveEngine started")
 
     def stop(self):
@@ -86,7 +102,7 @@ class ProactiveEngine:
         """Called when active window title changes."""
         logger.debug(f"Proactive active window changed: {active_title}")
         # detect VS Code + python file by simple heuristics
-        lower = active_title.lower()
+        lower = (active_title or "").lower()
         if ".py" in lower and ("visual studio code" in lower or "vscode" in lower or "code" in lower):
             # try extract filename
             import re
@@ -95,16 +111,53 @@ class ProactiveEngine:
             file_path = None
             if filename:
                 file_path = self._locate_file(filename)
-            if file_path:
-                todos = self._scan_todos(file_path)
-                failures = self._get_recent_failures()
+            if not file_path:
+                return
+
+            # permission check (optional)
+            if self._require_permission:
+                try:
+                    from security_v2 import get_security_manager
+                    sm = get_security_manager()
+                    allowed, _ = sm.check("find_files", {"filename": filename})
+                    if not allowed:
+                        logger.debug("Proactive: permissions deny file scan")
+                        return
+                except Exception:
+                    # If security manager not available, fallback to proceed
+                    pass
+
+            # throttle notifications per file
+            now = time.time()
+            last = self._last_notified.get(file_path, 0)
+            if now - last < self._notify_interval:
+                logger.debug(f"Proactive: skipping notify for {file_path}, throttled")
+                return
+
+            todos = self._scan_todos(file_path)
+            failures = self._get_recent_failures()
+
+            # git summary only if permission allows or not required
+            git_summary = ""
+            if not self._require_permission:
                 git_summary = self._get_git_summary(file_path)
-                if todos or failures:
-                    msg = self._build_suggestion_message(todos, failures, git_summary)
-                    try:
-                        self.notif.send("Chceš pokračovat na tomhle tasku?", msg)
-                    except Exception:
-                        logger.debug("Notification send failed")
+            else:
+                try:
+                    from security_v2 import get_security_manager
+                    sm = get_security_manager()
+                    allowed, _ = sm.check("run_script", {"cmd": "git"})
+                    if allowed:
+                        git_summary = self._get_git_summary(file_path)
+                except Exception:
+                    git_summary = self._get_git_summary(file_path)
+
+            if todos or failures:
+                msg = self._build_suggestion_message(todos, failures, git_summary)
+                try:
+                    self.notif.send("Chceš pokračovat na tomhle tasku?", msg)
+                    self._last_notified[file_path] = now
+                except Exception:
+                    logger.debug("Notification send failed")
 
     def _locate_file(self, filename: str) -> Optional[str]:
         """Search workspace roots for filename (fast heuristic with limits)."""
@@ -183,6 +236,15 @@ class ProactiveEngine:
             parts.append(f"Poslední commit: {first}")
         return " · ".join(parts)
 
+    def _on_active_event(self, event):
+        """EventBus callback for active window changes."""
+        try:
+            title = (event.data or {}).get("title")
+            if title:
+                self._handle_active_change(title)
+        except Exception:
+            pass
+
     def generate_daily_report(self):
         """Generate a simple markdown daily report saved to ~/jarvis_reports/YYYY-MM-DD.md"""
         try:
@@ -216,6 +278,20 @@ class ProactiveEngine:
             except Exception:
                 pass
             logger.info(f"Daily report generated: {path}")
+
+            # retention: remove old reports
+            try:
+                cutoff = datetime.now() - timedelta(days=self._retention_days)
+                for p in outdir.iterdir():
+                    if p.is_file() and p.suffix == ".md":
+                        if datetime.fromtimestamp(p.stat().st_mtime) < cutoff:
+                            try:
+                                p.unlink()
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+
             return str(path)
         except Exception as e:
             logger.debug(f"Daily report failed: {e}")

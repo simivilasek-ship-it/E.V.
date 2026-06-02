@@ -38,6 +38,18 @@ class ContextOrchestrator:
         ctx["clipboard"] = self._get_clipboard()
         ctx["system"]    = self._get_system_quick()
 
+        # Emit event if active window changed
+        try:
+            from event_bus import get_event_bus, EventType
+            prev_active = self._cache.get("data", {}).get("active") if self._cache else None
+            if ctx["active"] and ctx["active"] != prev_active:
+                try:
+                    get_event_bus().emit(EventType.ACTIVE_WINDOW_CHANGED, {"title": ctx["active"]})
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         formatted = self._format(ctx)
         self._cache = {"data": ctx, "formatted": formatted}
         self._last_update = now

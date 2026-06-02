@@ -42,6 +42,16 @@ def test_handle_active_change_notifies(tmp_path, monkeypatch):
     cfg = {"proactive_workspace_roots": [str(tmp_path)]}
     eng = ProactiveEngine(config=cfg, start=False)
 
+    # ensure security manager allows operations during test
+    class DummySM:
+        def check(self, action, params=None, user_text=""):
+            return True, "ok"
+    try:
+        import security_v2
+        monkeypatch.setattr(security_v2, 'get_security_manager', lambda: DummySM())
+    except Exception:
+        pass
+
     sent = {}
 
     class DummyNotif:

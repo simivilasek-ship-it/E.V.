@@ -59,6 +59,9 @@ class EventType:
     JARVIS_READY      = "system.ready"       # JARVIS připraven
     JARVIS_SHUTDOWN   = "system.shutdown"    # JARVIS se ukončuje
 
+    # Active window
+    ACTIVE_WINDOW_CHANGED = "active_window.changed"  # aktivní okno se změnilo
+
     # Wildcard
     ALL               = "*"                  # přihlásit se ke všem
 

@@ -88,6 +88,15 @@ DEFAULT_CONFIG = {
     "agent_max_replans": 1,       # max přeplánování při záseknutí
     "agent_timeout": 120,         # max celková doba běhu grafu v sekundách
     "agent_llm_tokens": 500,      # max tokenů na jeden LLM call v grafu
+    # Proactive engine
+    "proactive_enabled": True,
+    "proactive_daily_time": "18:00",
+    "proactive_workspace_roots": [],
+    "proactive_poll_interval": 2.0,
+    "proactive_max_notify_interval": 3600,  # seconds between notifications per file
+    "proactive_report_retention_days": 30,
+    "proactive_require_permission": False,  # if True, Proactive will check SecurityManager before file/git ops
+    "proactive_max_files_scan": 2000,
 }
 
 
