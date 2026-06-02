@@ -262,9 +262,7 @@ class ProactiveEngine:
                             continue
                         out = subprocess.check_output(["git", "-C", str(root), "log", "--since=24.hours", "--oneline", "-n", "20"], stderr=subprocess.DEVNULL, text=True)
                         if out.strip():
-                            f.write(f"### {root}\n```
-{out.strip()}
-```")
+                            f.write(f"### {root}\n```\n{out.strip()}\n```\n")
                     except Exception:
                         continue
                 f.write("\n## Recent Events\n")

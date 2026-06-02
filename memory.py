@@ -306,6 +306,208 @@ def _similarity_score(a: str, b: str) -> float:
     return len(wa & wb) / len(wa | wb)
 
 
+try:
+    import networkx as nx
+except ImportError:
+    nx = None
+
+
+# ══════════════════════════════════════════════════════
+#  THREE-TIER HIERARCHICAL MEMORY LAYER (v4.7)
+# ══════════════════════════════════════════════════════
+
+class EpisodicMemory:
+    """
+    Epizodická paměť (Krátkodobá):
+    Udržuje kontext aktuální konverzace a dění na obrazovce za posledních 5 minut (300 sekund).
+    Automaticky čistí staré záznamy.
+    """
+    def __init__(self, ttl_seconds: float = 300.0):
+        self.ttl_seconds = ttl_seconds
+        self.events: List[dict] = []
+        self._lock = threading.Lock()
+
+    def add_event(self, content: str, type_: str = "conversation", metadata: dict = None) -> None:
+        """Přidá novou epizodickou událost s časovým razítkem."""
+        with self._lock:
+            self.events.append({
+                "timestamp": time.time(),
+                "content": content,
+                "type": type_,
+                "metadata": metadata or {}
+            })
+            self._prune()
+
+    def _prune(self) -> None:
+        """Odstraní události starší než 5 minut."""
+        now = time.time()
+        self.events = [e for e in self.events if now - e["timestamp"] <= self.ttl_seconds]
+
+    def get_context(self) -> str:
+        """Vrátí naformátovaný kontext za posledních 5 minut."""
+        self._prune()
+        if not self.events:
+            return "Žádné nedávné události za posledních 5 minut."
+        
+        parts = []
+        for e in self.events:
+            dt = time.strftime("%H:%M:%S", time.localtime(e["timestamp"]))
+            t_type = e["type"].upper()
+            parts.append(f"[{dt}] ({t_type}): {e['content']}")
+        return "\n".join(parts)
+
+
+class ProceduralMemory:
+    """
+    Procedurální paměť (Dlouhodobá):
+    Grafová databáze využívající networkx (s fallbackem na prostý slovník).
+    Uchovává entity a vztahy (např. projekt X -> uses -> Python 3.11).
+    Perzistuje do JSON souboru.
+    """
+    def __init__(self, persist_path: Path):
+        self.persist_path = persist_path
+        self._lock = threading.Lock()
+        if nx is not None:
+            self.graph = nx.DiGraph()
+        else:
+            self.graph = None
+            self._nodes = {}  # fallback node storage
+            self._edges = []  # fallback edge storage
+        self._load()
+
+    def _load(self):
+        with self._lock:
+            if not self.persist_path.exists():
+                return
+            try:
+                if self.graph is not None:
+                    with open(self.persist_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    self.graph = nx.node_link_graph(data)
+                    logger.info(f"Procedurální paměť načtena: {self.graph.number_of_nodes()} uzlů, {self.graph.number_of_edges()} hran")
+                else:
+                    with open(self.persist_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    self._nodes = {n["id"]: n for n in data.get("nodes", [])}
+                    self._edges = data.get("edges", [])
+                    logger.info(f"Procedurální paměť (fallback) načtena: {len(self._nodes)} uzlů, {len(self._edges)} hran")
+            except Exception as e:
+                logger.warning(f"Chyba při načítání procedurální paměti: {e}")
+
+    def _save(self):
+        try:
+            if self.graph is not None:
+                data = nx.node_link_data(self.graph)
+            else:
+                data = {
+                    "directed": True,
+                    "multigraph": False,
+                    "graph": {},
+                    "nodes": [{"id": nid} for nid in self._nodes.keys()],
+                    "edges": self._edges
+                }
+            with open(self.persist_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"Chyba při ukládání procedurální paměti: {e}")
+
+    def add_relation(self, source: str, relation: str, target: str, metadata: dict = None) -> None:
+        """Přidá hranu (vztah) mezi dva uzly."""
+        with self._lock:
+            source = source.strip()
+            target = target.strip()
+            relation = relation.strip()
+            if not source or not target or not relation:
+                return
+            
+            if self.graph is not None:
+                self.graph.add_node(source, type="entity")
+                self.graph.add_node(target, type="entity")
+                self.graph.add_edge(source, target, relation=relation, metadata=metadata or {})
+            else:
+                self._nodes[source] = {"id": source}
+                self._nodes[target] = {"id": target}
+                # Check for existing
+                exists = False
+                for edge in self._edges:
+                    if edge["source"] == source and edge["target"] == target:
+                        edge["relation"] = relation
+                        edge["metadata"] = metadata or {}
+                        exists = True
+                        break
+                if not exists:
+                    self._edges.append({
+                        "source": source,
+                        "target": target,
+                        "relation": relation,
+                        "metadata": metadata or {}
+                    })
+            self._save()
+            logger.info(f"Přidán vztah: [{source}] --({relation})--> [{target}]")
+
+    def remove_relation(self, source: str, target: str) -> bool:
+        """Odstraní hranu mezi uzly."""
+        with self._lock:
+            if self.graph is not None:
+                if self.graph.has_edge(source, target):
+                    self.graph.remove_edge(source, target)
+                    self._save()
+                    return True
+                return False
+            else:
+                initial_len = len(self._edges)
+                self._edges = [e for e in self._edges if not (e["source"] == source and e["target"] == target)]
+                if len(self._edges) < initial_len:
+                    self._save()
+                    return True
+                return False
+
+    def query_relations(self, query_text: str) -> str:
+        """
+        Vyhledá v textu dotazu známé entity (uzly) a vrátí jejich vztahy.
+        Tím se LLM prompt obohatí o přesné okolní vztahy z grafu.
+        """
+        with self._lock:
+            query_lower = query_text.lower()
+            matching_nodes = []
+            
+            # Najdi uzly, které se vyskytují v dotazu
+            nodes = list(self.graph.nodes) if self.graph is not None else list(self._nodes.keys())
+            for node in nodes:
+                if str(node).lower() in query_lower:
+                    matching_nodes.append(node)
+            
+            if not matching_nodes:
+                return ""
+            
+            relations_text = []
+            # Pro každý odpovídající uzel najdi jeho přímé vztahy (odchozí i příchozí)
+            for node in matching_nodes:
+                if self.graph is not None:
+                    # Odchozí vztahy
+                    for successor in self.graph.successors(node):
+                        edge_data = self.graph.get_edge_data(node, successor)
+                        relation = edge_data.get("relation", "souvisí s")
+                        relations_text.append(f"- '{node}' {relation} '{successor}'")
+                    # Příchozí vztahy
+                    for predecessor in self.graph.predecessors(node):
+                        edge_data = self.graph.get_edge_data(predecessor, node)
+                        relation = edge_data.get("relation", "souvisí s")
+                        relations_text.append(f"- '{predecessor}' {relation} '{node}'")
+                else:
+                    for edge in self._edges:
+                        if edge["source"] == node:
+                            relations_text.append(f"- '{node}' {edge['relation']} '{edge['target']}'")
+                        elif edge["target"] == node:
+                            relations_text.append(f"- '{edge['source']}' {edge['relation']} '{node}'")
+            
+            # Odstraň duplicity a seřaď
+            unique_relations = sorted(list(set(relations_text)))
+            if unique_relations:
+                return "\n".join(unique_relations)
+            return ""
+
+
 # ══════════════════════════════════════════════════════
 #  JARVIS MEMORY (unifikovaná fasáda)
 # ══════════════════════════════════════════════════════
@@ -320,6 +522,11 @@ class JarvisMemory:
     def __init__(self, config: dict):
         self.config = config
         mem_dir = Path(os.path.dirname(os.path.abspath(__file__))) / "memory_data"
+        mem_dir.mkdir(parents=True, exist_ok=True)
+
+        # Inicializace Epizodické a Procedurální paměti
+        self.episodic = EpisodicMemory()
+        self.procedural = ProceduralMemory(mem_dir / "procedural_memory.json")
 
         if HAS_NEURAL_MEMORY:
             try:
