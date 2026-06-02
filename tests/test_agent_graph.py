@@ -281,3 +281,29 @@ class TestFullRun:
         g = _graph(["", "", "", ""])
         result = g.run("úkol")
         assert isinstance(result, str)
+
+    def test_event_bus_emissions(self):
+        """Testuje, že při spuštění grafu se posílají eventy do EventBusu."""
+        from event_bus import get_event_bus
+        bus = get_event_bus()
+        
+        events = []
+        def handler(event):
+            events.append(event)
+            
+        bus.subscribe("agent.graph", handler)
+        
+        g = _graph(
+            ['["krok1"]',
+             '{"tool": "DONE", "args": {"answer": "hotovo"}}']
+        )
+        g.run("rychly ukol")
+        
+        import time as _time
+        _time.sleep(0.1)
+        
+        bus.unsubscribe("agent.graph", handler)
+        assert len(events) > 0
+        node_enters = [e.data.get("node") for e in events if e.data and e.data.get("type") == "node_enter"]
+        assert "planning" in node_enters
+        assert "done" in node_enters

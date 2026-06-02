@@ -86,6 +86,11 @@ class AgentState:
         logger.debug(f"[Graf] {msg}")
         if self.on_step:
             self.on_step(msg)
+        try:
+            from event_bus import get_event_bus
+            get_event_bus().emit("agent.graph", {"type": "reasoning", "text": msg}, source="agent_graph")
+        except Exception:
+            pass
 
 
 # ── Systémové prompty uzlů ────────────────────────────────────────
@@ -154,6 +159,15 @@ class AgentGraph:
         state.notify(f"Plánuji: {task[:60]}")
 
         while state.status not in (NodeStatus.DONE, NodeStatus.FAILED):
+            node_name = state.status.value.lower()
+            if node_name == "criticizing":
+                node_name = "critic"
+            try:
+                from event_bus import get_event_bus
+                get_event_bus().emit("agent.graph", {"type": "node_enter", "node": node_name}, source="agent_graph")
+            except Exception:
+                pass
+
             # Circuit breaker: limit kroků
             if state.exec_count >= MAX_STEPS:
                 state.final_answer = (
@@ -182,6 +196,14 @@ class AgentGraph:
                 self._node_executor(state)
             elif state.status == NodeStatus.CRITICIZING:
                 self._node_critic(state)
+
+        try:
+            from event_bus import get_event_bus
+            final_node = "done" if state.status == NodeStatus.DONE else "failed"
+            get_event_bus().emit("agent.graph", {"type": "node_enter", "node": final_node}, source="agent_graph")
+            get_event_bus().emit("agent.graph", {"type": "node_exit"}, source="agent_graph")
+        except Exception:
+            pass
 
         return state.final_answer or "Úkol dokončen."
 

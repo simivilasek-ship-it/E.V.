@@ -83,6 +83,27 @@ if HAS_FASTAPI:
 
     app.broadcast_graph_event = broadcast_graph_event
 
+    _main_loop = None
+
+    @app.on_event("startup")
+    async def startup_event():
+        global _main_loop
+        _main_loop = asyncio.get_running_loop()
+        try:
+            from event_bus import get_event_bus
+            
+            def handle_bus_graph(event):
+                if _main_loop and event.data:
+                    asyncio.run_coroutine_threadsafe(
+                        broadcast_graph_event(event.data),
+                        _main_loop
+                    )
+            
+            get_event_bus().subscribe("agent.graph", handle_bus_graph)
+            logger.info("Dashboard: Odebírám 'agent.graph' eventy z EventBusu")
+        except Exception as e:
+            logger.warning(f"Dashboard: nelze se přihlásit k EventBusu: {e}")
+
     @app.get("/health")
     async def health():
         """Strukturovaný health check endpoint."""
