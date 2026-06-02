@@ -17,10 +17,10 @@ if ! pgrep -x "ollama" > /dev/null 2>&1; then
     ollama serve &>/dev/null & sleep 2
 fi
 
-# React build (jen pokud je novější)
+# Web build (jen pokud chybí)
 if [ -d web ] && [ ! -f web_dist/index.html ]; then
-    echo "Sestavuji React frontend..."
-    (cd web && npm install --legacy-peer-deps -s 2>/dev/null && npm run build -s)
+    echo "Sestavuji web frontend..."
+    bash scripts/build.sh
 fi
 
 echo "Spouštím JARVIS..."

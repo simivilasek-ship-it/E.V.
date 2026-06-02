@@ -208,7 +208,7 @@ def main():
         web_dir = ROOT / "web"
         if web_dir.exists():
             print("  Sestavuji React frontend...")
-            subprocess.run(["npm", "run", "build"], cwd=web_dir, capture_output=True)
+            subprocess.run(["bash", "scripts/build.sh"], cwd=ROOT, capture_output=True)
 
     start_backend()
     print("  Backend...", end=" ", flush=True)

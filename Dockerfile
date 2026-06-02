@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY web/package*.json web/
 RUN cd web && npm ci --legacy-peer-deps --quiet
 COPY web/ web/
-RUN cd web && npm run build && mv dist ../web_dist && cd .. && rm -rf web/node_modules
+RUN cd web && npm run build && mv out ../web_dist && cd .. && rm -rf web/node_modules
 
 # Zdrojový kód
 COPY --chown=jarvis:jarvis . .

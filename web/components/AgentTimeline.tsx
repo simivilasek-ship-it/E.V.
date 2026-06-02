@@ -213,7 +213,7 @@ export default function AgentTimeline() {
         }}>
           Žádné agentní úlohy zatím.<br />
           <span style={{ fontSize: 11, marginTop: 6, display: 'block' }}>
-            Zkus: „najdi ceny GPU a ulož je" nebo „porovnej Python vs JavaScript"
+            Zkus: „najdi ceny GPU a ulož je“ nebo „porovnej Python vs JavaScript“
           </span>
         </div>
       ) : (

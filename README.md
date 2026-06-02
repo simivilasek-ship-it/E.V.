@@ -30,6 +30,12 @@ python dashboard.py       # backend → :8002
 cd web && npm run dev     # frontend → :3000
 ```
 
+**Produkční build webu (servírováno FastAPI na `/app`):**
+```bash
+bash scripts/build.sh     # vytvoří ./web_dist (statický export)
+python dashboard.py       # UI pak běží na http://localhost:8002/app
+```
+
 ---
 
 ## Co umí
@@ -146,6 +152,25 @@ BRAVE_API_KEY=...   # Brave Search MCP
 ```bash
 python -m pytest tests/ test_jarvis.py -v   # 531 testů
 ruff check . --select F,E7                  # linter
+```
+
+### Frontend (web/)
+
+```bash
+cd web
+npm ci
+npm run lint
+npm run typecheck
+npm run dev
+```
+
+### Build webu pro produkci (`web_dist/`)
+
+FastAPI pak servíruje build na `http://localhost:8002/app`.
+
+```bash
+bash scripts/build.sh
+python dashboard.py
 ```
 
 **Přidání příkazu:** viz [CONTRIBUTING.md](CONTRIBUTING.md)
