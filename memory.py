@@ -588,6 +588,15 @@ class JarvisMemory:
         self.episodic = EpisodicMemory()
         self.procedural = ProceduralMemory(mem_dir / "procedural_memory.json")
 
+        # Initialize lightweight GraphStore (SQLite) for extracted triplets / facts
+        try:
+            from memory_graph import GraphStore
+            self.graph_store = GraphStore(mem_dir / "memory_graph.db")
+            logger.info(f"GraphStore inicializován v: {mem_dir / 'memory_graph.db'}")
+        except Exception as e:
+            logger.warning(f"Nelze inicializovat GraphStore: {e}")
+            self.graph_store = None
+
         if HAS_NEURAL_MEMORY:
             try:
                 mem_cfg = MemoryConfig(
@@ -624,11 +633,21 @@ class JarvisMemory:
     ]
 
     def _extract_graph_relations(self, content: str) -> None:
-        """Best-effort extraction of simple relations into procedural memory."""
+        """Best-effort extraction of simple relations into procedural memory and SQLite graph store."""
         try:
             triplets = _extract_entities_simple(content)
             for s, p, o in triplets:
-                self.procedural.add_relation(s, p, o, metadata={"source": "heuristic", "ts": time.time()})
+                meta = {"source": "heuristic", "ts": time.time()}
+                try:
+                    self.procedural.add_relation(s, p, o, metadata=meta)
+                except Exception:
+                    pass
+                # also store into lightweight GraphStore if available
+                try:
+                    if getattr(self, 'graph_store', None):
+                        self.graph_store.add_relation(s, p, o, ts=meta['ts'], source=meta['source'], confidence=0.9)
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -795,11 +814,23 @@ class JarvisMemory:
             else:
                 parts.append(f"Memory: {mem['content']}")
 
-        # Add knowledge-graph relations (procedural memory)
+        # Add knowledge-graph relations (GraphStore preferred, fallback to procedural)
         try:
-            rel = self.procedural.query_relations(current_query)
-            if rel:
-                parts.append("\nKnown relations (graph):\n" + rel)
+            rels = []
+            if getattr(self, 'graph_store', None):
+                try:
+                    rels = self.graph_store.query_relations_for_text(current_query)
+                except Exception:
+                    rels = []
+            if rels:
+                parts.append("\nKnown relations (graph):\n" + "\n".join(
+                    f"- '{r['subject']}' {r['predicate']} '{r['object']}' (src:{r.get('source')}, conf:{r.get('confidence')})" for r in rels
+                ))
+            else:
+                # fallback to procedural memory text
+                rel = self.procedural.query_relations(current_query)
+                if rel:
+                    parts.append("\nKnown relations (graph):\n" + rel)
         except Exception:
             pass
 

@@ -110,9 +110,16 @@ DEFAULT_CONFIG = {
 
     # Knowledge Graph extraction
     "graph_extraction_enabled": True,
+    # Graph backend note (MVP: sqlite local store). Possible values: sqlite_mvp|neo4j|memgraph
+    "graph_backend": "sqlite_mvp",
+
+    # MCP auto-install (MVP: only suggestions, installer not automatic)
+    "mcp_auto_install_enabled": False,
 
     # Shadow Mode (developer assistant)
     "shadow_mode_enabled": False,
+    # shadow_mode_level: 'suggestions' = read-only suggestions, 'autofix' = attempt fixes (ELEVATED)
+    "shadow_mode_level": "suggestions",
     "shadow_mode_workspace_roots": [],
 }
 

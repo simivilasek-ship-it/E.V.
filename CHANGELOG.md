@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [unreleased] - Memory Graph MVP
+
+### Added
+- SQLite-backed Memory Graph (entities + relations) with timestamps, source and confidence.
+- Heuristic extractor + GraphStore integration in JarvisMemory (writes triplets to memory_data/memory_graph.db).
+- Dashboard integration: /api/memory/graph includes graph entities and relations in UI.
+- Tests: basic unit tests for graph store and retriever.
+
+---
+
 ## [4.6] - 2026-06-02
 
 ### Added

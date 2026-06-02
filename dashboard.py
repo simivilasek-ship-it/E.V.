@@ -207,16 +207,49 @@ if HAS_FASTAPI:
 
     @app.get("/api/status")
     async def status():
-        if logger_module_available:
-            from config import CONFIG
+        """Returns basic runtime and feature availability status."""
+        from config import CONFIG
+        # Ollama status
+        ollama_ok = False
+        try:
             import requests as _r
-            try:
-                r = _r.get("http://localhost:11434/api/tags", timeout=2)
-                ok = r.status_code == 200
-            except Exception:
-                ok = False
-            return {"ollama": ok, "model": CONFIG.get("ollama_model", "?")}
-        return {"ollama": False, "model": "—"}
+            r = _r.get(CONFIG.get("ollama_url", "http://localhost:11434/api/chat").replace("/api/chat", "/api/tags"), timeout=2)
+            ollama_ok = r.status_code == 200
+        except Exception:
+            ollama_ok = False
+
+        # Feature-level capabilities (MVP notes)
+        features = {
+            "computer_use": {
+                "enabled": bool(CONFIG.get("computer_use_enabled", False)),
+                "backend": CONFIG.get("computer_use_backend", "auto"),
+                "cross_platform": "partial (Linux-first)" if CONFIG.get("computer_use_backend", "auto") in ("auto", "linux_atspi") else "limited",
+                "note": "Full cross-platform Computer Use currently focused on Linux (GNOME). Windows/macOS support partial or experimental.",
+            },
+            "audio_duplex": {
+                "live_duplex_stt_tts": bool(CONFIG.get("audio_ws_enabled", False)),
+                "note": "Live duplex STT/TTS streaming is experimental / opt-in and may require additional setup.",
+            },
+            "memory_graph": {
+                "backend": CONFIG.get("graph_backend", "sqlite_mvp"),
+                "note": "Graph memory is MVP using local SQLite (entities+relations). Enterprise graph DB adapters (Neo4j/Memgraph) planned.",
+            },
+            "mcp_auto_install": {
+                "enabled": bool(CONFIG.get("mcp_auto_install_enabled", False)),
+                "note": "MCP auto-install is disabled by default; current system only suggests servers and requires explicit user approval to install.",
+            },
+            "shadow_mode": {
+                "enabled": bool(CONFIG.get("shadow_mode_enabled", False)),
+                "level": CONFIG.get("shadow_mode_level", "suggestions"),
+                "note": "Shadow Mode currently offers read-only suggestions (no automatic commits or CI self-healing unless 'autofix' is enabled and explicitly approved).",
+            },
+        }
+
+        return {
+            "ollama": ollama_ok,
+            "model": CONFIG.get("ollama_model", "?"),
+            "features": features,
+        }
 
     @app.get("/api/agents")
     async def agents_status():
@@ -391,6 +424,32 @@ if HAS_FASTAPI:
                             break
                 if len(links) >= 120:
                     break
+
+            # Integrate GraphStore (entities + relations) if available
+            try:
+                if getattr(mem, 'graph_store', None):
+                    try:
+                        gd = mem.graph_store.dump()
+                        # merge graph nodes (prefix with 'g-' to avoid id collision)
+                        for n in gd.get('nodes', []):
+                            nid = 'g-' + str(n.get('id'))
+                            if nid not in seen_ids:
+                                nodes.append({
+                                    'id': nid,
+                                    'label': n.get('label') or n.get('name'),
+                                    'full': n.get('label') or n.get('name'),
+                                    'importance': n.get('importance', 0.5),
+                                    'tags': [],
+                                    'group': n.get('group', 'entity'),
+                                    'ts': 0,
+                                })
+                                seen_ids.add(nid)
+                        for l in gd.get('links', []):
+                            links.append({'source': 'g-' + str(l.get('source')), 'target': 'g-' + str(l.get('target')), 'label': l.get('label')})
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
             # Limit s total_count
             total = len(nodes)
