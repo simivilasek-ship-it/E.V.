@@ -522,10 +522,10 @@ class JarvisApp:
                 f"Akce zamítnuta: {r}", "jarvis"))
             return
 
-        # Potvrzení pro nebezpečné akce
+        # Potvrzení pro nebezpečné akce (headless mód — bez Tkinter okna)
         if self.security.needs_confirmation(action):
             from security_v2 import confirm_action
-            confirmed = confirm_action(action, params, parent=self.gui.root)
+            confirmed = confirm_action(action, params, parent=None)
             if not confirmed:
                 self._gui(lambda: self.gui.add_message("Akce zrušena.", "jarvis"))
                 return

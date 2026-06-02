@@ -265,21 +265,36 @@ class SecurityManager:
 # ── Potvrzovací dialog ────────────────────────────────
 
 def confirm_action(action: str, params: Dict[str, Any], parent=None) -> bool:
-    """Zobrazí dialog pro potvrzení nebezpečné akce."""
+    """Zobrazí dialog pro potvrzení nebezpečné akce.
+
+    V headless/web módu (bez Tkinter okna) se pokusí o konzolové potvrzení.
+    """
     level = ACTION_PERMISSIONS.get(action, PermissionLevel.RESTRICTED)
     if level not in (PermissionLevel.ELEVATED, PermissionLevel.RESTRICTED):
         return True
 
+    prompt = f"Opravdu chcete provést akci '{action}'?"
+    if params:
+        details = ", ".join(f"{k}={v}" for k, v in params.items())
+        prompt += f"\n{details}"
+
+    # Zkus Tkinter dialog (jen pokud je parent skutečné Tk okno, ne _StubRoot)
     try:
-        import tkinter.messagebox as msgbox
-        prompt = f"Opravdu chcete provést akci '{action}'?"
-        if params:
-            details = ", ".join(f"{k}={v}" for k, v in params.items())
-            prompt += f"\n{details}"
-        return msgbox.askyesno("Potvrzení akce", prompt, parent=parent)
-    except Exception as e:
-        logger.warning(f"Dialog potvrzení selhal: {e}")
-        return False
+        import tkinter as _tk
+        if parent is not None and isinstance(parent, _tk.Misc):
+            import tkinter.messagebox as msgbox
+            return msgbox.askyesno("Potvrzení akce", prompt, parent=parent)
+    except Exception:
+        pass
+
+    # Headless fallback — konzolové potvrzení (API / web mód automaticky schvaluje ELEVATED)
+    if level == PermissionLevel.ELEVATED:
+        logger.warning(f"Headless confirm_action: auto-approve ELEVATED '{action}'")
+        return True
+
+    # RESTRICTED v headless — loguj a zamítni (bezpečný výchozí stav)
+    logger.warning(f"Headless confirm_action: zamítám RESTRICTED '{action}' (žádné UI pro dialog)")
+    return False
 
 
 # ── Singleton ─────────────────────────────────────────

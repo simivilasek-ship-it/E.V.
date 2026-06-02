@@ -30,7 +30,7 @@ def main():
         description=f"JARVIS v{__version__} — lokální AI asistent",
     )
     parser.add_argument("--gui",       action="store_true",
-                        help="Klasické Tkinter okno (místo webového UI)")
+                        help="[LEGACY] Tkinter GUI (přesunuto do gui_legacy/; výchozí je Next.js web UI)")
     parser.add_argument("--webview",   action="store_true",
                         help="Nativní pywebview okno (místo prohlížeče)")
     parser.add_argument("--tray",      action="store_true",
@@ -54,9 +54,13 @@ def main():
         return
 
     if args.gui:
-        from app_core import JarvisApp
-        print(f"JARVIS v{__version__} (Tkinter GUI)")
-        JarvisApp().run()
+        # --gui příznak ponechán pro zpětnou kompatibilitu,
+        # ale Tkinter okno bylo nahrazeno headless backendem.
+        # Použij výchozí launcher (Next.js + dashboard) pro webové UI.
+        print(f"JARVIS v{__version__} — příznak --gui je deprecated, spouštím headless backend.")
+        print("Webové UI: http://localhost:8002/app  (spusť: cd web && npm run dev)")
+        import dashboard
+        dashboard.run()
         return
 
     # Výchozí: web launcher — backend + prohlížeč
