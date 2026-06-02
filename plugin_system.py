@@ -608,7 +608,25 @@ class PluginManager:
 
     def call_route(self, handler: Callable, text: str,
                    plugin_name: str = "?") -> Optional[Tuple]:
-        """Zavolá handler s timeoutem. Při chybě vrátí (None, None)."""
+        """Zavolá handler s timeoutem. Při chybě vrátí (None, None).
+
+        Pokud plugin má nebezpečné permissions, spustí handler v izolovaném
+        subprocess přes SandboxedPluginRunner.
+        """
+        # Zkus sandbox pro pluginy s nebezpečnými permissions
+        plugin = self.plugins.get(plugin_name)
+        manifest_perms = getattr(getattr(plugin, '_manifest', None), 'permissions', None)
+        if manifest_perms and _sandbox.should_isolate(manifest_perms):
+            skill_path = getattr(plugin._manifest, 'path', None)
+            handler_name = handler.__name__ if callable(handler) else None
+            if skill_path and handler_name:
+                import os as _os
+                import pathlib as _pl
+                p = _pl.Path(skill_path)
+                py_file = str(p / "skill.py") if p.is_dir() else str(p)
+                logger.debug(f"Plugin '{plugin_name}' sandbox izolace → {py_file}:{handler_name}")
+                return _sandbox.run_isolated(py_file, handler_name, text)
+
         timeout = self.config.get("plugin_handler_timeout", 5.0)
         # cancel_futures=True zajistí že shutdown nečeká na running thread
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -711,6 +729,60 @@ class PluginManager:
             self._disabled.discard(name)
             return True
         return False
+
+
+# ── Sandbox Process Isolation ─────────────────────────
+
+class SandboxedPluginRunner:
+    """Spouští plugin handlery v izolovaném subprocess pro bezpečnost.
+
+    Použití: pro pluginy s permissions system.exec nebo network.full.
+    Komunikace přes JSON na stdin/stdout.
+    """
+
+    DANGEROUS_PERMS = {"system.exec", "network.full", "internal"}
+
+    def __init__(self, timeout: float = 10.0):
+        self.timeout = timeout
+
+    def should_isolate(self, permissions: list) -> bool:
+        """True pokud plugin vyžaduje process izolaci."""
+        return bool(set(permissions) & self.DANGEROUS_PERMS)
+
+    def run_isolated(self, skill_path: str, handler_name: str,
+                     text: str) -> tuple:
+        """Spustí handler v subprocess a vrátí výsledek."""
+        import subprocess, json, sys as _sys
+
+        code = f"""
+import sys, json
+sys.path.insert(0, {repr(str(__import__('pathlib').Path(skill_path).parent.parent.parent))})
+import importlib.util
+spec = importlib.util.spec_from_file_location("skill", {repr(skill_path)})
+mod  = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+handler = getattr(mod, {repr(handler_name)}, None)
+if handler:
+    result = handler({repr(text)})
+    print(json.dumps(result if result else [None, None]))
+else:
+    print(json.dumps([None, None]))
+"""
+        try:
+            r = subprocess.run(
+                [_sys.executable, "-c", code],
+                capture_output=True, text=True, timeout=self.timeout,
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                data = json.loads(r.stdout.strip())
+                if isinstance(data, list) and len(data) == 2:
+                    return data[0], data[1]
+        except Exception as e:
+            logger.warning(f"Sandboxed run selhal: {e}")
+        return None, None
+
+
+_sandbox = SandboxedPluginRunner(timeout=8.0)
 
 
 # ── Built-in skills (class-based) ─────────────────────

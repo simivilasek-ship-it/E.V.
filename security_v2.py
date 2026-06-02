@@ -86,6 +86,21 @@ ACTION_PERMISSIONS: Dict[str, PermissionLevel] = {
     "restart":          PermissionLevel.ELEVATED,
     "sleep_pc":         PermissionLevel.ELEVATED,
     "update_system":    PermissionLevel.ELEVATED,
+
+    # Computer Use (Accessibility / UI automation)
+    "ui_tree":          PermissionLevel.SAFE,
+    "ui_click":         PermissionLevel.ELEVATED,
+    "ui_set_value":     PermissionLevel.ELEVATED,
+
+    # Shadow mode (developer suggestions)
+    "shadow_suggest":   PermissionLevel.SAFE,
+
+    # MCP hub
+    "mcp_suggest":      PermissionLevel.SAFE,
+    "mcp_install":      PermissionLevel.ELEVATED,
+
+    # Duplex audio
+    "audio_ws":         PermissionLevel.SAFE,
 }
 
 # Nebezpečné patterny v textu příkazů

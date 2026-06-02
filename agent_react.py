@@ -477,3 +477,79 @@ def reset_agent():
     global _agent
     with _agent_lock:
         _agent = None
+
+
+# ── ReAct 2.0 rozšíření ───────────────────────────────────────────
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class StepResult:
+    """Výsledek jednoho kroku agenta."""
+    action: str
+    result: str
+    success: bool
+    error: Optional[str] = None
+    rollback_fn: Optional[Callable] = field(default=None, repr=False)
+
+
+class ReactAgentV2(ReactAgent):
+    """ReAct 2.0 — s plánováním, kontrolou kroků a rollbackem."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._step_history: List[StepResult] = []
+        self._plan: List[str] = []
+
+    def plan(self, task: str) -> List[str]:
+        """Vytvoří plán kroků před spuštěním. Vrátí seznam akcí."""
+        prompt = (
+            f"Vytvoř stručný plán (max 5 kroků) pro úkol: {task}\n"
+            "Každý krok na nový řádek jako: KROK X: popis\n"
+            "Jen kroky, žádné vysvětlení."
+        )
+        try:
+            raw = self._client.call(
+                [{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=200,
+            )
+            steps = []
+            for line in raw.splitlines():
+                line = line.strip()
+                m = re.match(r"KROK\s*\d+\s*:\s*(.+)", line, re.IGNORECASE)
+                if m:
+                    steps.append(m.group(1).strip())
+            self._plan = steps if steps else [task]
+        except Exception as e:
+            logger.warning(f"ReactAgentV2.plan chyba: {e}")
+            self._plan = [task]
+        return self._plan
+
+    def validate_step(self, step: StepResult) -> bool:
+        """Zkontroluje výsledek kroku — detekuje chyby."""
+        if not step.success:
+            return False
+        error_keywords = ["error", "chyba", "selhal", "failed", "exception"]
+        if any(kw in step.result.lower() for kw in error_keywords):
+            return False
+        return True
+
+    def rollback_last(self) -> str:
+        """Odvolá poslední krok pokud má rollback funkci."""
+        if self._step_history and self._step_history[-1].rollback_fn:
+            self._step_history[-1].rollback_fn()
+            self._step_history.pop()
+            return "Krok odvolán."
+        return "Žádný krok k odvolání."
+
+    def introspect(self) -> str:
+        """Vrátí souhrn co agent dělal — pro debugging."""
+        if not self._step_history:
+            return "Žádná historie kroků."
+        lines = [f"Celkem kroků: {len(self._step_history)}"]
+        for i, s in enumerate(self._step_history, 1):
+            status = "✓" if s.success else "✗"
+            lines.append(f"  {i}. [{status}] {s.action}: {s.result[:50]}")
+        return "\n".join(lines)

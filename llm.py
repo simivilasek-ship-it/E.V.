@@ -417,6 +417,15 @@ class LLMEngine:
             resp = requests.post(self.url, json=payload, timeout=60)
             resp.raise_for_status()
             raw  = resp.json().get("message", {}).get("content", "").strip()
+            # Self-debugging: oprav odpověď pokud obsahuje chybové patterny
+            try:
+                from agent_roles import SelfDebuggingAgent
+                _debugger = SelfDebuggingAgent(self.url, self.model)
+                if _debugger.has_error(raw):
+                    logger.info("Self-debugging: detekována chyba v odpovědi, opravuji...")
+                    raw = _debugger.debug_and_fix(user_text, raw)
+            except Exception as _dbg_err:
+                logger.debug(f"Self-debugging přeskočen: {_dbg_err}")
             self.history.append({"role": "assistant", "content": raw})
             # Ulož do cache (faktické dotazy se nevyřadí automaticky uvnitř .set())
             answer_action = {"action": "answer", "params": {}}

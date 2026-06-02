@@ -57,6 +57,10 @@ class TestCommandExecutorIntegration:
         result = executor.execute("akce_ktera_neexistuje_xyz", {})
         assert isinstance(result, str)
 
+    def test_ui_set_value_command_registered(self, executor):
+        result = executor.execute("ui_set_value", {"text": "username", "value": "user123"})
+        assert "Computer Use je vypnuté" in result
+
     def test_note_add_and_list(self, executor):
         with tempfile.TemporaryDirectory() as tmpdir:
             note_file = os.path.join(tmpdir, "notes.txt")
@@ -107,6 +111,10 @@ class TestSecurityPipeline:
             log.log("test", {}, allowed=True)
             mode = oct(log_path.stat().st_mode)[-3:]
             assert mode == "600", f"Očekáváno 600, dostal {mode}"
+
+    def test_ui_set_value_is_elevated(self, security):
+        ok, reason = security.check("ui_set_value", {"text": "username", "value": "user123"})
+        assert ok is True
 
 
 # ─────────────────────────────────────────────────────

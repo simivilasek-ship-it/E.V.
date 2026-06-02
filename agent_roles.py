@@ -321,3 +321,108 @@ class MultiAgentOrchestrator:
             except Exception:
                 pass
         return self.executor_agent.execute(step)
+
+
+# ── SupervisorAgent ───────────────────────────────────────────────
+
+class SupervisorAgent:
+    """Hlavní agent který plánuje a deleguje sub-agentům."""
+
+    def __init__(self, ollama_url: str, model: str):
+        self.planner    = PlannerAgent(ollama_url, model)
+        self.researcher = ResearcherAgent(ollama_url, model)
+        self.executor   = ExecutorAgent(ollama_url, model)
+        self.critic     = CriticAgent(ollama_url, model)
+        self._log: list[str] = []
+
+    def run_with_delegation(self, task: str, max_rounds: int = 3) -> str:
+        """Spustí úkol s hierarchickou delegací.
+
+        1. Planner vytvoří plán
+        2. Pro každý krok: Supervisor rozhodne který sub-agent ho vykoná
+        3. Critic hodnotí výsledek
+        4. Pokud RETRY: Supervisor přeplánuje
+        """
+        plan = self.planner.plan(task)
+        results = []
+
+        for step in plan[:5]:  # max 5 kroků
+            # Supervisor rozhodne kdo vykoná krok
+            agent_type = self._route_step(step)
+
+            if agent_type == "research":
+                result = self.researcher.research(step)
+            elif agent_type == "execute":
+                result = self.executor.execute(step)
+            else:
+                result = self.executor.execute(step)
+
+            ok, feedback = self.critic.evaluate(step, result)
+            self._log.append(f"{agent_type}: {step[:40]} → {'✓' if ok else '✗'}")
+
+            if ok:
+                results.append(result)
+            elif max_rounds > 0:
+                # Retry s feedbackem
+                retry_result = self.executor.execute(f"{step} (oprav: {feedback})")
+                results.append(retry_result)
+
+        return "\n".join(results) if results else "Úkol nedokončen."
+
+    def _route_step(self, step: str) -> str:
+        """Rozhodne který typ agenta má krok vykonat."""
+        step_l = step.lower()
+        if any(w in step_l for w in ["vyhledej", "najdi", "zjisti", "info"]):
+            return "research"
+        return "execute"
+
+    def get_log(self) -> str:
+        return "\n".join(self._log) if self._log else "Žádný log."
+
+
+class SelfDebuggingAgent:
+    """Agent který detekuje chyby ve vlastních odpovědích a opravuje je."""
+
+    ERROR_PATTERNS = [
+        r"traceback", r"exception", r"error:", r"syntax error",
+        r"nameerror", r"typeerror", r"attributeerror",
+        r"chyba:", r"selhalo", r"nelze",
+    ]
+
+    def __init__(self, ollama_url: str, model: str):
+        self.url   = ollama_url
+        self.model = model
+        self._re   = __import__('re').compile(
+            "|".join(self.ERROR_PATTERNS), __import__('re').IGNORECASE
+        )
+
+    def has_error(self, text: str) -> bool:
+        """True pokud text obsahuje chybové patterny."""
+        return bool(self._re.search(text))
+
+    def debug_and_fix(self, original_task: str, broken_response: str,
+                      max_attempts: int = 2) -> str:
+        """Pokusí se opravit chybnou odpověď."""
+        import requests
+
+        for attempt in range(max_attempts):
+            try:
+                prompt = (
+                    f"Tato odpověď obsahuje chybu:\n{broken_response}\n\n"
+                    f"Původní úkol: {original_task}\n\n"
+                    f"Oprav chybu a vrať správnou odpověď:"
+                )
+                r = requests.post(self.url, json={
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                    "options": {"temperature": 0.1, "num_predict": 500},
+                }, timeout=30)
+                if r.ok:
+                    fixed = r.json().get("message", {}).get("content", "").strip()
+                    if fixed and not self.has_error(fixed):
+                        return fixed
+            except Exception as e:
+                logger.debug(f"SelfDebugging attempt {attempt+1} selhal: {e}")
+
+        return broken_response  # Vrátí originál pokud se nepodaří opravit

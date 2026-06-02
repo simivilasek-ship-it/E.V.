@@ -397,6 +397,48 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
     if not slack_token:
         logger.debug("Slack MCP: SLACK_BOT_TOKEN není nastaven → zakázáno")
 
+    # ── Discord MCP ──────────────────────────────────────
+    # Vyžaduje DISCORD_TOKEN v .env
+    discord_token = os.environ.get("DISCORD_TOKEN", "")
+    bridge.register(MCPServerConfig(
+        name="discord",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-discord"],
+        env={"DISCORD_TOKEN": discord_token} if discord_token else {},
+        enabled=bool(discord_token) and config.get("mcp_discord_enabled", True),
+    ))
+    if not discord_token:
+        logger.debug("Discord MCP: DISCORD_TOKEN není nastaven → zakázáno. Přidej do .env: DISCORD_TOKEN=...")
+
+    # ── Spotify MCP ──────────────────────────────────────
+    # Vyžaduje SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET
+    spotify_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
+    bridge.register(MCPServerConfig(
+        name="spotify",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-spotify"],
+        env={
+            "SPOTIFY_CLIENT_ID": spotify_id,
+            "SPOTIFY_CLIENT_SECRET": os.environ.get("SPOTIFY_CLIENT_SECRET", ""),
+        } if spotify_id else {},
+        enabled=bool(spotify_id) and config.get("mcp_spotify_enabled", False),
+    ))
+    if not spotify_id:
+        logger.debug("Spotify MCP: SPOTIFY_CLIENT_ID není nastaven → zakázáno. Přidej do .env.")
+
+    # ── Notion MCP ───────────────────────────────────────
+    # Vyžaduje NOTION_API_KEY v .env
+    notion_key = os.environ.get("NOTION_API_KEY", "")
+    bridge.register(MCPServerConfig(
+        name="notion",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-notion"],
+        env={"NOTION_API_KEY": notion_key} if notion_key else {},
+        enabled=bool(notion_key) and config.get("mcp_notion_enabled", False),
+    ))
+    if not notion_key:
+        logger.debug("Notion MCP: NOTION_API_KEY není nastaven → zakázáno. Přidej do .env.")
+
     _warn_missing_commands(bridge)
     return bridge
 

@@ -181,6 +181,7 @@ class JarvisApp:
         self.bus.subscribe(EventType.RAM_HIGH,      self._on_agent_alert)
         self.bus.subscribe(EventType.DISK_LOW,      self._on_agent_alert)
         self.bus.subscribe(EventType.TASK_FIRED,    self._on_task_fired)
+        self.bus.subscribe(EventType.AUDIO_SPEECH,  self._on_audio_speech)
 
         # ── Background Agents ────────────────────────
         self.agent_manager = AgentManager.create_default(self.bus)
@@ -402,6 +403,15 @@ class JarvisApp:
         data = event.data or {}
         name = data.get("name", "?")
         self._gui(lambda n=name: self.gui.set_status(f"⏰ {n}"))
+
+    def _on_audio_speech(self, event: Event):
+        """Barge-in: if user starts speaking while TTS is active, stop TTS immediately."""
+        try:
+            logger.info("VAD: detekována řeč — přerušuji TTS")
+            self.tts.stop()
+            self._gui(lambda: self.gui.set_status("🎙️ Přerušeno — poslouchám…"))
+        except Exception:
+            pass
 
     def _on_wake_word(self):
         """Wake word detekován — spustí naslouchání jako klik na mikrofon."""

@@ -35,6 +35,7 @@ interface JarvisState {
   connStatus:  ConnStatus
   connError:   string | null
   isMicActive: boolean
+  quickActionHistory: string[]
 
   // Internal
   _ws:        WebSocket | null
@@ -61,6 +62,7 @@ interface JarvisState {
   setAgents:      (data: Record<string, unknown>) => void
   setPlugins:     (data: unknown[]) => void
   setModel:       (model: string) => void
+  addToQuickHistory: (cmd: string) => void
   checkBackend:   () => Promise<boolean>
   fetchSystem:    () => Promise<void>
   fetchAgents:    () => Promise<void>
@@ -97,6 +99,7 @@ export const useJarvis = create<JarvisState>((set, get) => ({
   system: { cpu: 0, ram: 0, disk: 0, cpu_temp: null, net: null, gpu: null },
   agents: {}, plugins: [], currentModel: '',
   isConnected: false, connStatus: 'disconnected', connError: null, isMicActive: false,
+  quickActionHistory: [],
   _ws: null, _attempt: 0, _retryId: null, _metricsWs: null, _chatWs: null,
 
   async checkBackend() {
@@ -289,6 +292,9 @@ export const useJarvis = create<JarvisState>((set, get) => ({
   setAgents(data) { set({ agents: data }) },
   setPlugins(data){ set({ plugins: data }) },
   setModel(model) { set({ currentModel: model }) },
+  addToQuickHistory(cmd) {
+    set(s => ({ quickActionHistory: [cmd, ...s.quickActionHistory.filter(c => c !== cmd)].slice(0, 10) }))
+  },
   async fetchSystem() {
     try { get().setSystem(await fetch(`${getApiBase()}/api/system`).then(r => r.json())) } catch {}
   },

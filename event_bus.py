@@ -62,6 +62,10 @@ class EventType:
     # Active window
     ACTIVE_WINDOW_CHANGED = "active_window.changed"  # aktivní okno se změnilo
 
+    # Audio / duplex
+    AUDIO_SPEECH      = "audio.speech"      # VAD detekoval řeč (interrupt)
+    AUDIO_FRAME       = "audio.frame"       # raw audio frame (debug)
+
     # Wildcard
     ALL               = "*"                  # přihlásit se ke všem
 

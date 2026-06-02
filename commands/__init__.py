@@ -24,6 +24,9 @@ from .system import (cmd_get_time, cmd_get_date, cmd_system_info,
                      cmd_update_system, cmd_volume, cmd_set_brightness,
                      cmd_hardware_info, cmd_disk_space,
                      cmd_list_directory, cmd_file_info)
+from .ui_automation import (cmd_ui_tree, cmd_ui_click, cmd_ui_set_value)
+from shadow_mode import cmd_shadow_suggest
+from mcp_hub import cmd_mcp_suggest
 from .utils  import (cmd_calculate, cmd_translate, cmd_note_add, cmd_note_list,
                      cmd_reminder_set, cmd_weather, cmd_wiki_search,
                      cmd_currency_convert, cmd_write_email,
@@ -172,6 +175,11 @@ class CommandExecutor:
     def _cmd_disk_space(self, path="/", **_):     return cmd_disk_space(path)
     def _cmd_list_directory(self, path="~", **_): return cmd_list_directory(path)
     def _cmd_file_info(self, path="", **_):       return cmd_file_info(path)
+    def _cmd_ui_tree(self, max_nodes=400, **_):    return cmd_ui_tree(max_nodes=max_nodes)
+    def _cmd_ui_click(self, text="", role="", **_): return cmd_ui_click(text=text, role=role)
+    def _cmd_ui_set_value(self, text="", value="", role="", **_): return cmd_ui_set_value(text=text, value=value, role=role)
+    def _cmd_shadow_suggest(self, **_):             return cmd_shadow_suggest(self.config)
+    def _cmd_mcp_suggest(self, task="", **_):       return cmd_mcp_suggest(task)
 
     # ── apps ─────────────────────────────────────────
     def _cmd_open_app(self, app="", args=None, **_): return cmd_open_app(app, args)

@@ -109,7 +109,8 @@ class _SQLiteMemoryStore:
         access_count INTEGER NOT NULL DEFAULT 0,
         priority     INTEGER NOT NULL DEFAULT 0,
         ttl_seconds  INTEGER NOT NULL DEFAULT 0,
-        expires_at   REAL NOT NULL DEFAULT 0
+        expires_at   REAL NOT NULL DEFAULT 0,
+        access_score REAL NOT NULL DEFAULT 0.0
     );
     CREATE INDEX IF NOT EXISTS idx_importance ON memories(importance);
     CREATE INDEX IF NOT EXISTS idx_created_at ON memories(created_at);
@@ -130,11 +131,12 @@ class _SQLiteMemoryStore:
 
     @staticmethod
     def _add_columns(con) -> None:
-        """Přidá TTL/priority sloupce do existující DB (idempotentní)."""
+        """Přidá TTL/priority/access_score sloupce do existující DB (idempotentní)."""
         for col, typedef in [
-            ("priority",    "INTEGER NOT NULL DEFAULT 0"),
-            ("ttl_seconds", "INTEGER NOT NULL DEFAULT 0"),
-            ("expires_at",  "REAL    NOT NULL DEFAULT 0"),
+            ("priority",     "INTEGER NOT NULL DEFAULT 0"),
+            ("ttl_seconds",  "INTEGER NOT NULL DEFAULT 0"),
+            ("expires_at",   "REAL    NOT NULL DEFAULT 0"),
+            ("access_score", "REAL    NOT NULL DEFAULT 0.0"),
         ]:
             try:
                 con.execute(f"ALTER TABLE memories ADD COLUMN {col} {typedef}")
@@ -181,11 +183,11 @@ class _SQLiteMemoryStore:
         expires_at = now + ttl_seconds if ttl_seconds > 0 else 0
         with self._lock, self._connect() as con:
             con.execute(
-                "INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (mid, content, importance,
                  json.dumps(tags, ensure_ascii=False),
                  json.dumps(metadata, ensure_ascii=False),
-                 now, now, 0, priority, ttl_seconds, expires_at),
+                 now, now, 0, priority, ttl_seconds, expires_at, 0.0),
             )
         return mid
 
@@ -238,7 +240,8 @@ class _SQLiteMemoryStore:
             placeholders = ",".join("?" * len(ids))
             with self._lock, self._connect() as con:
                 con.execute(
-                    f"UPDATE memories SET last_access=?, access_count=access_count+1 "
+                    f"UPDATE memories SET last_access=?, access_count=access_count+1, "
+                    f"access_score=access_score+0.1 "
                     f"WHERE id IN ({placeholders})",
                     (now, *ids),
                 )
@@ -253,8 +256,11 @@ class _SQLiteMemoryStore:
                     min_importance: float = 0.05) -> dict:
         now = time.time()
         with self._lock, self._connect() as con:
-            rows = con.execute("SELECT id, importance, created_at FROM memories").fetchall()
+            rows = con.execute("SELECT id, importance, created_at, access_score FROM memories").fetchall()
             for row in rows:
+                # Long-term memories (access_score >= 5.0) nepodléhají decay
+                if row["access_score"] >= 5.0:
+                    continue
                 age_days    = (now - row["created_at"]) / 86400
                 new_imp     = row["importance"] * _math.exp(-decay_rate * age_days)
                 if new_imp < min_importance:
@@ -291,6 +297,22 @@ class _SQLiteMemoryStore:
         if deleted:
             logger.info(f"Memory maintenance: smazáno {deleted} expirovaných záznamů")
         return {"deleted_expired": deleted, "total": total_after}
+
+
+    def get_long_term(self, top_k: int = 20) -> list:
+        """Vrátí vzpomínky s nejvyšším access_score — ty jsou 'permanentní'."""
+        with self._lock, self._connect() as con:
+            rows = con.execute(
+                "SELECT * FROM memories WHERE access_score >= 2.0 "
+                "ORDER BY access_score DESC LIMIT ?", (top_k,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def promote_to_long_term(self, memory_id: str) -> None:
+        """Explicitně povýší vzpomínku na long-term (score = 10.0)."""
+        with self._lock, self._connect() as con:
+            con.execute("UPDATE memories SET access_score = 10.0 WHERE id = ?", (memory_id,))
+            con.commit()
 
 
 # Alias pro zpětnou kompatibilitu
@@ -512,6 +534,44 @@ class ProceduralMemory:
 #  JARVIS MEMORY (unifikovaná fasáda)
 # ══════════════════════════════════════════════════════
 
+def _extract_entities_simple(text: str) -> list[tuple[str, str, str]]:
+    """Very small heuristic extractor for graph relations.
+
+    Returns list of (subject, predicate, object) triplets.
+    """
+    import re
+
+    t = (text or "").strip()
+    if not t:
+        return []
+
+    triplets: list[tuple[str, str, str]] = []
+
+    # Examples:
+    # "Můj brácha Jirka začal programovat v Rustu"
+    m = re.search(r"\b(m[uů]j\s+br[áa]cha|bratr)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][\wÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž-]{1,30})\b", t)
+    if m:
+        person = m.group(2)
+        triplets.append(("Ty", "MÁ_BRATRA", person))
+
+    # "Jirka se učí Rust" / "Jirka programuje v Rustu"
+    m2 = re.search(r"\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][\wÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž-]{1,30})\s+(se\s+u[cč]i|u[cč]i\s+se|programuje\s+v|k[oó]duje\s+v)\s+([A-Za-z][A-Za-z0-9_\-\+\.#]{1,40})\b", t)
+    if m2:
+        who = m2.group(1)
+        what = m2.group(3)
+        pred = "UČÍ_SE" if "u" in m2.group(2) else "PROGRAMUJE_V"
+        triplets.append((who, pred, what))
+
+    # "Mám rád X" / "Preferuji X"
+    m3 = re.search(r"\b(m[aá]m\s+r[aá]d|preferuji|m[ou]j\s+obl[ií]ben[yý])\s+(.{2,40})$", t, re.I)
+    if m3:
+        obj = m3.group(2).strip(" .!?")
+        if 2 <= len(obj) <= 40:
+            triplets.append(("Ty", "MÁ_RÁD", obj))
+
+    return triplets
+
+
 class JarvisMemory:
     """
     Paměťová fasáda pro JARVIS.
@@ -562,6 +622,15 @@ class JarvisMemory:
         (r"\bbydlim\s+v\b|\bmestu\b|\badresa\b",              "lokalita"),
         (r"\bpracuji\s+pro\b|\bzamestnani\b|\bfirma\b",       "zaměstnání"),
     ]
+
+    def _extract_graph_relations(self, content: str) -> None:
+        """Best-effort extraction of simple relations into procedural memory."""
+        try:
+            triplets = _extract_entities_simple(content)
+            for s, p, o in triplets:
+                self.procedural.add_relation(s, p, o, metadata={"source": "heuristic", "ts": time.time()})
+        except Exception:
+            pass
 
     def check_conflict(self, new_content: str, top_k: int = 5) -> Optional[dict]:
         """Zjistí, zda nový záznam odporuje existujícím vzpomínkám.
@@ -629,6 +698,13 @@ class JarvisMemory:
     def store(self, content: str, importance: float = 0.5, context: str = None,
               tags: List[str] = None, metadata: dict = None,
               ttl_seconds: int = 0, priority: int = 0) -> Optional[str]:
+        # Graph extraction (best-effort)
+        try:
+            if bool(self.config.get("graph_extraction_enabled", True)):
+                self._extract_graph_relations(content)
+        except Exception:
+            pass
+
         if self.system:
             try:
                 mem = self.system.store(content=content, importance=importance,
@@ -712,17 +788,103 @@ class JarvisMemory:
     def recall_context(self, current_query: str, top_k: int = 3) -> str:
         """Získá kontext z paměti pro aktuální dotaz."""
         memories = self.recall(current_query, top_k=top_k, min_importance=0.2)
-        if not memories:
-            return ""
         parts = []
-        for mem in memories:
-            if mem["tags"] and "conversation" in mem["tags"]:
+        for mem in memories or []:
+            if mem.get("tags") and "conversation" in mem["tags"]:
                 parts.append(f"Previous: {mem['content']}")
             else:
                 parts.append(f"Memory: {mem['content']}")
+
+        # Add knowledge-graph relations (procedural memory)
+        try:
+            rel = self.procedural.query_relations(current_query)
+            if rel:
+                parts.append("\nKnown relations (graph):\n" + rel)
+        except Exception:
+            pass
+
         context = "\n".join(parts)
-        logger.info(f"Kontext z paměti: {len(context)} znaků")
+        if context:
+            logger.info(f"Kontext z paměti: {len(context)} znaků")
         return context
+
+    def compress_old_memories(self, days_old: int = 7, max_to_compress: int = 20) -> str:
+        """Zkomprimuje staré vzpomínky do jedné souhrnné.
+
+        Vzpomínky starší než days_old → sloučí je do jednoho textu přes LLM
+        → uloží jako novou vzpomínku s vysokou důležitostí
+        → smaže originály
+        """
+        if not self._store:
+            return "Paměť není inicializována."
+
+        cutoff = time.time() - (days_old * 86400)
+
+        with self._store._lock, self._store._connect() as con:
+            old_rows = con.execute(
+                "SELECT id, content FROM memories "
+                "WHERE created_at < ? AND access_score < 2.0 "
+                "LIMIT ?", (cutoff, max_to_compress)
+            ).fetchall()
+
+        if len(old_rows) < 3:
+            return f"Příliš málo starých vzpomínek ({len(old_rows)}) k sloučení."
+
+        # Sestav text pro LLM
+        combined = "\n".join(f"- {r['content'][:100]}" for r in old_rows)
+
+        # Pokus o LLM komprimaci
+        compressed = combined  # fallback bez LLM
+        try:
+            import requests
+            from config import CONFIG
+            r = requests.post(CONFIG.get("ollama_url", "http://localhost:11434/api/chat"),
+                json={"model": CONFIG.get("ollama_model", "qwen2.5:3b"),
+                      "messages": [{"role": "user", "content":
+                          f"Zkomprimuj tyto záznamy do 2-3 klíčových faktů:\n{combined}"}],
+                      "stream": False, "options": {"num_predict": 200}},
+                timeout=15)
+            if r.ok:
+                compressed = r.json().get("message", {}).get("content", combined)
+        except Exception:
+            pass
+
+        # Ulož komprimovanou verzi
+        new_id = self.store(f"[KOMPRIMOVÁNO] {compressed}", importance=0.8,
+                            tags=["compressed"], metadata={"source_count": len(old_rows)})
+
+        # Smaž originály
+        ids = [r["id"] for r in old_rows]
+        with self._store._lock, self._store._connect() as con:
+            con.execute(f"DELETE FROM memories WHERE id IN ({','.join('?'*len(ids))})", ids)
+            con.commit()
+
+        return f"Sloučeno {len(old_rows)} vzpomínek → nová ID: {new_id}"
+
+    def export_memories(self, path: str) -> str:
+        """Exportuje paměť do JSON souboru."""
+        import json as _json
+        from pathlib import Path as _Path
+        if not self._store:
+            return "Paměť není inicializována."
+        memories = self.recall("", top_k=1000, min_importance=0.0)
+        _Path(path).write_text(_json.dumps(memories, ensure_ascii=False, indent=2), encoding="utf-8")
+        return f"Exportováno {len(memories)} vzpomínek do {path}"
+
+    def import_memories(self, path: str) -> str:
+        """Importuje paměť z JSON souboru."""
+        import json as _json
+        from pathlib import Path as _Path
+        data = _json.loads(_Path(path).read_text(encoding="utf-8"))
+        imported = 0
+        for m in data:
+            try:
+                self.store(m.get("content", ""), importance=m.get("importance", 0.5),
+                          tags=m.get("tags", []), metadata=m.get("metadata", {}))
+                imported += 1
+            except Exception:
+                pass
+        return f"Importováno {imported}/{len(data)} vzpomínek"
 
 
 # ══════════════════════════════════════════════════════

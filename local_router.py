@@ -840,6 +840,25 @@ class LocalRouter:
                 return f"Spouštím paralelní agenty: {task}", {
                     "action": "agent_parallel_task", "params": {"task": task}}
 
+        # ── COMPUTER USE (Accessibility) ─────────────
+        if re.search(r"\b(ui\s+strom|ui\s+tree|accessibility\s+tree|strom\s+elementu)\b", t):
+            return "Získávám strom UI elementů…", {"action": "ui_tree", "params": {"max_nodes": 400}}
+
+        m = re.search(r"\b(ui\s+klikni|ui\s+click|klikni\s+na\s+ui)\b\s+(.+)", t)
+        if m:
+            label = m.group(2).strip()
+            return f"Klikám na UI element: {label}", {"action": "ui_click", "params": {"text": label, "role": ""}}
+
+        # ── SHADOW MODE ───────────────────────────────
+        if re.search(r"\b(shadow\s+mode|shadow\s+navrh|shadow\s+suggest|navrhni\s+refaktor|navrhni\s+zlepseni)\b", t):
+            return "Generuji návrhy (Shadow Mode)…", {"action": "shadow_suggest", "params": {}}
+
+        # ── MCP HUB ───────────────────────────────────
+        m = re.search(r"\b(mcp\s+suggest|doporu[cč]\s+mcp|mcp\s+server)\b\s*(.*)", t)
+        if m:
+            task = (m.group(2) or "").strip() or text
+            return "Doporučuji MCP server…", {"action": "mcp_suggest", "params": {"task": task}}
+
         # ── NEURAL MEMORY ────────────────────────────
         if re.search(r"\b(vyhledej\s+v\s+paměti|recall\s+memory|co\s+si\s+pamatuješ)\b", t):
             query = re.sub(r"\b(vyhledej\s+v\s+paměti|recall\s+memory|co\s+si\s+pamatuješ)\b\s*",

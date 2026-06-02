@@ -138,6 +138,8 @@ export default function ChatPanel() {
   const [hist, setHist] = useState<string[]>([])
   const [hidx, setHidx] = useState(-1)
   const [plIdx, setPlIdx] = useState(0)
+  const [dragOver, setDragOver] = useState(false)
+  const [pendingImage, setPendingImage] = useState<string | null>(null)
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
   useEffect(() => {
@@ -145,13 +147,31 @@ export default function ChatPanel() {
     return () => clearInterval(t)
   }, [])
 
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        const base64 = ev.target?.result as string
+        setPendingImage(base64)
+      }
+      reader.readAsDataURL(file)
+    }
+  }, [])
+
   const send = useCallback(() => {
     const t = input.trim()
-    if (!t || orbState === 'thinking') return
-    setHist(h => [t, ...h.slice(0, 49)]); setHidx(-1); setInput('')
+    if (!t && !pendingImage || orbState === 'thinking') return
+    const text = pendingImage
+      ? `[OBRAZ:${pendingImage.substring(0, 100)}...] ${t}`
+      : t
+    setHist(h => [text, ...h.slice(0, 49)]); setHidx(-1); setInput('')
     if (taRef.current) taRef.current.style.height = 'auto'
-    sendCmd(t); taRef.current?.focus()
-  }, [input, orbState, sendCmd])
+    setPendingImage(null)
+    sendCmd(text); taRef.current?.focus()
+  }, [input, pendingImage, orbState, sendCmd])
 
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); return }
@@ -167,7 +187,13 @@ export default function ChatPanel() {
   const pl = PLACEHOLDERS[plIdx]
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
+    <div
+      className="flex flex-col flex-1 overflow-hidden"
+      onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+      onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false) }}
+      onDrop={handleDrop}
+      style={dragOver ? { outline: '2px solid rgba(0,200,255,.6)', outlineOffset: -2, borderRadius: 12 } : undefined}
+    >
 
       {/* Toolbar */}
       <div className="flex items-center justify-between shrink-0 px-4 py-2.5"
@@ -214,6 +240,31 @@ export default function ChatPanel() {
 
       {/* Input */}
       <div className="shrink-0 px-4 pb-4 flex flex-col gap-1.5 max-w-[760px] w-full mx-auto">
+        {/* Pending image thumbnail */}
+        {pendingImage && (
+          <div className="flex items-center gap-2 px-1">
+            <div className="relative inline-block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={pendingImage} alt="pending" className="h-14 w-14 rounded-lg object-cover"
+                style={{ border: '1px solid rgba(0,200,255,.3)' }} />
+              <button
+                onClick={() => setPendingImage(null)}
+                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
+                style={{ background: 'rgba(239,68,68,.85)', color: '#fff', border: '1px solid rgba(0,0,0,.3)' }}>
+                ✕
+              </button>
+            </div>
+            <span className="font-mono text-[10px]" style={{ color: 'var(--muted)' }}>Obrázek připraven k odeslání</span>
+          </div>
+        )}
+
+        {/* Drag over overlay hint */}
+        {dragOver && (
+          <div className="text-center font-mono text-[11px] py-1" style={{ color: 'var(--cyan)' }}>
+            📂 Pusť obrázek pro přiložení
+          </div>
+        )}
+
         {/* Feature tag */}
         {!input && (
           <div className="flex items-center gap-2 pl-0.5">
@@ -243,14 +294,14 @@ export default function ChatPanel() {
             className="flex-1 bg-transparent border-none resize-none outline-none text-sm leading-[1.55] py-1.5"
             style={{ color: 'var(--text)', fontFamily: "'Inter',system-ui", minHeight: 36, maxHeight: 160 }}
           />
-          <button onClick={send} disabled={busy || !input.trim()}
+          <button onClick={send} disabled={busy || (!input.trim() && !pendingImage)}
             className="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center transition-all"
             style={{
-              background: input.trim() && !busy ? 'linear-gradient(135deg,#4ecdc4,#3b82f6)' : 'rgba(255,255,255,.04)',
+              background: (input.trim() || pendingImage) && !busy ? 'linear-gradient(135deg,#4ecdc4,#3b82f6)' : 'rgba(255,255,255,.04)',
               border: 'none',
-              color: input.trim() && !busy ? '#000' : 'var(--muted)',
-              cursor: input.trim() && !busy ? 'pointer' : 'not-allowed',
-              boxShadow: input.trim() && !busy ? '0 0 18px rgba(78,205,196,.35)' : 'none',
+              color: (input.trim() || pendingImage) && !busy ? '#000' : 'var(--muted)',
+              cursor: (input.trim() || pendingImage) && !busy ? 'pointer' : 'not-allowed',
+              boxShadow: (input.trim() || pendingImage) && !busy ? '0 0 18px rgba(78,205,196,.35)' : 'none',
             }}>
             {busy
               ? <div className="w-4 h-4 rounded-full anim-spin" style={{ border: '2px solid var(--muted)', borderTopColor: 'transparent' }}/>

@@ -848,6 +848,80 @@ Pravidla pro skill.py:
         except Exception:
             _ws_clients.discard(ws)
 
+    @app.websocket("/ws/audio")
+    async def ws_audio(ws: WebSocket):
+        """Duplex audio websocket (MVP).
+
+        Client sends raw PCM16 mono frames (default 16kHz). Server runs VAD and emits
+        EventType.AUDIO_SPEECH on detected speech (for barge-in interruption).
+
+        This endpoint is intentionally minimal: it does not perform STT yet.
+        """
+        await ws.accept()
+
+        try:
+            from config import CONFIG
+            if not bool(CONFIG.get("audio_ws_enabled", False)):
+                await ws.send_text(json.dumps({"type": "error", "data": "audio_ws_enabled is false"}))
+                await ws.close()
+                return
+        except Exception:
+            pass
+
+        vad = None
+        try:
+            from vad import get_vad
+            from config import CONFIG
+            if bool(CONFIG.get("vad_enabled", True)):
+                vad = get_vad(CONFIG)
+        except Exception:
+            vad = None
+
+        # lazy bus import
+        bus = None
+        try:
+            from event_bus import get_event_bus, EventType
+            bus = get_event_bus()
+        except Exception:
+            bus = None
+
+        try:
+            while True:
+                frame = await ws.receive_bytes()
+                if not frame:
+                    continue
+                # Debug: optionally broadcast audio frames (off by default)
+                try:
+                    if bus and False:
+                        bus.emit(EventType.AUDIO_FRAME, {"n": len(frame)}, source="ws_audio")
+                except Exception:
+                    pass
+
+                speech = False
+                try:
+                    if vad is not None:
+                        speech = vad.is_speech(frame)
+                except Exception:
+                    speech = False
+
+                if speech:
+                    # emit event for barge-in
+                    try:
+                        if bus:
+                            bus.emit(EventType.AUDIO_SPEECH, {"ts": time.time()}, source="ws_audio")
+                    except Exception:
+                        pass
+                    # send ack to client
+                    try:
+                        await ws.send_text(json.dumps({"type": "vad", "speech": True}))
+                    except Exception:
+                        pass
+
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:
+            logger.debug(f"ws_audio closed: {e}")
+
     @app.websocket("/ws/graph")
     async def ws_graph(ws: WebSocket):
         """Streaming stavu Graf agenta — posílá JSON eventi."""

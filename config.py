@@ -97,6 +97,23 @@ DEFAULT_CONFIG = {
     "proactive_report_retention_days": 30,
     "proactive_require_permission": False,  # if True, Proactive will check SecurityManager before file/git ops
     "proactive_max_files_scan": 2000,
+
+    # Computer Use (Accessibility / UI Automation)
+    "computer_use_enabled": False,
+    "computer_use_backend": "auto",  # auto|windows_uia|macos_ax|linux_atspi
+
+    # Live audio / duplex
+    "audio_ws_enabled": False,
+    "vad_enabled": True,
+    "vad_mode": "auto",  # auto|webrtcvad|rms
+    "vad_sample_rate": 16000,
+
+    # Knowledge Graph extraction
+    "graph_extraction_enabled": True,
+
+    # Shadow Mode (developer assistant)
+    "shadow_mode_enabled": False,
+    "shadow_mode_workspace_roots": [],
 }
 
 

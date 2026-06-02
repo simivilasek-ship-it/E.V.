@@ -23,6 +23,19 @@ function detectIntent(q: string): WidgetType {
   return null
 }
 
+// ── Quick Actions (Raycast style) ────────────────────
+const QUICK_ACTIONS = [
+  { key: '1', label: 'Screenshot',    icon: '📸', cmd: 'screenshot' },
+  { key: '2', label: 'Hardware info', icon: '💻', cmd: 'jaký mám hardware' },
+  { key: '3', label: 'Disk space',    icon: '💾', cmd: 'kolik mám místa' },
+  { key: '4', label: 'Počasí Praha',  icon: '🌤', cmd: 'počasí Praha' },
+  { key: '5', label: 'Timer 5 min',   icon: '⏱', cmd: 'timer 5 minut' },
+  { key: '6', label: 'System info',   icon: '📊', cmd: 'info o systemu' },
+  { key: '7', label: 'Marketplace',   icon: '🏪', cmd: 'marketplace seznam' },
+  { key: '8', label: 'Git status',    icon: '🔀', cmd: 'git status' },
+  { key: '9', label: 'Popiš plochu',  icon: '👁',  cmd: 'popiš obrazovku' },
+]
+
 // Quick suggestions shown when spotlight is empty
 const SUGGESTIONS = [
   { icon: '🌤️', label: 'Počasí Praha',    query: 'počasí Praha' },
@@ -44,6 +57,7 @@ export default function Spotlight({ open, onClose, onCommand }: SpotlightProps) 
   const [widgetQuery, setWidgetQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const sendCommand = useJarvis(s => s.sendCommand)
+  const addToQuickHistory = useJarvis(s => s.addToQuickHistory)
 
   // Focus on open
   useEffect(() => {
@@ -114,6 +128,11 @@ export default function Spotlight({ open, onClose, onCommand }: SpotlightProps) 
               onKeyDown={e => {
                 if (e.key === 'Enter') submit()
                 if (e.key === 'Escape') onClose()
+                // Čísla 1-9 spouštějí quick actions
+                if (e.key >= '1' && e.key <= '9' && !input) {
+                  const action = QUICK_ACTIONS[parseInt(e.key) - 1]
+                  if (action) { addToQuickHistory(action.cmd); sendCommand(action.cmd); onCommand(action.cmd); onClose() }
+                }
               }}
               placeholder="Příkaz, počasí, sport, výpočet…"
               className="flex-1 bg-transparent border-none outline-none text-base"
@@ -154,6 +173,46 @@ export default function Spotlight({ open, onClose, onCommand }: SpotlightProps) 
             </Suspense>
           </div>
 
+          {/* Quick Actions grid — shown when input is empty */}
+          {!input && (
+            <div className="px-4 pt-2 pb-1">
+              <div className="font-mono text-[9px] tracking-wider mb-2" style={{ color: 'var(--muted)' }}>QUICK ACTIONS</div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {QUICK_ACTIONS.map(action => (
+                  <button
+                    key={action.key}
+                    onClick={() => { addToQuickHistory(action.cmd); sendCommand(action.cmd); onCommand(action.cmd); onClose() }}
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all group"
+                    style={{
+                      background: 'rgba(255,255,255,.03)',
+                      border: '1px solid rgba(255,255,255,.07)',
+                      color: 'var(--muted)',
+                    }}
+                    onMouseEnter={e => {
+                      const el = e.currentTarget as HTMLElement
+                      el.style.borderColor = 'rgba(0,200,255,.25)'
+                      el.style.background = 'rgba(0,200,255,.06)'
+                      el.style.color = 'var(--text)'
+                    }}
+                    onMouseLeave={e => {
+                      const el = e.currentTarget as HTMLElement
+                      el.style.borderColor = 'rgba(255,255,255,.07)'
+                      el.style.background = 'rgba(255,255,255,.03)'
+                      el.style.color = 'var(--muted)'
+                    }}
+                  >
+                    <span className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-mono shrink-0"
+                      style={{ background: 'rgba(0,200,255,.08)', color: 'var(--cyan)', border: '1px solid rgba(0,200,255,.15)' }}>
+                      {action.key}
+                    </span>
+                    <span className="text-base leading-none shrink-0">{action.icon}</span>
+                    <span className="text-[11px] truncate">{action.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Suggestions — shown when input is empty */}
           {!input && (
             <div className="px-4 pb-3 pt-1 flex gap-2 flex-wrap">
@@ -178,6 +237,7 @@ export default function Spotlight({ open, onClose, onCommand }: SpotlightProps) 
           <div className="px-4 py-2 font-mono text-[9px] flex gap-4 justify-end"
             style={{ color: 'var(--text3)', borderTop: '1px solid rgba(255,255,255,.04)' }}>
             <span>↵ odeslat</span>
+            <span>1-9 quick action</span>
             <span>Esc zavřít</span>
             <span>Alt+Space přepnout</span>
           </div>
