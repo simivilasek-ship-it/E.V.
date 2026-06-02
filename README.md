@@ -98,6 +98,8 @@ pip install -r requirements.txt
 ollama pull qwen2.5:3b
 ```
 
+Pozn.: `requirements.txt` je primární seznam runtime+dev závislostí pro lokální instalaci/CI.
+
 **Volitelné:**
 ```bash
 pip install pynput          # Alt+Space global hotkey
@@ -171,6 +173,24 @@ FastAPI pak servíruje build na `http://localhost:8002/app`.
 ```bash
 bash scripts/build.sh
 python dashboard.py
+```
+
+### Debug bundle (bugreport)
+
+Bezpečný ZIP bez secrets (obsahuje safe config + tail logů):
+
+```bash
+curl -L "http://localhost:8002/api/debug/bundle" -o jarvis-debug-bundle.zip
+```
+
+### Lokální příkazy (justfile)
+
+Pokud máš nainstalovaný [`just`](https://github.com/casey/just):
+
+```bash
+just web-dev
+just web-build
+just docker-build
 ```
 
 **Přidání příkazu:** viz [CONTRIBUTING.md](CONTRIBUTING.md)

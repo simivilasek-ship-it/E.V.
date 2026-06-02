@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "jarvis-assistant"
-version = "4.4.0"
+version = "4.6.0"
 description = "Lokální AI asistent — ovládej celý PC hlasem nebo textem, 100 % offline"
 readme = "README.md"
 license = { text = "MIT" }
@@ -110,3 +110,15 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+ignore_missing_imports = true
+check_untyped_defs = false
+disallow_untyped_defs = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = false
+show_error_codes = true

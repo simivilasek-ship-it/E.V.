@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useJarvis } from '@/store/jarvis'
-
-const API = ''
+import { apiUrl } from '@/lib/api'
 
 const STEP_COLORS: Record<string, string> = {
   plan:    '#8b5cf6',
@@ -183,7 +182,7 @@ export default function AgentTimeline() {
 
   // Načti historii z API
   useEffect(() => {
-    fetch(`${API}/api/agent/timeline`).then(r => r.json())
+    fetch(apiUrl('/api/agent/timeline')).then(r => r.json())
       .then((d: { runs?: Run[] }) => setRuns(d.runs || []))
       .catch(() => {})
   }, [])

@@ -1,8 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useJarvis } from '@/store/jarvis'
-
-const API = 'http://127.0.0.1:8002'
+import { apiUrl } from '@/lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -177,10 +176,10 @@ export default function SettingsPanel() {
     const load = async () => {
       try {
         const [sRes, mRes, vRes, mcpRes] = await Promise.allSettled([
-          fetch(`${API}/api/settings`),
-          fetch(`${API}/api/models`),
-          fetch(`${API}/api/tts/voices`),
-          fetch(`${API}/api/mcp/status`),
+          fetch(apiUrl('/api/settings')),
+          fetch(apiUrl('/api/models')),
+          fetch(apiUrl('/api/tts/voices')),
+          fetch(apiUrl('/api/mcp/status')),
         ])
 
         if (sRes.status === 'fulfilled' && sRes.value.ok) {
@@ -222,7 +221,7 @@ export default function SettingsPanel() {
     try {
       const payload: Partial<Settings> = {}
       keys.forEach(k => { (payload as Record<string, unknown>)[k] = settings[k] })
-      const r = await fetch(`${API}/api/config`, {
+      const r = await fetch(apiUrl('/api/config'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -243,7 +242,7 @@ export default function SettingsPanel() {
   const testVoice = useCallback(async () => {
     setTestingVoice(true)
     try {
-      const r = await fetch(`${API}/api/command`, {
+      const r = await fetch(apiUrl('/api/command'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'get_time' }),
@@ -262,7 +261,7 @@ export default function SettingsPanel() {
       prev.map(s => s.name === server.name ? { ...s, enabled: next } : s)
     )
     try {
-      const r = await fetch(`${API}/api/mcp/toggle`, {
+      const r = await fetch(apiUrl('/api/mcp/toggle'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ server: server.name, enabled: next }),

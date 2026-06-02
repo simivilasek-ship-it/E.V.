@@ -407,6 +407,67 @@ if HAS_FASTAPI:
         except Exception:
             return {}
 
+    @app.get("/api/debug/bundle")
+    async def debug_bundle(limit_log_lines: int = 400):
+        """Vytvoří ZIP bundle pro bugreport (bez secrets)."""
+        import io, json, os, platform, zipfile, time
+        from pathlib import Path as _Path
+        from fastapi.responses import StreamingResponse
+
+        limit = max(50, min(int(limit_log_lines or 400), 2000))
+        root = _Path(__file__).parent
+
+        # Safe config
+        try:
+            from config import CONFIG, __version__
+            safe_config = {k: v for k, v in CONFIG.items()
+                           if k not in ("brave_api_key",) and "key" not in k.lower()}
+        except Exception:
+            __version__ = "unknown"
+            safe_config = {}
+
+        meta = {
+            "timestamp": int(time.time()),
+            "version": __version__,
+            "platform": {
+                "system": platform.system(),
+                "release": platform.release(),
+                "machine": platform.machine(),
+                "python": platform.python_version(),
+            },
+            "env": {
+                "JARVIS_HEADLESS": os.getenv("JARVIS_HEADLESS", ""),
+                "AUTO_RELOAD": os.getenv("AUTO_RELOAD", ""),
+                "DEBUG_MODE": os.getenv("DEBUG_MODE", ""),
+            },
+        }
+
+        def _tail_text(path: _Path) -> str:
+            try:
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+                return "\n".join(lines[-limit:])
+            except Exception:
+                return ""
+
+        # Collect logs if present (never include .env)
+        log_text = _tail_text(root / "jarvis.log")
+        audit_text = _tail_text(root / "audit.log")
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("meta.json", json.dumps(meta, ensure_ascii=False, indent=2))
+            zf.writestr("config.safe.json", json.dumps(safe_config, ensure_ascii=False, indent=2))
+            if log_text:
+                zf.writestr("jarvis.log.tail.txt", log_text)
+            if audit_text:
+                zf.writestr("audit.log.tail.txt", audit_text)
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/zip",
+            headers={"Content-Disposition": "attachment; filename=jarvis-debug-bundle.zip"},
+        )
+
     @app.post("/api/config")
     async def update_config(body: dict):
         """Aktualizuje konfiguraci za běhu (whitelist bezpečných klíčů)."""
@@ -601,14 +662,21 @@ Pravidla pro skill.py:
     @app.post("/api/skill/save")
     async def skill_save(body: dict):
         """Uloží vygenerovaný plugin do plugins/custom/."""
+        import re as _re
         name       = body.get("name", "").strip().replace(" ", "_").lower()
         skill_code = body.get("skill_code", "")
         manifest   = body.get("manifest", {})
         if not name or not skill_code:
             return {"error": "Chybí name nebo skill_code"}
+        if not _re.fullmatch(r"[a-z0-9_\\-]{1,64}", name):
+            return {"error": "Neplatný název pluginu (povoleno: a-z, 0-9, _, -; max 64 znaků)"}
         try:
             from pathlib import Path as _Path
-            dest = _Path(__file__).parent / "plugins" / "custom" / name
+            root = _Path(__file__).parent
+            base = (root / "plugins" / "custom").resolve()
+            dest = (base / name).resolve()
+            if base not in dest.parents:
+                return {"error": "Neplatná cesta pro plugin (path traversal blocked)"}
             dest.mkdir(parents=True, exist_ok=True)
             (dest / "skill.py").write_text(skill_code, encoding="utf-8")
             import json as _json
@@ -622,6 +690,10 @@ Pravidla pro skill.py:
     @app.get("/api/skill/download/{name}")
     async def skill_download(name: str):
         """Stáhne plugin jako ZIP archiv."""
+        import re as _re
+        if not _re.fullmatch(r"[a-z0-9_\\-]{1,64}", name):
+            from fastapi import HTTPException
+            raise HTTPException(400, "Neplatný název pluginu")
         import zipfile, io
         from fastapi.responses import StreamingResponse
         from pathlib import Path as _Path

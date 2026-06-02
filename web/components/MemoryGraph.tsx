@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-
-const API = ''
+import { apiUrl } from '@/lib/api'
 
 const GROUP_COLORS: Record<string, string> = {
   memory:         '#00d4ff',
@@ -120,7 +119,7 @@ export default function MemoryGraph() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const d = await fetch(`${API}/api/memory/graph`).then(r => r.json())
+      const d = await fetch(apiUrl('/api/memory/graph')).then(r => r.json())
       setData(d)
     } catch { setData({ nodes: [], links: [] }) }
     setLoading(false)

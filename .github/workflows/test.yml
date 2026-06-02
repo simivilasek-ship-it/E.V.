@@ -37,6 +37,12 @@ jobs:
       - name: Lint (ruff)
         run: ruff check . --output-format=github
 
+      - name: Format check (ruff)
+        run: ruff format --check .
+
+      - name: Typecheck (mypy)
+        run: mypy .
+
       - name: Start Xvfb
         run: |
           Xvfb :99 -screen 0 1024x768x24 &
@@ -92,3 +98,10 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t jarvis:ci .

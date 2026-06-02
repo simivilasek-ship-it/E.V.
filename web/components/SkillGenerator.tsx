@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
-
-const API = ''
+import { apiUrl } from '@/lib/api'
 
 const EXAMPLE_PROMPTS: string[] = [
   'Plugin pro počasí v Brně',
@@ -33,7 +32,7 @@ export default function SkillGenerator() {
     if (!prompt.trim()) return
     setLoading(true); setError(null); setResult(null); setSaved(false)
     try {
-      const r = await fetch(`${API}/api/skill/generate`, {
+      const r = await fetch(apiUrl('/api/skill/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
@@ -50,7 +49,7 @@ export default function SkillGenerator() {
   async function save(): Promise<void> {
     if (!result) return
     try {
-      const r = await fetch(`${API}/api/skill/save`, {
+      const r = await fetch(apiUrl('/api/skill/save'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: result.name, skill_code: result.skill_py, manifest: result.manifest }),
@@ -134,7 +133,7 @@ export default function SkillGenerator() {
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
               {saved && (
-                <a href={`${API}/api/skill/download/${result.name}`} download
+                <a href={apiUrl(`/api/skill/download/${result.name}`)} download
                   style={{
                     background: '#1a3050', border: 'none', borderRadius: 6,
                     color: '#00d4ff', padding: '5px 12px', fontSize: 11,

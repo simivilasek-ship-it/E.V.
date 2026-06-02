@@ -11,7 +11,6 @@ from stt import STTEngine
 from tts import TTSEngine
 from llm import LLMEngine
 from commands import CommandExecutor
-from gui import JarvisGUI
 from logging_setup import setup_logging
 
 # Core moduly — nutné ihned
@@ -29,6 +28,76 @@ from event_bus import EventType, Event, get_event_bus
 # from mcp_bridge import get_mcp_bridge, HAS_MCP   → lazy v _init_mcp
 
 logger = logging.getLogger(__name__)
+
+
+class _HeadlessGUI:
+    """Placeholder GUI pro headless/web mód — žádné Tkinter okno.
+
+    Implementuje stejné veřejné API jako JarvisGUI, ale místo vykreslování
+    do okna pouze loguje zprávy. Web UI běží samostatně jako Next.js na
+    localhost:3000 / dashboard na localhost:8002.
+    """
+
+    def __init__(self):
+        self.on_mic_click = None
+        self.on_send = None
+        self.on_model_change = None
+        self.on_language_change = None
+        self.on_energy_threshold_change = None
+        self.on_tts_rate_change = None
+        self._clear_mem = None
+        # Stub orb — _shutdown volá self.gui.orb.stop()
+        self.orb = _StubOrb()
+        # Stub root — _gui volá self.gui.root.after(0, fn)
+        self.root = _StubRoot()
+
+    def _add_sys(self, msg: str):
+        logger.info(f"[GUI] {msg}")
+
+    def set_state(self, state: str):
+        logger.debug(f"[GUI] set_state({state})")
+
+    def add_message(self, text: str, sender: str):
+        logger.info(f"[GUI:{sender}] {text}")
+
+    def set_status(self, text: str):
+        logger.info(f"[GUI status] {text}")
+
+    def update_model_list(self, models: list, current: str = ""):
+        logger.debug(f"[GUI] update_model_list({models}, current={current})")
+
+    def run(self):
+        """V headless módu neblokuje — web UI běží samostatně."""
+        logger.info("Headless mód — GUI je Next.js na localhost:3000 / dashboard na localhost:8002")
+
+
+class _StubOrb:
+    """Prázdný stub pro gui.orb — nevyžaduje Tkinter."""
+
+    def set_state(self, state: str):
+        pass
+
+    def set_speed(self, speed: float):
+        pass
+
+    def stop(self):
+        pass
+
+
+class _StubRoot:
+    """Prázdný stub pro gui.root.after() — vykoná callback přímo v calling threadu."""
+
+    def after(self, delay_ms: int, fn=None, *args):
+        """Spustí callback okamžitě (bez Tkinter event loop)."""
+        if fn is not None:
+            import threading
+            threading.Timer(delay_ms / 1000.0, fn, args=args).start()
+
+    def quit(self):
+        pass
+
+    def destroy(self):
+        pass
 
 
 class JarvisApp:
@@ -68,20 +137,22 @@ class JarvisApp:
         from routing import CommandRouter
         self._router = CommandRouter(self)
 
-        # GUI
-        self.gui = JarvisGUI()
+        # GUI — headless mód, Next.js / pywebview je primární UI
+        self.gui = _HeadlessGUI()
         self.gui.on_mic_click    = self._on_mic_click
         self.gui.on_send         = self._on_send
         self.gui.on_model_change = self._on_model_change
         self.gui.on_language_change = self._on_language_change
         self.gui.on_energy_threshold_change = self._on_energy_threshold_change
         self.gui.on_tts_rate_change = self._on_tts_rate_change
+        logger.info("Headless mód — GUI je Next.js na localhost:3000")
 
         signal.signal(signal.SIGINT,  self._sig)
         signal.signal(signal.SIGTERM, self._sig)
 
         self.gui._clear_mem = self._clear_memory
 
+        # Ollama check s krátkým zpožděním (jako dříve root.after(800, ...))
         self.gui.root.after(800, self._check_ollama)
         self._schedule_memory_maintenance()
         logger.info("JARVIS připraven.")

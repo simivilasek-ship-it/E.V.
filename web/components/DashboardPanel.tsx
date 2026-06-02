@@ -1,8 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useJarvis } from '@/store/jarvis'
-
-const API = ''
+import { apiUrl } from '@/lib/api'
 
 const S = {
   card:  { background:'#0b1220', border:'1px solid #1a3050', borderRadius:8, padding:'14px 16px', marginBottom:12 },
@@ -74,9 +73,9 @@ export default function DashboardPanel() {
   const refresh = useCallback(async () => {
     try {
       const [st, au, sc] = await Promise.all([
-        fetch(`${API}/api/status`).then(r => r.json()).catch(() => ({})),
-        fetch(`${API}/api/audit`).then(r => r.json()).catch(() => []),
-        fetch(`${API}/api/scheduler`).then(r => r.json()).catch(() => []),
+        fetch(apiUrl('/api/status')).then(r => r.json()).catch(() => ({})),
+        fetch(apiUrl('/api/audit')).then(r => r.json()).catch(() => []),
+        fetch(apiUrl('/api/scheduler')).then(r => r.json()).catch(() => []),
       ])
       setOllama({ ok: st.ollama, model: st.model || '—' })
       setAudit(Array.isArray(au) ? au.slice(-20).reverse() : [])
