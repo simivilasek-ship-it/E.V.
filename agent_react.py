@@ -20,6 +20,8 @@ import re
 import threading
 from typing import Callable,  TYPE_CHECKING, List, Optional
 
+import requests
+
 from commands.utils import normalize_text as _norm
 from llm import OllamaClient
 
@@ -191,6 +193,92 @@ Pravidla:
 
     def _llm(self, messages: list) -> str:
         return self._client.call(messages, temperature=0.2, max_tokens=MAX_TOKENS)
+
+    def run_with_tool_calling(self, user_text: str,
+                              on_step: Optional[Callable] = None) -> str:
+        """Ollama nativní tool-calling — JSON místo regex parsování.
+
+        Používá Ollama /api/chat s `tools` polem. Model vrátí
+        structured `tool_calls` místo textu Action: format(...).
+        Robustnější — žádné regex falešné alarmy, přesné argumenty.
+
+        Fallback na klasický run() pokud model tool-calling nepodporuje.
+        """
+        import json as _json
+
+        tools_schema = self.registry.ollama_tools_schema()
+        if not tools_schema:
+            return self.run(user_text, on_step)
+
+        messages = [
+            {"role": "system", "content": (
+                "Jsi JARVIS, AI asistent. Používáš nástroje k splnění úkolů. "
+                "Komunikuješ česky. Když máš výsledek, odpověz přímo."
+            )},
+            {"role": "user", "content": user_text},
+        ]
+        trace: List[str] = []
+
+        for step in range(MAX_STEPS):
+            payload = {
+                "model":    self.model,
+                "messages": messages,
+                "tools":    tools_schema,
+                "stream":   False,
+                "options":  {"temperature": 0.1, "num_predict": MAX_TOKENS},
+            }
+            try:
+                resp = requests.post(self.ollama_url, json=payload, timeout=60)
+                resp.raise_for_status()
+                msg = resp.json().get("message", {})
+            except Exception as e:
+                logger.warning(f"Tool-calling LLM chyba ({e}) — fallback na ReAct")
+                return self.run(user_text, on_step)
+
+            tool_calls = msg.get("tool_calls", [])
+            content    = (msg.get("content") or "").strip()
+
+            # Model odpověděl textem bez tool call — to je finální odpověď
+            if not tool_calls:
+                return content or "Hotovo."
+
+            # Zpracuj každý tool call
+            messages.append({"role": "assistant", "content": content or None,
+                              "tool_calls": tool_calls})
+
+            for tc in tool_calls:
+                fn   = tc.get("function", {})
+                name = fn.get("name", "")
+                args = fn.get("arguments", {})
+                if isinstance(args, str):
+                    try:
+                        args = _json.loads(args)
+                    except Exception:
+                        args = {}
+
+                tool = self.registry.get(name)
+                if tool is None:
+                    observation = f"Nástroj '{name}' neexistuje"
+                else:
+                    try:
+                        observation = tool.call(**args)
+                        if len(observation) > 1200:
+                            observation = observation[:1200] + "…[zkráceno]"
+                    except Exception as e:
+                        observation = f"Chyba nástroje {name}: {e}"
+
+                step_text = f"[{name}] → {observation[:80]}"
+                trace.append(step_text)
+                if on_step:
+                    on_step(step_text)
+
+                messages.append({
+                    "role": "tool",
+                    "content": observation,
+                })
+
+        logger.warning("Tool-calling: dosažen limit kroků")
+        return "Nepodařilo se dokončit úkol. Kroky: " + " → ".join(trace)
 
 
 # ── Singleton factory ─────────────────────────────────────────────

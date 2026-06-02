@@ -105,14 +105,15 @@ class CommandRouter:
             app._execute_result(answer, {"action": "answer", "params": {}})
             return True
 
-        # 4. ReAct agent
+        # 4. ReAct agent — preferuje Ollama tool-calling, fallback na regex ReAct
         from agent_react import should_handle as _react_should
         if getattr(app, "react_agent", None) and _react_should(text):
             import time as _t, uuid as _uuid
             app._gui(lambda: app.gui.set_status("Agent přemýšlí…"))
             steps: list = []
             t0 = _t.time()
-            answer = app.react_agent.run(
+            # run_with_tool_calling automaticky fallbackne na run() pokud model nepodporuje tools
+            answer = app.react_agent.run_with_tool_calling(
                 text,
                 on_step=lambda s: (
                     steps.append({"type": "react", "text": s, "ts": _t.time()}),

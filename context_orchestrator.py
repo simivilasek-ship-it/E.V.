@@ -60,26 +60,20 @@ class ContextOrchestrator:
         return str(raw or "").strip()
 
     def _get_active_window(self) -> str:
-        # 1. ewmh — DISPLAY musí být v os.environ (ignoruje display= kwarg)
+        # 1. ewmh
         for disp in [os.environ.get("DISPLAY", ""), ":0.0", ":0", ":1"]:
             if not disp:
                 continue
             try:
+                from Xlib import display as _xlib_display
                 import ewmh as _ewmh
-                old = os.environ.get("DISPLAY")
-                os.environ["DISPLAY"] = disp
-                try:
-                    e = _ewmh.EWMH()
-                    w = e.getActiveWindow()
-                    if w:
-                        name = self._decode_wm_name(e.getWmName(w))
-                        if name:
-                            return name[:100]
-                finally:
-                    if old is not None:
-                        os.environ["DISPLAY"] = old
-                    elif "DISPLAY" in os.environ:
-                        del os.environ["DISPLAY"]
+                d = _xlib_display.Display(disp)
+                e = _ewmh.EWMH(_display=d)
+                w = e.getActiveWindow()
+                if w:
+                    name = self._decode_wm_name(e.getWmName(w))
+                    if name:
+                        return name[:100]
             except Exception:
                 pass
 
@@ -122,23 +116,17 @@ class ContextOrchestrator:
             if not disp:
                 continue
             try:
+                from Xlib import display as _xlib_display
                 import ewmh as _ewmh
-                old = os.environ.get("DISPLAY")
-                os.environ["DISPLAY"] = disp
-                try:
-                    e = _ewmh.EWMH()
-                    for w in e.getClientList():
-                        try:
-                            name = self._decode_wm_name(e.getWmName(w))
-                            if name and name.lower() not in _IGNORE_NAMES:
-                                names.append(name[:80])
-                        except Exception:
-                            pass
-                finally:
-                    if old is not None:
-                        os.environ["DISPLAY"] = old
-                    elif "DISPLAY" in os.environ:
-                        del os.environ["DISPLAY"]
+                d = _xlib_display.Display(disp)
+                e = _ewmh.EWMH(_display=d)
+                for w in e.getClientList():
+                    try:
+                        name = self._decode_wm_name(e.getWmName(w))
+                        if name and name.lower() not in _IGNORE_NAMES:
+                            names.append(name[:80])
+                    except Exception:
+                        pass
                 if names:
                     return names
             except Exception:
