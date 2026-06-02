@@ -226,3 +226,51 @@ class TestLLMRouterIntegration:
         router = LLMRouter()
         # Should handle action routing
         assert hasattr(router, 'route')
+
+
+# ── OllamaClient Cache Tests ──────────────────────────────────────
+
+class TestOllamaClientCache:
+
+    @pytest.fixture(autouse=True)
+    def clean_cache(self):
+        from cache_manager import get_cache_manager
+        get_cache_manager().clear()
+
+    @patch("requests.post")
+    def test_ollama_client_cache_hit(self, mock_post):
+        from llm import OllamaClient
+        
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {"message": {"content": "První odpověď"}}
+        mock_post.return_value = mock_resp
+        
+        client = OllamaClient("http://mock/api/chat", "model-abc")
+        
+        r1 = client.call([{"role": "user", "content": "Ahoj"}])
+        assert r1 == "První odpověď"
+        assert mock_post.call_count == 1
+        
+        r2 = client.call([{"role": "user", "content": "Ahoj"}])
+        assert r2 == "První odpověď"
+        assert mock_post.call_count == 1
+
+    @patch("requests.post")
+    def test_ollama_client_json_cache_hit(self, mock_post):
+        from llm import OllamaClient
+        
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {"message": {"content": '{"key": "value"}'}}
+        mock_post.return_value = mock_resp
+        
+        client = OllamaClient("http://mock/api/chat", "model-abc")
+        
+        r1 = client.call_json([{"role": "user", "content": "Ahoj"}], schema={"key": "string"})
+        assert r1 == {"key": "value"}
+        assert mock_post.call_count == 1
+        
+        r2 = client.call_json([{"role": "user", "content": "Ahoj"}], schema={"key": "string"})
+        assert r2 == {"key": "value"}
+        assert mock_post.call_count == 1

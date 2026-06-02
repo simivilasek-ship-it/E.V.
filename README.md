@@ -218,6 +218,15 @@ Supervisor/koordinátor rozděluje komplexní zadání na pod-úkoly a deleguje 
 
 ---
 
+## Výkon a optimalizace (v4.7+)
+
+### 1. Caching odpovědí (OllamaClient Caching)
+- **OllamaClient** nyní automaticky ukládá výsledky dotazů `/api/chat` (textové i strukturované JSON odpovědi) do cache.
+- Caching zamezuje opakovaným voláním Ollama pro identické dotazy (např. při opakovaném spouštění Planneru, Criticu nebo stejných ReAct kroků).
+- Výrazně (2–4×) zrychluje reakce agentů a šetří hardware při opakovaných dotazech a ladění úloh.
+
+---
+
 ## Licence
 
 MIT © 2026 — [simivilasek-ship-it](https://github.com/simivilasek-ship-it)

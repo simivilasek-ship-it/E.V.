@@ -130,6 +130,29 @@ class OllamaClient:
 
     def call(self, messages: list[dict], temperature: float = 0.1,
              max_tokens: int = 500, timeout: int = 60) -> str:
+        import json as _json
+        import hashlib as _hashlib
+        from cache_manager import get_cache_manager
+
+        try:
+            payload_str = _json.dumps({
+                "model": self.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens
+            }, sort_keys=True)
+            key_hash = _hashlib.md5(payload_str.encode("utf-8")).hexdigest()
+            cache_key = f"ollama_client_call:{key_hash}"
+            
+            cache = get_cache_manager()
+            cached = cache.get(cache_key, backend="memory")
+            if cached is not None:
+                logger.info(f"OllamaClient cache hit for model {self.model}")
+                return cached
+        except Exception as e:
+            logger.debug(f"OllamaClient cache lookup chyba: {e}")
+            cache_key = None
+
         payload = {
             "model":    self.model,
             "messages": messages,
@@ -139,7 +162,13 @@ class OllamaClient:
         try:
             r = requests.post(self.url, json=payload, timeout=timeout)
             r.raise_for_status()
-            return r.json().get("message", {}).get("content", "").strip()
+            result = r.json().get("message", {}).get("content", "").strip()
+            if result and cache_key:
+                try:
+                    cache.set(cache_key, result, ttl=300, backend="memory")
+                except Exception:
+                    pass
+            return result
         except Exception as e:
             logger.error(f"OllamaClient chyba: {e}")
             return ""
@@ -161,6 +190,30 @@ class OllamaClient:
         else:
             msgs = messages
 
+        import json as _json
+        import hashlib as _hashlib
+        from cache_manager import get_cache_manager
+        
+        try:
+            payload_str = _json.dumps({
+                "model": self.model,
+                "messages": msgs,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "format": "json"
+            }, sort_keys=True)
+            key_hash = _hashlib.md5(payload_str.encode("utf-8")).hexdigest()
+            cache_key = f"ollama_client_json:{key_hash}"
+            
+            cache = get_cache_manager()
+            cached = cache.get(cache_key, backend="memory")
+            if cached is not None:
+                logger.info(f"OllamaClient JSON cache hit for model {self.model}")
+                return cached
+        except Exception as e:
+            logger.debug(f"OllamaClient JSON cache lookup chyba: {e}")
+            cache_key = None
+
         payload = {
             "model":    self.model,
             "messages": msgs,
@@ -172,7 +225,13 @@ class OllamaClient:
             r = requests.post(self.url, json=payload, timeout=timeout)
             r.raise_for_status()
             raw = r.json().get("message", {}).get("content", "").strip()
-            return json.loads(raw)
+            result = json.loads(raw)
+            if result and cache_key:
+                try:
+                    cache.set(cache_key, result, ttl=300, backend="memory")
+                except Exception:
+                    pass
+            return result
         except json.JSONDecodeError as e:
             logger.warning(f"OllamaClient.call_json: JSON parse error: {e} — raw: {raw[:120]}")
             return {}
