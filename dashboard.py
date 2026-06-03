@@ -122,24 +122,29 @@ if HAS_FASTAPI:
 
     _main_loop = None
 
-    @app.on_event("startup")
-    async def startup_event():
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def _lifespan(application):
         global _main_loop
         _main_loop = asyncio.get_running_loop()
         try:
             from event_bus import get_event_bus
-            
+
             def handle_bus_graph(event):
                 if _main_loop and event.data:
                     asyncio.run_coroutine_threadsafe(
                         broadcast_graph_event(event.data),
-                        _main_loop
+                        _main_loop,
                     )
-            
+
             get_event_bus().subscribe("agent.graph", handle_bus_graph)
             logger.info("Dashboard: Odebírám 'agent.graph' eventy z EventBusu")
         except Exception as e:
             logger.warning(f"Dashboard: nelze se přihlásit k EventBusu: {e}")
+        yield  # aplikace běží
+
+    app.router.lifespan_context = _lifespan
 
     @app.get("/health")
     async def health():
