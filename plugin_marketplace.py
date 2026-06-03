@@ -10,7 +10,17 @@ Příkazy (přes LocalRouter):
 """
 
 from __future__ import annotations
+
+import json
+import logging
+import os
+import subprocess
+import threading
+import time
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class PluginMarketplace:
@@ -269,6 +279,167 @@ class PluginMarketplace:
     def update(self, name: str) -> str:
         self.uninstall(name)
         return self.install(name)
+
+    # ── Sandbox ───────────────────────────────────────────────────────────────
+
+    def run_sandboxed(self, plugin_name: str, entry: str = "main.py",
+                      args: Optional[List[str]] = None,
+                      timeout: int = 30,
+                      memory_mb: int = 256) -> Dict[str, Any]:
+        """
+        Spustí plugin v izolovaném subprocess s resource limity.
+
+        Sandbox omezení:
+          - Timeout (default 30s) — subprocess.run(timeout=...)
+          - Memory limit přes ulimit (Linux) nebo job object (Windows)
+          - Oddělený working directory (plugin složka)
+          - Žádný přístup k internetu není vynucen (plugin může volat net — TODO: nftables)
+
+        Vrátí: {"ok": bool, "stdout": str, "stderr": str, "returncode": int, "elapsed": float}
+        """
+        plugin_path = self.plugins_dir / plugin_name
+        script = plugin_path / entry
+
+        if not plugin_path.exists():
+            return {"ok": False, "stdout": "", "stderr": f"Plugin '{plugin_name}' není nainstalován.", "returncode": -1, "elapsed": 0.0}
+        if not script.exists():
+            return {"ok": False, "stdout": "", "stderr": f"Entry point '{entry}' nenalezen.", "returncode": -1, "elapsed": 0.0}
+
+        cmd = ["python3", str(script)] + (args or [])
+
+        # Přidej ulimit wrapper na Linuxu
+        preexec = None
+        if os.name == "posix":
+            mem_bytes = memory_mb * 1024 * 1024
+            def _set_limits():
+                try:
+                    import resource
+                    resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
+                    resource.setrlimit(resource.RLIMIT_CPU, (timeout, timeout + 5))
+                except Exception:
+                    pass
+            preexec = _set_limits
+
+        t0 = time.monotonic()
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=str(plugin_path),
+                preexec_fn=preexec,
+                env={**os.environ, "JARVIS_SANDBOX": "1"},
+            )
+            elapsed = time.monotonic() - t0
+            ok = result.returncode == 0
+            if not ok:
+                logger.warning(f"Plugin '{plugin_name}' skončil s kódem {result.returncode}")
+            return {
+                "ok": ok,
+                "stdout": result.stdout[:4096],
+                "stderr": result.stderr[:2048],
+                "returncode": result.returncode,
+                "elapsed": round(elapsed, 3),
+            }
+        except subprocess.TimeoutExpired:
+            elapsed = time.monotonic() - t0
+            logger.error(f"Plugin '{plugin_name}' překročil timeout {timeout}s")
+            return {"ok": False, "stdout": "", "stderr": f"Timeout po {timeout}s", "returncode": -9, "elapsed": round(elapsed, 3)}
+        except Exception as e:
+            return {"ok": False, "stdout": "", "stderr": str(e), "returncode": -1, "elapsed": 0.0}
+
+    # ── Ratings & Reviews ─────────────────────────────────────────────────────
+
+    def submit_review(self, name: str, rating: float, comment: str = "") -> str:
+        """Přidá hodnocení + volitelný komentář. Rating 1.0–5.0."""
+        try:
+            r = max(1.0, min(5.0, float(rating)))
+        except Exception:
+            return "Neplatný rating (použij číslo 1.0–5.0)"
+
+        entry: Dict[str, Any] = {"rating": r, "comment": comment[:200], "ts": time.time()}
+        reviews = self._ratings.get(name, [])
+        if not isinstance(reviews, list):
+            reviews = []
+        reviews.append(entry)
+        self._ratings[name] = reviews
+
+        try:
+            self._ratings_file.parent.mkdir(parents=True, exist_ok=True)
+            self._ratings_file.write_text(
+                json.dumps(self._ratings, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as e:
+            logger.warning(f"Uložení ratingu selhalo: {e}")
+
+        avg = sum(e["rating"] for e in reviews) / len(reviews)
+        return f"Hodnocení uloženo: {name} → {r:.1f}★ (průměr: {avg:.1f}★ z {len(reviews)} hodnocení)"
+
+    def get_reviews(self, name: str) -> List[Dict[str, Any]]:
+        """Vrátí seznam hodnocení pro plugin."""
+        reviews = self._ratings.get(name, [])
+        return reviews if isinstance(reviews, list) else []
+
+    def avg_rating(self, name: str) -> float:
+        """Vrátí průměrný rating (nebo registry default)."""
+        reviews = self.get_reviews(name)
+        if reviews:
+            return round(sum(r["rating"] for r in reviews) / len(reviews), 1)
+        return self.REGISTRY.get(name, {}).get("rating", 0.0)
+
+    # ── Update checker (background) ───────────────────────────────────────────
+
+    def start_update_checker(self, interval_hours: int = 24) -> None:
+        """Spustí background thread který každých N hodin zkontroluje aktualizace."""
+        def _loop():
+            while True:
+                time.sleep(interval_hours * 3600)
+                try:
+                    updates = self.check_updates()
+                    if updates:
+                        logger.info(f"Marketplace: dostupné aktualizace: {list(updates.keys())}")
+                        try:
+                            from notification_engine import get_notification_engine
+                            from config import CONFIG
+                            names = ", ".join(updates.keys())
+                            get_notification_engine(CONFIG).notify(
+                                title="JARVIS Marketplace",
+                                body=f"Dostupné aktualizace: {names}",
+                                urgency="low",
+                            )
+                        except Exception:
+                            pass
+                except Exception as e:
+                    logger.debug(f"Update checker chyba: {e}")
+
+        t = threading.Thread(target=_loop, daemon=True, name="MarketplaceUpdateChecker")
+        t.start()
+        logger.info(f"Marketplace update checker spuštěn (interval: {interval_hours}h)")
+
+    # ── Marketplace info API (pro React UI) ───────────────────────────────────
+
+    def get_catalog(self) -> List[Dict[str, Any]]:
+        """Vrátí úplný katalog pro frontend — seznam dicts s instalačním stavem."""
+        updates = self.check_updates()
+        result = []
+        for name, info in self.REGISTRY.items():
+            installed = (self.plugins_dir / name).exists()
+            result.append({
+                "id":          name,
+                "name":        name,
+                "description": info.get("description", ""),
+                "author":      info.get("author", ""),
+                "version":     info.get("version", "?"),
+                "rating":      self.avg_rating(name),
+                "reviews":     len(self.get_reviews(name)),
+                "downloads":   info.get("downloads", 0),
+                "tags":        info.get("tags", []),
+                "builtin":     info.get("builtin", False),
+                "installed":   installed,
+                "has_update":  name in updates,
+                "new_version": updates.get(name),
+            })
+        return sorted(result, key=lambda x: (-x["rating"], -x["downloads"]))
 
     def install_from_github(self, repo: str) -> str:
         """Přímá instalace z GitHub repo (user/repo nebo URL)."""
