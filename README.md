@@ -1,221 +1,330 @@
 <div align="center">
 
-# 🤖 JARVIS
+<img src="jarvis.png" width="120" alt="JARVIS" />
 
-**Váš ultimátní, 100% offline a soukromý AI kopilot**
+# JARVIS
 
-*Představte si asistenta, který má plnou kontrolu nad vaším počítačem, rozumí vašemu hlasu, vidí vaši obrazovku a pamatuje si vaše preference. A to vše bez odeslání jediného bajtu dat na internet.*
+### Váš osobní AI, který skutečně ovládá váš počítač
+
+*Mluví. Vidí. Pamatuje si. Jedná.*
+
+<br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Tests](https://img.shields.io/badge/tests-531%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
-[![Version](https://img.shields.io/badge/version-5.0.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
-[![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/badge/verze-5.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
+[![License](https://img.shields.io/badge/licence-MIT-0ea5e9?style=flat-square)](LICENSE)
+[![Tests](https://img.shields.io/badge/testy-531%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 
----
+<br/>
 
-**[Rychlý start](#rychlý-start) • [Co Jarvis umí](#co-jarvis-dokáže) • [Architektura](#architektura) • [Instalace](#instalace) • [Novinky v5.0](#novinky-v50)**
+**[Začít za 60 sekund](#-začít-za-60-sekund) · [Co umí](#-co-jarvis-dokáže) · [Jak to funguje](#-jak-to-funguje) · [Instalace](#-instalace)**
 
 </div>
 
 ---
 
-## Novinky v5.0
+<br/>
 
-### ⚡ Hybridní Cloud Router (Groq + OpenRouter)
-Komplexní dotazy (kód, analýza, agenti) automaticky letí na **Groq LLaMA 3.3** — odpověď do **200 ms** místo 5 sekund. Jednoduché dotazy zůstávají lokálně. Fallback Groq → OpenRouter → Ollama, vše transparentně.
+## Proč JARVIS?
 
-### 👁️ Vision-Guided Computer Use
-JARVIS nyní **vidí obrazovku** a ovládá UI jako člověk — kliká na tlačítka popsaná textem, vyplňuje formuláře, scrolluje. Powered by Groq llama-3.2-90b-vision nebo lokální LLaVA. `"Najdi nejlevnější letenky do Tokia a vyplň formulář"` → JARVIS to sám nakliká.
+Většina "AI asistentů" jsou jen chatboti. Napíšete otázku, dostanete odpověď. Tím to končí.
 
-### 🧠 GraphRAG Paměť
-Místo prosté SQLite paměti nyní **znalostní graf** (entity + vztahy). Z každé konverzace se automaticky extrahují trojice `(Petr, pracuje na, projekt Alpha)`. Při dalším dotazu JARVIS ví, co s čím souvisí — i po týdnech.
+**JARVIS je jiný.** Je to agent, který přečte váš e-mail, všimne si změny v kódu, otevře prohlížeč, vyplní formulář a přijde za vámi — sám od sebe, bez vyzvání.
 
-### 🤖 Autonomní Background Workers
-JARVIS běží na pozadí a **sám vás přeruší** při důležité události: nový e-mail s klíčovým slovem, commit v git repozitáři, blížící se schůzka v kalendáři, zmínka na Slacku, GitHub notifikace. Konfigurovatelný interval, filtrování podle urgence.
+```
+Vy:     "Najdi nejlevnější letenky do Říma na příští víkend a rezervuj."
 
-### 🎙️ Whisper Live — Real-time Duplex Audio
-Nahrazuje blocking Google STT kontinuálním streamingem: **WebRTC VAD** → **Groq Whisper API** (200 ms) nebo lokální faster-whisper. Plná podpora **barge-in** — přerušíte JARVIS uprostřed věty a on okamžitě naslouchá.
+JARVIS: Otevírám prohlížeč... ✓
+        Vyhledávám letenky... ✓
+        Nejlevnější: Wizz Air, pátek 18:40, 2 890 Kč
+        Vyplňuji formulář... ✓
+        Čeká na vaše potvrzení platby.
+```
 
----
+Žádné API klíče třetích stran. Žádná cloudová AI co čte vaše zprávy. Běží na vašem počítači.
 
-## Proč zvolit JARVIS?
-
-### 🔒 100% Soukromí & Volitelný Cloud
-Jarvis běží primárně lokálně přes Ollama. Pro rychlost lze zapnout hybridní cloud routing (Groq/OpenRouter) — volba je na vás. Žádné nucené předplatné, žádné sledování.
-
-### 🎙️ Hlasové ovládání & Vision (Whisper Live / LLaVA)
-Ovládejte systém hands-free s **real-time Whisper** transkripcí (latence ~200 ms). Díky integraci **LLaVA Vision** a **vision-guided Computer Use** JARVIS vidí obrazovku a ovládá jakoukoliv aplikaci.
-
-### 🧠 Pokročilá agentní inteligence (ReAct 2.0 & Supervisor)
-Jarvis není jen chatovací bot. Je to autonomní agent, který umí:
-*   **Plánovat (Planning):** Rozložit složitý úkol na logické kroky ještě před spuštěním.
-*   **Sebe-opravovat (Introspection & Rollback):** Pokud se nástroj setká s chybou, Jarvis vrátí stav zpět a zkusí jinou cestu.
-*   **Delegovat (Hierarchical Supervisor):** Koordinátor rozděluje zadání specializovaným sub-agentům.
-
-### 💻 Integrace s OS & MCP servery
-Díky podpoře standardu MCP (Model Context Protocol) má Jarvis k dispozici bohatý ekosystém nástrojů:
-*   Přímé ovládání souborového systému (čtení, zápis, mazání souborů)
-*   Integraci s Gitem (commitování, tvorba větví, PR)
-*   Plnohodnotný prohlížeč Puppeteer (web-scraping, automatizace klikání)
-*   Spouštění lokálních příkazů a monitorování hardwaru
-
-### ⚡ Bleskový výkon (Cloud Router + Caching)
-*   **Hybrid Cloud Router:** Groq LLaMA 3.3 pro složité dotazy (~200 ms), Ollama lokálně pro jednoduché.
-*   **LLM Router v2:** Směruje mezi lokálními modely podle náročnosti úkolu.
-*   **Ollama Client Caching:** Opakované dotazy 2–4× rychlejší díky lokální mezipaměti.
+<br/>
 
 ---
 
-## Rychlý start
-
-Během několika minut máte svého osobního asistenta plně zprovozněného:
+## ⚡ Začít za 60 sekund
 
 ```bash
-# 1. Naklonujte repozitář
-git clone https://github.com/simivilasek-ship-it/Jarvis.git && cd Jarvis
-
-# 2. Spusťte instalační skript (nastaví venv a závislosti)
+git clone https://github.com/simivilasek-ship-it/Jarvis.git
+cd Jarvis
 ./install.sh
-
-# 3. Spusťte React HUD v nativním desktopovém okně
 bash start_desktop.sh
 ```
 
-### Spuštění Webového Rozhraní (Next.js Dashboard)
-Pro plnohodnotný moderní dashboard s live metrikami a grafem agenta:
+> Potřebujete Python 3.11+ a [Ollama](https://ollama.com). Nic víc.
+
+**Nebo s webovým dashboardem:**
+
 ```bash
-# Spusťte FastAPI backend (port 8002)
-python dashboard.py
+python dashboard.py   # backend :8002
+cd web && npm run dev # frontend :3000
+```
 
-# V novém terminálu spusťte frontend (port 3000)
-cd web
-npm run dev
+<br/>
+
+---
+
+## 🎯 Co JARVIS dokáže
+
+### Mluví s vámi — a skutečně vás slyší
+
+Žádné stisknutí tlačítka, žádné čekání. Jen mluvte.
+
+- **Whisper Live** — real-time transkripce s latencí ~200 ms (přes Groq nebo lokálně)
+- **Barge-in** — přerušíte JARVIS uprostřed věty, on okamžitě naslouchá
+- **WebRTC VAD** — automaticky rozezná řeč od ticha, neplýtvá výpočetním výkonem
+
+```
+"Hej JARVIS, jaký je stav mého projektu?"
+→ JARVIS přečte git log, zkontroluje otevřené PR a odpoví hlasem za 0.8 s
 ```
 
 ---
 
-## Co Jarvis dokáže?
+### Vidí vaši obrazovku — a ovládá ji
 
-| Oblast | Příklad příkazu | Co Jarvis udělá |
-| :--- | :--- | :--- |
-| 💻 **Počítač & Systém** | *"Nainstaluj Git a uvolni místo na disku"* | Vyhledá chybějící balíčky, zkontroluje diskové kapacity a provede úklid. |
-| 📁 **Soubory** | *"Smaž staré logy a vytvoř složku archiv"* | Prozkoumá strukturu, vybere soubory dle vzoru a přesune/smaže je. |
-| 👁️ **Vision (Vize)** | *"Popiš, co je na mé obrazovce"* | Udělá screenshot, pošle ho LLaVA modelu a popíše otevřená okna či kód. |
-| 🌐 **Prohlížení & Web** | *"Najdi nejlepší ceny grafických karet"* | Otevře Puppeteer, vyhledá weby, vyškrábe ceny a porovná je. |
-| 💾 **Dlouhodobá paměť** | *"Zapamatuj si, že preferuji tmavý režim"* | Uloží informaci do SQLite databáze s embeddingy pro pozdější vyvolání. |
-| ⚙️ **Automatizace** | *"Když CPU stoupne nad 90%, pošli notifikaci"* | Spustí běžící workflow engine, který hlídá systémové triggery a spouští akce. |
+JARVIS pořídí screenshot, pochopí co vidí, a pak klikne přesně tam, kde má.
+
+- Klikání, vyplňování formulářů, scrollování — bez XPath, bez selektorů
+- Popíšete prvek slovy: `"tlačítko Přihlásit"`, `"pole pro e-mail"` — najde ho
+- Funguje v **jakékoliv aplikaci** — Chrome, Excel, Photoshop, terminál
+
+```
+"Otevři Gmail, najdi nepřečtený e-mail od klienta a přepošli mi shrnutí."
+→ JARVIS otevře Gmail, přečte e-mail, přepíše klíčové body a oznámí vám je hlasem
+```
 
 ---
 
-## Architektura systému
+### Pamatuje si vás — opravdu
+
+Žádné "Jako AI nemám přístup k předchozím konverzacím."
+
+- **GraphRAG** — znalostní graf vztahů (entity, projekty, lidé, preference)
+- Z každé konverzace extrahuje trojice: `(Petr, pracuje na, projekt Alpha)`
+- Při dalším dotazu automaticky doplní kontext z grafu
 
 ```
-JARVIS
-├── 🐍 Python backend          FastAPI :8002 · WebSocket streaming
-│   ├── LLM Router v2       7 typů úkolů → správný model automaticky
-│   ├── 15 Skills           Plugin sandbox · Health check · Marketplace
-│   ├── 10 MCP serverů      Filesystem · Git · Puppeteer · Computer Control
-│   ├── Memory              SQLite + embeddingy · TTL/priority · auto-pruning
-│   ├── Agents              ReAct 2.0 (Rollback, Introspection) · Hierarchical (Supervisor)
-│   ├── Workflow Engine     Trigger-based automation (CPU · time · app)
-│   └── Notifications       Desktop alerts · CPU/RAM monitoring
-│
-├── ⚛️ Next.js frontend        TypeScript · Tailwind · React
-│   ├── Chat                Streaming · markdown · copy button · history
-│   ├── SystemPanel         Circular gauges · 60s sparklines · live metrics
-│   ├── Agent Graph         SVG pipeline visualization
-│   └── Spotlight           Alt+Space global hotkey · widgets
-│
-└── 🪟 Desktop wrapper         pywebview nativní okno
+Minulý týden: "Pracuji s Petrem na redesignu webu, deadline je 20. června."
+
+Dnes: "Jak jsme na tom s tím projektem?"
+→ JARVIS ví: projekt = redesign webu, kolega = Petr, deadline = 20. června
 ```
-
-### LLM Router — Inteligentní rozdělování zátěže
-
-| Typ úkolu | Doporučený lokální model | Rychlost / Náročnost |
-| :--- | :--- | :--- |
-| **Překlady, jednoduchá fakta** | `qwen2.5:1.5b` | Blesková rychlost, minimální RAM |
-| **Běžný chat, obecné dotazy** | `qwen2.5:3b` *(výchozí)* | Skvělý poměr výkon/rychlost |
-| **Kódování, matematika** | `deepseek-coder` nebo `qwen2.5:7b` | Pokročilé programovací schopnosti |
-| **Autonomní agenti, uvažování**| `llama3.1:8b` | Vysoká úroveň logiky a plánování |
-| **Vision (analýza obrazu)** | `llava:7b` | Vyžaduje GPU, automatické uvolnění VRAM |
 
 ---
 
-## Instalace a požadavky
+### Hlídá za vás — bez vašeho vyzvání
 
-### Prerekvizity
-*   **Python 3.11+**
-*   **Node.js 18+**
-*   [Ollama](https://ollama.com) (pro běh lokálních LLM)
-*   **ffmpeg** (pro zpracování zvuku/hlasu)
+JARVIS běží na pozadí a přijde za vámi, když se něco děje.
 
-### Nastavení prostředí
+| Zdroj | Co monitoruje | Jak reaguje |
+|---|---|---|
+| 📧 **E-mail** | Klíčová slova, urgentní odesílatelé | Hlasové upozornění + shrnutí |
+| 🐙 **Git** | Nové commity, PR, fixbranch | "Kolega pushnil změnu do hlavní větve" |
+| 📅 **Kalendář** | Blížící se schůzky (< 30 min) | "Za 15 minut máš standup, chceš podklady?" |
+| 💬 **Slack** | Přímé zmínky, klíčová slova | Přečte a navrhne odpověď |
+| 🐱 **GitHub** | Review requests, mentions | "Žádají tě o code review" |
+
+---
+
+### Přemýšlí v krocích — a opravuje se sám
+
+JARVIS není jen chatbot. Je to **ReAct agent** — plánuje, provádí, kontroluje výsledek.
+
+```
+Úkol: "Nainstaluj závislosti a spusť testy."
+
+Krok 1: pip install -r requirements.txt  ✓
+Krok 2: pytest tests/                    ✗  (3 testy selhaly)
+Krok 3: Analyzuji chyby...               ✓
+Krok 4: Opravuji import v test_memory.py ✓
+Krok 5: pytest tests/                    ✓  531/531 passing
+```
+
+Při chybě JARVIS **neselže tiše** — vrátí se zpět, zkusí jinou cestu a informuje vás.
+
+---
+
+### Rychlý jako cloud — soukromý jako lokál
+
+Hybridní router automaticky rozhoduje kde dotaz zpracovat:
+
+| Dotaz | Kde se zpracuje | Latence |
+|---|---|---|
+| "Přelož tuhle větu" | Ollama lokálně | ~1 s |
+| "Napiš mi REST API v Pythonu" | Groq LLaMA 3.3 | **~200 ms** |
+| "Analyzuj tento dataset" | Groq / OpenRouter | **~300 ms** |
+| "Otevři Spotify" | Lokální router (regex) | **< 50 ms** |
+
+Bez Groq klíče — vše lokálně. S klíčem — automaticky nejrychlejší cesta.
+
+<br/>
+
+---
+
+## 🏗️ Jak to funguje
+
+```
+  Váš hlas / text
+        │
+        ▼
+  ┌─────────────┐     regex match?     ┌──────────────────┐
+  │ Local Router│ ──────────────────► │ CommandExecutor  │
+  └─────────────┘         ne          └──────────────────┘
+        │                                      │
+        ▼                               otevře app / soubor
+  ┌─────────────────────────────────────────────────────┐
+  │              Hybrid LLM Router                      │
+  │  jednoduché → Ollama qwen2.5:3b  (lokálně, ~1 s)   │
+  │  složité    → Groq LLaMA 3.3     (cloud, ~200 ms)  │
+  │  vision     → LLaVA / Groq Vision                   │
+  └─────────────────────────────────────────────────────┘
+        │
+        ├── Paměť: GraphRAG knowledge graph + SQLite embeddingy
+        ├── Nástroje: 10 MCP serverů (filesystem, git, browser...)
+        ├── Agenti: ReAct 2.0 (plán → akce → kontrola → oprava)
+        └── Workers: email, git, calendar, slack, github (pozadí)
+```
+
+### Stack
+
+| Vrstva | Technologie |
+|---|---|
+| **AI / LLM** | Ollama + Groq API + OpenRouter |
+| **STT** | Whisper Live (Groq) · faster-whisper · Vosk offline |
+| **TTS** | Edge-TTS streaming · piper-tts |
+| **Vision** | LLaVA · Groq llama-3.2-90b-vision |
+| **Paměť** | SQLite + embeddingy · GraphRAG knowledge graph |
+| **Backend** | FastAPI · WebSocket streaming · asyncio |
+| **Frontend** | Next.js · TypeScript · Tailwind CSS |
+| **Desktop** | pywebview nativní okno |
+| **Nástroje** | MCP (Model Context Protocol) |
+| **Bezpečnost** | SecurityManager · shell blacklist/whitelist · audit log |
+
+<br/>
+
+---
+
+## 🔧 Instalace
+
+### Minimální (lokální, bez cloudu)
+
 ```bash
+git clone https://github.com/simivilasek-ship-it/Jarvis.git
+cd Jarvis
 pip install -r requirements.txt
 ollama pull qwen2.5:3b
+python jarvis.py
 ```
 
-### Rozšířené offline možnosti (volitelně)
+### Plná instalace (doporučeno)
+
 ```bash
-pip install pynput          # Aktivuje globální klávesovou zkratku Alt+Space
-pip install faster-whisper  # Výkonný offline převod řeči na text (STT s podporou GPU)
-pip install piper-tts       # Velmi rychlý a přirozený lokální syntetizátor řeči (TTS)
-pip install sentence-transformers  # Pokročilé embeddingy pro sémantické vyhledávání v paměti
-ollama pull llava:7b        # Podpora pro vizuální úkoly (čtení obrazovky, webkamera)
+# Rychlejší STT
+pip install faster-whisper sounddevice webrtcvad soundfile
+
+# Vision-guided ovládání UI
+pip install pyautogui pillow pyperclip
+
+# Desktop aplikace
+bash start_desktop.sh
 ```
+
+### Cloud routing — volitelné, ale výrazně rychlejší
+
+Přidejte do `.env`:
+
+```env
+GROQ_API_KEY=gsk_...          # zdarma na console.groq.com
+OPENROUTER_API_KEY=sk-or-...  # zdarma na openrouter.ai
+```
+
+Bez těchto klíčů JARVIS funguje 100% lokálně. S nimi se složité dotazy zpracují za ~200 ms.
+
+### Monitorování (volitelné)
+
+```env
+IMAP_HOST=imap.gmail.com
+IMAP_USER=vas@gmail.com
+IMAP_PASS=app-heslo           # Google App Password
+GITHUB_TOKEN=ghp_...
+SLACK_BOT_TOKEN=xoxb-...
+CALENDAR_ICAL_URL=https://...
+```
+
+<br/>
 
 ---
 
-## Bezpečnost (Security & Headless režim)
+## 🛡️ Bezpečnost
 
-Při spouštění Jarvise v headless (serverovém) prostředí nebo v CI je bezpečnost prioritou číslo jedna:
+JARVIS nikdy neprovede destruktivní akci bez vašeho vědomí.
 
-> [!IMPORTANT]
-> **Omezení ELEVATED akcí v Headless režimu:**
-> Ve výchozím nastavení Jarvis v headless režimu **automaticky zamítá** všechny nebezpečné (ELEVATED) akce, jako je např. odstraňování souborů (`delete_file`) nebo vypínání systému (`shutdown`).
-
-### Jak povolit automatické schvalování na důvěryhodných serverech?
-Pokud provozujete Jarvise v kontrolovaném testovacím/CI prostředí a potřebujete povolit automatické schvalování i pro ELEVATED akce, můžete toto chování povolit nastavením systémové proměnné prostředí:
+- **Shell blacklist** — `rm -rf /`, `dd`, `mkfs`, reverse shell, fork bomb → vždy blokováno
+- **Shell whitelist** — pouze explicitně povolené příkazy (`git`, `pip`, `ls`, ...)
+- **Headless mode** — v CI/serveru jsou ELEVATED akce automaticky zamítnuty
+- **Audit log** — každá akce je zaznamenána do `~/.jarvis_audit.jsonl`
 
 ```bash
+# Povolení ELEVATED akcí v CI (jen na důvěryhodných serverech)
 export JARVIS_HEADLESS_APPROVE_ELEVATED=1
 ```
-*Varování: Nikdy nepovolujte tuto proměnnou na veřejně dostupných serverech bez dodatečného zabezpečení.*
+
+<br/>
 
 ---
 
-## API a vývojářské rozhraní
+## 📡 API
 
-Backend nabízí kompletní sadu REST a WebSocket endpointů pro integraci do dalších systémů:
+| Endpoint | Popis |
+|---|---|
+| `GET /health` | Status backendu |
+| `GET /api/system` | CPU, RAM, GPU, disk — live |
+| `POST /api/command` | Odešle příkaz, vrátí výsledek |
+| `WS /ws/chat` | Streaming LLM odpovědi chunk po chunku |
+| `WS /ws/agents` | Live stav ReAct agenta |
+| `WS /ws/graph` | Vizualizace agent pipeline |
+| `WS /ws/audio` | Duplex audio (WebRTC VAD) |
 
-*   `GET  /health` – Rychlý status backendu a WebSocket serveru
-*   `GET  /api/system` – Aktuální vytížení CPU, RAM, GPU, disku a sítě
-*   `POST /api/command` – Odeslání textového příkazu asistentovi
-*   `WS   /ws/chat` – Streamování odpovědí LLM v reálném čase
-*   `WS   /ws/agents` – Live statistiky o běžících agentech a jejich krocích
+<br/>
 
-### Spuštění testů
-Před odesláním příspěvku do projektu vždy spusťte kompletní testovací sadu:
+---
+
+## 🧪 Testy
+
 ```bash
-# Spuštění všech 500+ testů
-python -m pytest tests/ test_jarvis.py -v
-
-# Rychlý test pouze headless bezpečnostních potvrzení
-pytest tests/test_confirm_action_headless.py -q
+pytest tests/ test_jarvis.py -v          # 531 testů
+pytest tests/test_confirm_action_headless.py -q  # bezpečnostní testy
 ```
 
----
-
-## Vývoj a přispívání
-
-Pokud máte nainstalovaný nástroj [`just`](https://github.com/casey/just), můžete využít následující zkratky:
-*   `just web-dev` – Spustí vývojový server frontendu
-*   `just web-build` – Vytvoří produkční build frontendu
-*   `just docker-build` – Sestaví Docker obraz pro izolovaný běh
-
-Podrobnosti o zapojení do vývoje a standardech kódu naleznete v souboru [CONTRIBUTING.md](CONTRIBUTING.md).
+<br/>
 
 ---
+
+## 🤝 Přispívání
+
+```bash
+just web-dev      # vývojový server frontendu
+just web-build    # produkční build
+just docker-build # Docker image
+```
+
+Podrobnosti v [CONTRIBUTING.md](CONTRIBUTING.md).
+
+<br/>
+
+---
+
+<div align="center">
+
+**JARVIS je open-source. Žádné předplatné. Žádné sledování. Váš počítač, váš asistent.**
 
 MIT © 2026 — [simivilasek-ship-it](https://github.com/simivilasek-ship-it)
+
+</div>
