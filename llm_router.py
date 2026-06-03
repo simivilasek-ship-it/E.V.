@@ -40,6 +40,7 @@ class ModelConfig:
     temperature:  float  = 0.2
     timeout:      int    = 60
     priority:     int    = 0     # vyšší = preferovaný
+    cost_score:   float  = 1.0   # lower = cheaper / more efficient
 
 
 @dataclass
@@ -169,6 +170,18 @@ class LLMRouter:
 
         return TaskType.STANDARD
 
+    def _score_model(self, model_name: str) -> float:
+        stats = self._stats.get(model_name, {})
+        calls = stats.get("calls", 0)
+        errors = stats.get("errors", 0)
+        total_ms = stats.get("total_ms", 0.0)
+        cost = self._models.get(model_name, ModelConfig(model_name)).cost_score
+        if calls == 0:
+            return float(cost)
+        avg_ms = total_ms / calls if calls else 0.0
+        error_rate = errors / calls if calls else 0.0
+        return float(cost) + avg_ms * 0.002 + error_rate * 5.0
+
     def get_model_for_task(self, task: TaskType) -> Tuple[str, float, int]:
         """Vrátí (model, temperature, max_tokens) pro daný úkol (v2)."""
         available = self._get_available_models()
@@ -185,17 +198,27 @@ class LLMRouter:
 
         if task in model_prefs:
             candidates, temp, max_tok = model_prefs[task]
+            scored = []
             for m in candidates:
                 if m in available or m == self._default:
-                    return m, temp, max_tok
-            return self._default, 0.7, 800
+                    score = self._score_model(m)
+                    scored.append((score, m))
+            if scored:
+                scored.sort(key=lambda item: item[0])
+                return scored[0][1], temp, max_tok
+            return self._default, temp, max_tok
 
         # Zpětná kompatibilita — starý routing přes RoutingRule
         for rule in self._rules:
             if rule.task_type == task:
+                scored = []
                 for model_name in rule.model_names:
                     if model_name in available or not available:
-                        return model_name, rule.temperature, rule.max_tokens
+                        score = self._score_model(model_name)
+                        scored.append((score, model_name, rule.temperature, rule.max_tokens))
+                if scored:
+                    scored.sort(key=lambda item: item[0])
+                    return scored[0][1], scored[0][2], scored[0][3]
 
         return self._default, 0.2, 1000
 

@@ -97,15 +97,24 @@ interface NodeRectProps {
   id: string
   node: NodeDef
   active: string | null
+  hovered: string | null
+  onHover: (id: string | null) => void
 }
 
-function NodeRect({ id, node, active }: NodeRectProps) {
+function NodeRect({ id, node, active, hovered, onHover }: NodeRectProps) {
   const isActive = active === id
+  const isHovered = hovered === id
   const color = node.color
-  const glow = isActive ? `0 0 16px ${color}, 0 0 32px ${color}66` : 'none'
+  const glow = isActive ? `0 0 18px ${color}, 0 0 38px ${color}55` : 'none'
+  const fillColor = isActive
+    ? `${color}22`
+    : isHovered
+      ? 'rgba(0,212,255,0.08)'
+      : 'rgba(11,18,32,0.96)'
+  const stroke = isActive ? color : isHovered ? '#00b4ff' : '#1a3050'
 
   return (
-    <g>
+    <g onMouseEnter={() => onHover(id)} onMouseLeave={() => onHover(null)} style={{ cursor: 'pointer' }}>
       {isActive && (
         <rect
           x={node.x - NODE_W / 2 - 4}
@@ -125,13 +134,13 @@ function NodeRect({ id, node, active }: NodeRectProps) {
         y={node.y - NODE_H / 2}
         width={NODE_W}
         height={NODE_H}
-        rx="6"
-        fill={isActive ? `${color}22` : '#0b1220'}
-        stroke={isActive ? color : '#1a3050'}
-        strokeWidth={isActive ? 2 : 1}
+        rx="10"
+        fill={fillColor}
+        stroke={stroke}
+        strokeWidth={isActive || isHovered ? 2 : 1}
         style={{
-          filter: isActive ? `drop-shadow(${glow})` : 'none',
-          transition: 'all 0.4s',
+          filter: isActive ? `drop-shadow(${glow})` : 'drop-shadow(0 0 8px rgba(0,0,0,0.12))',
+          transition: 'all 0.25s ease',
         }}
       />
       <text
@@ -142,8 +151,8 @@ function NodeRect({ id, node, active }: NodeRectProps) {
         fontSize="9"
         fontFamily="'Courier New', monospace"
         letterSpacing="2"
-        fill={isActive ? color : '#7ea8d4'}
-        style={{ transition: 'fill 0.4s' }}
+        fill={isActive || isHovered ? color : '#7ea8d4'}
+        style={{ transition: 'fill 0.25s ease' }}
       >
         {node.label}
       </text>
@@ -157,6 +166,7 @@ interface AgentGraphProps {
 
 export default function AgentGraph({ active: tabActive }: AgentGraphProps) {
   const [activeNode, setActiveNode] = useState<string | null>(null)
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null)
   const [log, setLog] = useState<string[]>([])
   const [status, setStatus] = useState<'connecting' | 'online' | 'offline'>('connecting')
   const wsRef = useRef<WebSocket | null>(null)
@@ -323,7 +333,14 @@ export default function AgentGraph({ active: tabActive }: AgentGraphProps) {
 
           {/* Nodes */}
           {Object.entries(NODES).map(([id, node]) => (
-            <NodeRect key={id} id={id} node={node} active={activeNode} />
+            <NodeRect
+              key={id}
+              id={id}
+              node={node}
+              active={activeNode}
+              hovered={hoveredNode}
+              onHover={setHoveredNode}
+            />
           ))}
         </svg>
       </div>

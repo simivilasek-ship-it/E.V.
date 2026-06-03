@@ -211,20 +211,34 @@ class _SQLiteMemoryStore:
             recency  = _math.exp(-age_days / 14)
             importance = max(0.0, min(1.0, float(row["importance"])))
             recency    = max(0.0, min(1.0, recency))
+            access_score = max(0.0, min(1.0, float(row["access_score"] or 0.0)))
+            priority = max(0, int(row["priority"] or 0))
             if engine.available:
                 sem_score = engine.similarity(query, row["content"])
                 # Odmítni NaN / inf / záporné hodnoty z embedding modelu
                 if not _math.isfinite(sem_score) or sem_score <= 0.0:
                     continue
                 sem_score = min(1.0, sem_score)
-                score = 0.5 * sem_score + 0.3 * importance + 0.2 * recency
+                score = (
+                    0.40 * sem_score +
+                    0.25 * importance +
+                    0.15 * recency +
+                    0.15 * access_score +
+                    0.05 * min(priority / 10.0, 1.0)
+                )
             else:
                 c_words = set(row["content"].lower().split())
                 overlap = len(q_words & c_words)
                 if overlap == 0:
                     continue
                 sem_score = overlap / max(len(q_words), 1)
-                score = 0.5 * sem_score + 0.3 * importance + 0.2 * recency
+                score = (
+                    0.40 * sem_score +
+                    0.25 * importance +
+                    0.15 * recency +
+                    0.15 * access_score +
+                    0.05 * min(priority / 10.0, 1.0)
+                )
             results.append({
                 "id": row["id"], "content": row["content"],
                 "importance": row["importance"],
@@ -243,7 +257,7 @@ class _SQLiteMemoryStore:
             with self._lock, self._connect() as con:
                 con.execute(
                     f"UPDATE memories SET last_access=?, access_count=access_count+1, "
-                    f"access_score=access_score+0.1 "
+                    f"access_score=MIN(access_score+0.25, 1.0) "
                     f"WHERE id IN ({placeholders})",
                     (now, *ids),
                 )

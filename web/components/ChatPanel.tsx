@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { useJarvis, type Message } from '@/store/jarvis'
 import { Icons } from './Icons'
 import HeroPanel from './HeroPanel'
@@ -26,26 +27,32 @@ function formatTime(ts: number) {
 
 function renderContent(text: string) {
   if (!text) return null
-  const parts = text.split(/(```[\s\S]*?```)/g)
-  return parts.map((p, i) => {
-    if (p.startsWith('```')) {
-      const lang = p.match(/^```(\w+)/)?.[1] ?? ''
-      const code = p.replace(/^```\w*\n?/, '').replace(/\n?```$/, '')
-      return (
-        <pre key={i} className="prose-j">
-          {lang && <span className="float-right font-mono text-[8px]" style={{ color: 'var(--muted)' }}>{lang}</span>}
-          {code}
-        </pre>
-      )
-    }
-    return (
-      <span key={i}>
-        {p.split(/(`[^`]+`)/g).map((c, j) =>
-          c.startsWith('`') ? <code key={j} className="prose-j">{c.slice(1, -1)}</code> : c
-        )}
-      </span>
-    )
-  })
+  return (
+    <ReactMarkdown
+      components={{
+        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+        ul: ({ children }) => <ul className="list-disc ml-5 mb-2 space-y-0.5">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal ml-5 mb-2 space-y-0.5">{children}</ol>,
+        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+        h1: ({ children }) => <h1 className="text-base font-bold mb-2 mt-3" style={{ color: 'var(--cyan)' }}>{children}</h1>,
+        h2: ({ children }) => <h2 className="text-sm font-semibold mb-1.5 mt-3" style={{ color: 'var(--cyan)' }}>{children}</h2>,
+        h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 mt-2" style={{ color: 'rgba(0,200,255,.7)' }}>{children}</h3>,
+        strong: ({ children }) => <strong className="font-semibold" style={{ color: '#e2e8f0' }}>{children}</strong>,
+        em: ({ children }) => <em className="italic" style={{ color: 'rgba(219,234,254,.7)' }}>{children}</em>,
+        code: ({ children, className }) => {
+          const isBlock = className?.startsWith('language-')
+          if (isBlock) return <code className="prose-j block">{children}</code>
+          return <code className="prose-j">{children}</code>
+        },
+        pre: ({ children }) => <pre className="prose-j mb-2">{children}</pre>,
+        a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" className="underline" style={{ color: 'var(--cyan)' }}>{children}</a>,
+        blockquote: ({ children }) => <blockquote className="border-l-2 pl-3 my-2 italic" style={{ borderColor: 'var(--cyan)', color: 'var(--muted)' }}>{children}</blockquote>,
+        hr: () => <hr className="my-3" style={{ borderColor: 'rgba(255,255,255,.08)' }} />,
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  )
 }
 
 function TypingDots() {

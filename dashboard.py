@@ -1104,17 +1104,18 @@ Pravidla pro skill.py:
                         llm    = LLMEngine(CONFIG)
                         q: asyncio.Queue = asyncio.Queue()
 
+                        loop = asyncio.get_event_loop()
+
                         def _stream():
                             try:
                                 for chunk in llm.stream_ask(text):
                                     if isinstance(chunk, str) and chunk:
                                         asyncio.run_coroutine_threadsafe(
-                                            q.put(chunk), asyncio.get_event_loop())
+                                            q.put(chunk), loop)
                             finally:
                                 asyncio.run_coroutine_threadsafe(
-                                    q.put(None), asyncio.get_event_loop())
+                                    q.put(None), loop)
 
-                        loop = asyncio.get_event_loop()
                         loop.run_in_executor(None, _stream)
 
                         while True:

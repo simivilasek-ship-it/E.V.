@@ -10,6 +10,7 @@ Skills se načítají lazy — pouze pokud manifest existuje nebo .py soubor nal
 from __future__ import annotations
 import ast
 import sys
+import os
 import json
 import importlib
 import importlib.util
@@ -514,6 +515,8 @@ class PluginManager:
                 return None
 
             self.plugins[manifest.name] = plugin
+            # Keep manifest reference for permission-aware sandboxing and metadata inspection.
+            setattr(plugin, '_manifest', manifest)
             plugin.on_load()
             self._register(plugin)
             logger.info(f"Skill '{manifest.name}' v{manifest.version} načten ✓")
@@ -647,6 +650,14 @@ class PluginManager:
     def call_action(self, action_fn: Callable, plugin_name: str = "?",
                     **kwargs) -> Tuple[Optional[Any], Optional[str]]:
         """Zavolá plugin action s timeoutem. Vrátí (result, error)."""
+        plugin = self.plugins.get(plugin_name)
+        manifest_perms = getattr(getattr(plugin, '_manifest', None), 'permissions', None)
+        if manifest_perms and _sandbox.should_isolate(manifest_perms):
+            handler_name = action_fn.__name__ if callable(action_fn) else None
+            skill_path = getattr(plugin, '_manifest', None)
+            if handler_name and skill_path:
+                py_file = str(Path(skill_path.path) / "skill.py") if Path(skill_path.path).is_dir() else str(Path(skill_path.path))
+                return _sandbox.run_isolated_action(py_file, handler_name, kwargs)
         return self._call_with_timeout(
             action_fn, (), kwargs, _PLUGIN_ACTION_TIMEOUT, plugin_name)
 
@@ -740,7 +751,7 @@ class SandboxedPluginRunner:
     Komunikace přes JSON na stdin/stdout.
     """
 
-    DANGEROUS_PERMS = {"system.exec", "network.full", "internal"}
+    DANGEROUS_PERMS = {"system.exec", "network.full", "internal", "vision.capture", "keyboard.input"}
 
     def __init__(self, timeout: float = 10.0):
         self.timeout = timeout
@@ -749,29 +760,48 @@ class SandboxedPluginRunner:
         """True pokud plugin vyžaduje process izolaci."""
         return bool(set(permissions) & self.DANGEROUS_PERMS)
 
+    def _simple_env(self, skill_path: str) -> dict:
+        plugin_dir = os.path.dirname(skill_path)
+        env = {
+            "PYTHONNOUSERSITE": "1",
+            "PYTHONPATH": plugin_dir,
+            "PATH": os.environ.get("PATH", ""),
+            "LANG": os.environ.get("LANG", "C.UTF-8"),
+        }
+        return env
+
+    def _build_process_code(self, skill_path: str, handler_name: str, args_json: str):
+        plugin_dir = os.path.dirname(skill_path)
+        return f"""
+import sys, json, os, traceback
+sys.path.insert(0, {repr(plugin_dir)})
+try:
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('skill', {repr(skill_path)})
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    handler = getattr(mod, {repr(handler_name)}, None)
+    if not handler:
+        raise AttributeError('Handler {handler_name} not found')
+    args = json.loads({repr(args_json)})
+    result = handler(**args) if isinstance(args, dict) else handler(args)
+    print(json.dumps(result if result is not None else [None, None]))
+except Exception as e:
+    traceback.print_exc()
+    print(json.dumps([None, None]))
+"""
+
     def run_isolated(self, skill_path: str, handler_name: str,
                      text: str) -> tuple:
         """Spustí handler v subprocess a vrátí výsledek."""
         import subprocess, json, sys as _sys
 
-        code = f"""
-import sys, json
-sys.path.insert(0, {repr(str(__import__('pathlib').Path(skill_path).parent.parent.parent))})
-import importlib.util
-spec = importlib.util.spec_from_file_location("skill", {repr(skill_path)})
-mod  = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
-handler = getattr(mod, {repr(handler_name)}, None)
-if handler:
-    result = handler({repr(text)})
-    print(json.dumps(result if result else [None, None]))
-else:
-    print(json.dumps([None, None]))
-"""
+        code = self._build_process_code(skill_path, handler_name, json.dumps(text))
         try:
             r = subprocess.run(
                 [_sys.executable, "-c", code],
                 capture_output=True, text=True, timeout=self.timeout,
+                env=self._simple_env(skill_path), cwd=os.path.dirname(skill_path), stdin=subprocess.DEVNULL,
             )
             if r.returncode == 0 and r.stdout.strip():
                 data = json.loads(r.stdout.strip())
@@ -779,6 +809,26 @@ else:
                     return data[0], data[1]
         except Exception as e:
             logger.warning(f"Sandboxed run selhal: {e}")
+        return None, None
+
+    def run_isolated_action(self, skill_path: str, action_name: str,
+                            kwargs: dict) -> tuple:
+        """Spustí action v izolovaném subprocess a vrátí výsledek."""
+        import subprocess, json, sys as _sys
+
+        code = self._build_process_code(skill_path, action_name, json.dumps(kwargs))
+        try:
+            r = subprocess.run(
+                [_sys.executable, "-c", code],
+                capture_output=True, text=True, timeout=self.timeout,
+                env=self._simple_env(skill_path), cwd=os.path.dirname(skill_path), stdin=subprocess.DEVNULL,
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                data = json.loads(r.stdout.strip())
+                if isinstance(data, list) and len(data) == 2:
+                    return data[0], data[1]
+        except Exception as e:
+            logger.warning(f"Sandboxed action selhal: {e}")
         return None, None
 
 
