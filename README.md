@@ -1,12 +1,10 @@
 <div align="center">
 
-<img src="jarvis.png" width="100" alt="JARVIS" />
+<img src="jarvis.png" width="90" alt="JARVIS" />
 
 # JARVIS
 
-### The Open-Source AI Operating System for Your Desktop
-
-*Not a chatbot. An autonomous agent that sees, hears, remembers, and acts.*
+**Local AI Operating System for autonomous computer control.**
 
 <br/>
 
@@ -16,324 +14,158 @@
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-531%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 
-<br/>
-
-**[Začít za 60 sekund](#začít-za-60-sekund) · [Demo](#demo) · [Výkon](#výkon) · [Architektura](#architektura) · [📚 Docs](docs/index.md)**
-
 </div>
-
----
-
-## Proč "AI Operating System"?
-
-Chatbot čeká na otázku a odpovídá. JARVIS **žije na pozadí a jedná autonomně**.
-
-```
-├── Hlídá váš e-mail, Slack, GitHub, kalendář — nepřetržitě
-├── Vidí obrazovku a ovládá jakoukoliv aplikaci jako člověk
-├── Pamatuje si vás přes týdny díky knowledge grafu
-├── Plánuje vícedenní mise a provádí je sám
-└── Odpovídá za 200 ms díky hybridnímu cloud routingu
-```
-
-Tohle není chatbot s hlasovým vstupem. Je to **vrstva inteligence nad vaším počítačem**.
 
 ---
 
 ## Demo
 
-> 📹 **[YouTube demo — přidáme brzy]** · **[GIF: Vision Computer Use]** · **[GIF: Real-time voice]**
-
-### Co JARVIS udělá když mu řeknete:
-
 ```
-"Najdi na internetu nejlevnější letenky do Říma na tento víkend,
- vyplň formulář s mými údaji a pak mi pošli shrnutí na Slack."
-```
+You:    "Open Chrome, research the best Python async libraries,
+         summarize findings, and save a note."
 
-```
-JARVIS:  Otevírám prohlížeč...                        ✓  0.3s
-         Vyhledávám letenky (Skyscanner + Google)...  ✓  2.1s
-         Nejlevnější: Ryanair pá 19:40, 2 340 Kč
-         Vyplňuji jméno, e-mail, datum...              ✓  4.8s
-         Čeká na potvrzení platby (bezpečnost)         ⏸
-         Posílám shrnutí na Slack #travel...           ✓  5.2s
-         Hotovo. Uložil jsem do paměti pro příště.
+JARVIS: Opening Chrome...                      ✓  0.3s
+        Searching: best Python async libraries ✓  1.8s
+        Reading top 5 results...               ✓  4.2s
+        Summarizing with Groq LLaMA 3.3...     ✓  5.1s
+        Saving note to ~/notes/async-libs.md   ✓  5.4s
+        Done. Want me to read it aloud?
 ```
 
-### Multi-day mise
-
-```
-Vy:     "Napiš tento týden každý den shrnutí AI novinek."
-
-JARVIS: Plánuji 5 kroků (Po–Pá)...
-        [Pondělí 8:00] Prohledal jsem 23 zdrojů → shrnutí uloženo ✓
-        [Úterý  8:00]  Nové: GPT-5 announced → shrnutí + tweet ✓
-        ...automaticky každý den bez vyzvání
-```
+> 📹 **[YouTube demo — coming soon]** · **[GIF — coming soon]**
 
 ---
 
-## Výkon
+## 3 things that make it different
 
-Měřeno na: Intel i7, 30 GB RAM, RTX 3060 (nebo bez GPU), Ubuntu 24.04
+### 1 · AI controls your PC
 
-### Latence odpovědí
+JARVIS sees your screen, clicks buttons, fills forms, reads content — in any app.
 
-| Typ dotazu | Zpracování | Latence |
-|------------|-----------|---------|
-| OS příkaz (`otevři Chrome`) | LocalRouter regex | **< 1 ms** |
-| Překlad, krátká fráze | Ollama qwen2.5:3b | **~200 ms** (cache hit) |
-| Chat, obecná odpověď | Ollama qwen2.5:3b | **~570 ms** avg |
-| Kód, analýza, reasoning | Groq LLaMA 3.3-70B | **~200 ms** |
-| Vision OCR (kliknutí) | pytesseract | **~50 ms** |
-| Vision LLM (fallback) | Groq vision | **~400 ms** |
-| STT transkripce | Groq Whisper | **~200 ms** |
+```python
+agent.run_task("Open Gmail, find invoice from last week, download attachment")
+# → opens browser → navigates → clicks → downloads. Watches it happen.
+```
 
-### Spotřeba zdrojů
-
-| Komponenta | RAM | VRAM |
-|------------|-----|------|
-| Python proces (idle) | **34 MB** | — |
-| Ollama qwen2.5:3b | **+268 MB** | ~2.0 GB |
-| faster-whisper base | +120 MB | ~0.5 GB |
-| LLaVA 7b (vision, uvolní se po použití) | — | ~4.5 GB → **0 po use** |
-| JARVIS celkem (bez GPU) | **~1.2 GB RAM** | 0 GB |
-| JARVIS celkem (s GPU) | ~1.5 GB RAM | ~2.5 GB VRAM |
-
-### Rychlost modelů (lokálně)
-
-| Model | Tok/s | Paměť | Nejlepší pro |
-|-------|--------|-------|-------------|
-| `qwen2.5:1.5b` | ~180 tok/s | 1.1 GB | Překlady, fakta |
-| `qwen2.5:3b` | **~84 tok/s** | 2.0 GB | Chat, příkazy (výchozí) |
-| `llama3.1:8b` | ~35 tok/s | 5.5 GB | Reasoning, agenti |
-| Groq LLaMA 3.3 70B ☁️ | **~500 tok/s** | cloud | Kód, analýza |
-
-### Propustnost agentů
-
-| Úkol | Kroky | Čas |
-|------|-------|-----|
-| "Najdi všechna TODO v projektu" | 3 | **~4 s** |
-| "Napiš a otestuj Python funkci" | 5 | **~12 s** |
-| "Prohledej web, shrň, ulož do paměti" | 6 | **~18 s** |
-| LocalRouter 1000× dotazů | — | **4.4 ms** (0.004 ms/dotaz) |
+It uses OCR first (50 ms), falls back to vision AI (400 ms). Works in Chrome, Excel, Photoshop, terminal — anything visible on screen.
 
 ---
 
-## Začít za 60 sekund
+### 2 · Agent Graph Orchestration
+
+Not a single LLM call. A full pipeline: **Plan → Route → Execute → Critique → Repeat**.
+
+```
+PLANNER   breaks the task into ordered steps
+    │
+ROUTER    picks the right tool for each step
+    │
+EXECUTOR  runs the tool, captures output
+    │
+CRITIC    validates result — retry, replan, or done
+```
+
+If a step fails, the agent backs up and tries a different path. Self-correcting. Visible in real-time in the dashboard.
+
+---
+
+### 3 · Plugin + MCP Ecosystem
+
+Every external tool is a plugin. Install in one command, sandboxed by default.
+
+```bash
+"install plugin brave-search"
+"install plugin github-copilot"
+"install plugin slack-notifier"
+```
+
+Built on [Model Context Protocol](https://modelcontextprotocol.io/) — the same standard used by Claude, Cursor, and Zed. 10 MCP servers included out of the box.
+
+---
+
+## Quickstart
 
 ```bash
 git clone https://github.com/simivilasek-ship-it/Jarvis.git
-cd Jarvis
-./install.sh
+cd Jarvis && ./install.sh
 bash start_desktop.sh
 ```
 
-> Vyžaduje: Python 3.11+ a [Ollama](https://ollama.com). Nic víc.
-
-### S webovým dashboardem
-
+Add speed (optional — free API key at [console.groq.com](https://console.groq.com)):
 ```bash
-python dashboard.py    # backend :8002
-cd web && npm run dev  # dashboard :3000
-```
-
-### Přidej rychlost (volitelné)
-
-```bash
-# Groq API — odpovědi za 200 ms místo 1 s
 echo "GROQ_API_KEY=gsk_..." >> .env
-
-# Real-time Whisper STT
-pip install faster-whisper sounddevice webrtcvad soundfile
-
-# Vision + UI automation
-pip install pyautogui pillow pytesseract opencv-python
 ```
 
 ---
 
-## Co JARVIS umí
+## Performance
 
-### 🎙️ Slyší — real-time, bez prodlevy
+| What | How fast |
+|------|----------|
+| OS command (`open Chrome`) | **< 1 ms** — regex, no LLM |
+| Chat response (local, warm) | **~120 ms** — Ollama cached |
+| Chat response (Groq cloud) | **~200 ms** — LLaMA 3.3 70B |
+| Voice transcription | **~200 ms** — Groq Whisper |
+| Screen click via OCR | **~50 ms** — pytesseract |
+| Voice → answer end-to-end | **~580 ms** total |
 
-- **Whisper Live** — WebRTC VAD detekuje řeč, Groq Whisper přepíše za ~200 ms
-- **Barge-in** — přerušíte JARVIS uprostřed věty, on ihned naslouchá
-- Bez tlačítka, bez čekání — prostě mluvíte
-
-### 👁️ Vidí — a kliká
-
-- Pořídí screenshot, přečte text přes OCR (~50 ms), klikne přesně
-- Fallback na vision model (LLaVA / Groq) pokud OCR nestačí
-- Funguje v **jakékoliv aplikaci** — prohlížeč, Excel, Photoshop, terminál
-
-### 🧠 Pamatuje si — týdny, ne minuty
-
-- **GraphRAG** — knowledge graph s entitami a vztahy
-- Automaticky extrahuje: `(Petr, pracuje na, projekt Alpha)` z každé věty
-- "Ten projekt z minulého úterý" → JARVIS ví co tím myslíte
-
-### 🤖 Jedná — autonomně na pozadí
-
-| Worker | Monitoruje | Při události |
-|--------|-----------|-------------|
-| Email | Klíčová slova, urgentní odesílatelé | Hlasové shrnutí |
-| Git | Nové commity, PR, opravy | "Kolega pushnil do main" |
-| Kalendář | Schůzky < 30 min | "Za 15 min standup, podklady?" |
-| Slack | Přímé zmínky, klíčová slova | Přečte + navrhne odpověď |
-| GitHub | Review requests, mentions | Upozornění |
-
-### ⚡ Reaguje — 200 ms díky hybridnímu routingu
-
-```
-Dotaz přijde
-    │
-    ├─ Regex match? ──────────────────────────► OS příkaz  < 1 ms
-    │
-    └─ LLM potřeba?
-         │
-         ├─ Jednoduchý ───────────► Ollama lokálně  ~500 ms
-         └─ Složitý/kód ──────────► Groq cloud      ~200 ms
-```
+RAM: **34 MB** idle · **~650 MB** with Ollama · runs on any modern laptop.
 
 ---
 
-## Architektura
+## What else it does
+
+- **Listens continuously** — WebRTC VAD + Whisper Live, barge-in supported
+- **Remembers across weeks** — GraphRAG knowledge graph, not just chat history
+- **Monitors in background** — email, git, Slack, GitHub, calendar — notifies you when something matters
+- **Long-horizon missions** — plan a multi-day task, JARVIS executes steps each day autonomously
+- **100% local option** — no API key needed, everything runs on-device via Ollama
+
+---
+
+## Architecture
 
 ```
 src/
-├── agents/      ReactAgent, GraphAgent, HierarchicalSupervisor, MissionManager
-├── llm/         LLMEngine, CloudRouter (Groq+OpenRouter), LocalRouter
-├── memory/      SQLiteStore, GraphRAG, UserProfile, Embeddings
-├── vision/      VisionOCRPipeline, VisionAgent, RealTimeScreenMonitor
-├── workers/     AutonomousWorkers, Scheduler, EventBus, WorkflowEngine
-├── plugins/     PluginSystem, Marketplace, MCPBridge
-├── security/    SecurityManager, ShellBlacklist, AuditLog
-└── audio/       WhisperLive, DuplexEngine, VAD, TTS
+├── agents/    ReactAgent · GraphAgent · MissionManager
+├── llm/       Engine · CloudRouter (Groq + OpenRouter) · LocalRouter
+├── memory/    SQLite + embeddings · GraphRAG knowledge graph
+├── vision/    OCR pipeline · VisionAgent · Screen monitor
+├── workers/   Email · Git · Slack · Calendar · GitHub watchers
+├── plugins/   Marketplace · Sandbox · MCP bridge (10 servers)
+├── security/  Shell blacklist · Audit log · Permission levels
+└── audio/     Whisper Live · Duplex · VAD · Edge-TTS
 ```
 
-### Stack
+Backend: **FastAPI** · Frontend: **Next.js** · Desktop: **pywebview**
 
-| | |
-|--|--|
-| **AI** | Ollama · Groq API · OpenRouter |
-| **Agenti** | ReAct 2.0 · Graf (Planner→Critic) · Hierarchical |
-| **Paměť** | SQLite + embeddingy · GraphRAG knowledge graph |
-| **STT** | Whisper Live (Groq) · faster-whisper · Vosk offline |
-| **Vision** | pytesseract · OpenCV · LLaVA · Groq Vision |
-| **Backend** | FastAPI · WebSocket streaming · asyncio |
-| **Frontend** | Next.js · TypeScript · Tailwind CSS |
-| **Nástroje** | MCP Protocol (10 serverů) |
+→ Full docs: **[docs/index.md](docs/index.md)**
 
 ---
 
-## Instalace — detaily
+## Security
 
-### Minimální (offline, bez cloudu)
+- Shell commands go through a **blacklist** (`rm -rf /`, `dd`, reverse shells, fork bombs — always blocked)
+- Agent actions require **permission levels** — destructive ops need user confirmation
+- Every action is **audit-logged** to `~/.jarvis_audit.jsonl`
+- Headless/CI mode blocks `ELEVATED` actions by default
+
+---
+
+## Tests · Docs · Contributing
 
 ```bash
-pip install -r requirements.txt
-ollama pull qwen2.5:3b
-python jarvis.py
+pytest tests/ test_jarvis.py -v   # 531 tests
 ```
 
-### Plná instalace
-
-```bash
-# Whisper Live (real-time STT)
-pip install faster-whisper sounddevice webrtcvad soundfile
-
-# Vision Computer Use
-pip install pyautogui pillow pytesseract opencv-python pyperclip
-sudo apt install tesseract-ocr tesseract-ocr-ces
-
-# Desktop app
-bash start_desktop.sh
-```
-
-### `.env` — klíče pro cloud
-
-```env
-# Groq — zdarma na console.groq.com (nutné pro <200ms)
-GROQ_API_KEY=gsk_...
-
-# OpenRouter — záloha, více modelů
-OPENROUTER_API_KEY=sk-or-...
-
-# Monitoring (vše volitelné)
-IMAP_HOST=imap.gmail.com
-IMAP_USER=vas@gmail.com
-IMAP_PASS=app-password
-GITHUB_TOKEN=ghp_...
-SLACK_BOT_TOKEN=xoxb-...
-CALENDAR_ICAL_URL=https://...
-```
-
----
-
-## Bezpečnost
-
-```python
-# Shell blacklist — vždy blokováno, bez výjimky:
-rm -rf /    dd if=    mkfs.    :(){ :|:& };:    curl | sh    ...
-
-# Shell whitelist — agent smí volat pouze:
-git  pip  python3  ls  find  grep  curl  wget  npm  ...
-
-# ELEVATED akce vyžadují potvrzení uživatele
-# V headless/CI režimu jsou automaticky zamítnuty
-export JARVIS_HEADLESS_APPROVE_ELEVATED=1  # jen na důvěryhodných serverech
-```
-
-Každá akce je auditována do `~/.jarvis_audit.jsonl`.
-
----
-
-## API přehled
-
-| Endpoint | Popis |
-|----------|-------|
-| `WS /ws/chat` | Streaming LLM odpovědi |
-| `WS /ws/graph` | Real-time agent pipeline vizualizace |
-| `WS /ws/audio` | Duplex audio (WebRTC) |
-| `POST /api/command` | Synchronní příkaz |
-| `POST /api/missions` | Vytvoř autonomní misi |
-| `GET /api/marketplace` | Katalog pluginů |
-| `GET /api/vision/analyze` | OCR analýza obrazovky |
-| `GET /api/system` | CPU, RAM, GPU metriky |
-
-→ Kompletní reference: **[docs/api-reference.md](docs/api-reference.md)**
-
----
-
-## Testy
-
-```bash
-pytest tests/ test_jarvis.py -v        # 531 testů
-pytest tests/test_confirm_action_headless.py -q  # security testy
-```
-
----
-
-## Přispívání
-
-→ **[docs/plugin-development.md](docs/plugin-development.md)** — jak napsat plugin  
-→ **[CONTRIBUTING.md](CONTRIBUTING.md)** — jak přispět do core  
-→ **[CHANGELOG.md](CHANGELOG.md)** — co se změnilo
-
-```bash
-just web-dev      # Next.js dev server
-just web-build    # produkční build
-just docker-build # Docker image
-```
+[API Reference](docs/api-reference.md) · [Configuration](docs/configuration.md) · [Plugin Dev](docs/plugin-development.md) · [Benchmarks](docs/benchmarks.md) · [CHANGELOG](CHANGELOG.md)
 
 ---
 
 <div align="center">
 
-**Váš počítač. Vaše data. Váš asistent.**
+MIT © 2026 · [simivilasek-ship-it](https://github.com/simivilasek-ship-it)
 
-MIT © 2026 · [simivilasek-ship-it](https://github.com/simivilasek-ship-it) · [Dokumentace](docs/index.md)
+*Your computer. Your data. Your OS.*
 
 </div>
