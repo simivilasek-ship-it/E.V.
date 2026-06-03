@@ -1,5 +1,91 @@
 # CHANGELOG
 
+## [5.0] - 2026-06-03
+
+### Added
+
+**Hybridní Cloud Router (`cloud_router.py`)**
+- Groq LLaMA 3.1/3.3 + OpenRouter routing — komplexní dotazy odpovídají za ~200 ms
+- Automatický fallback: Groq → OpenRouter → Ollama (lokálně)
+- Streaming podpora, konfigurace přes GROQ_API_KEY / OPENROUTER_API_KEY v .env
+
+**Vision-Guided Computer Use (`vision_computer_use.py`, `vision_v2.py`)**
+- `VisionAgent.smart_click()` — OCR-first (~50 ms), LLaVA fallback (~2 s)
+- `RealTimeScreenMonitor` — 1 FPS capture, pixel diff detekce změn
+- `VisionOCRPipeline` — pytesseract OCR + OpenCV button/input/label klasifikace
+- `VisualActionPlanner` — fuzzy OCR match → koordináty pro klikání
+- `VisionAgent.run_task()` — autonomní ReAct smyčka pro UI úkoly
+
+**GraphRAG Paměť (`graph_extractor.py`)**
+- Automatická extrakce entit+relací z každé konverzace (regex + LLM)
+- SQLite knowledge graph s vektory pro sémantické hledání
+- Kontext grafu injektován do každého LLM dotazu
+
+**Autonomní Background Workers (`autonomous_workers.py`)**
+- Email (IMAP), Git, Calendar (iCal), Slack, GitHub monitoring
+- Proaktivní notifikace s LLM shrnutím důležitých událostí
+- Konfigurovatelný interval, filtrování podle urgence
+
+**Whisper Live Duplex Audio (`whisper_live.py`)**
+- Real-time STT: WebRTC VAD → Groq Whisper (~200 ms) nebo faster-whisper
+- Barge-in podpora — přerušení TTS uprostřed věty
+- Edge-TTS streaming s podporou přerušení
+
+**Mission Manager (`mission_manager.py`)**
+- LLM rozdělí long-term úkol na kroky s due_date přes více dní
+- Background executor (každých 15 min via Scheduler)
+- Evaluace výsledku po dokončení (success/partial/failed)
+- REST API: GET/POST/PUT/DELETE /api/missions
+
+**Plugin Marketplace v2 (`plugin_marketplace.py`, `PluginMarketplace.tsx`)**
+- `run_sandboxed()` — subprocess isolation, ulimit (memory+CPU), timeout
+- `submit_review()` — hodnocení s komentáři, persistováno do JSON
+- `start_update_checker()` — background thread s notifikacemi
+- React UI: katalog, filtry, install/uninstall, hvězdičkové hodnocení
+
+**Workflow Editor (`WorkflowEditor.tsx`)**
+- Canvas SVG drag & drop editor — trigger/condition/action/delay/notify bloky
+- Bezier propojování uzlů, Save/Load REST API, Export/Import JSON
+- Dynamické editační fieldy dle typu bloku
+
+**Agent Graph v2 (`AgentGraphV2.tsx`)**
+- Animované hrany s pohyblivými tečkami (strokeDashoffset animate)
+- Reasoning chain panel: 🤔 Thought / 🔧 Action / 👁️ Observation / ✅ Result
+- Node pass-count badges, step counter, debug panel s raw JSON
+- Timeline posledních 30 minut
+
+**LLM Router v2.1 (`llm_router.py`)**
+- `_score_model()` — rankovanie kandidátů dle cost_score + průměrné latence + error rate
+- `get_model_for_task()` — výběr nejlepšího dostupného modelu (ne jen prvního matching)
+
+**AgentGraph hover efekty (`AgentGraph.tsx`)**
+- Glassmorphism-style fills při hover/active stavech
+- Glow efekty, plynulejší animace, pointer cursor
+
+### Performance
+- VRAM agresivní uvolňování po každém LLaVA volání (`keep_alive=0`)
+- WebSocket ConnectionManager — thread-safe, čistí mrtvá spojení v `finally`
+- `ws_chat` stream přesunut do thread poolu přes `run_in_executor` + `asyncio.Queue`
+- SQLite indexy: `last_access`, `access_score` přidány do memories
+- Background auto-pruning přes Scheduler (každou hodinu, non-blocking)
+
+### Security
+- Shell command blacklist: 30+ regex patternů (rm -rf /, dd, mkfs, reverse shell...)
+- Shell whitelist: pouze explicitně povolené prefixy (git, pip, ls, ...)
+- `check_shell_command()` integrován do SecurityManager pro shell/mcp_tool akce
+
+### Documentation
+- Vytvořen `docs/` adresář s kompletní dokumentací:
+  - `architecture.md` — systémová architektura, moduly, datové toky
+  - `api-reference.md` — všechny REST + WebSocket endpointy
+  - `configuration.md` — kompletní reference všech konfiguračních klíčů
+  - `plugin-development.md` — průvodce vývojem pluginů
+  - `agents.md` — ReAct, Graf, Hierarchical, Mission agenti
+  - `memory.md` — paměťový systém, GraphRAG, embeddingy
+  - `vision-computer-use.md` — vision pipeline, computer use
+
+---
+
 ## [unreleased] - Memory Graph MVP
 
 ### Added

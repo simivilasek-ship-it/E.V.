@@ -18,7 +18,7 @@
 
 <br/>
 
-**[Začít za 60 sekund](#-začít-za-60-sekund) · [Co umí](#-co-jarvis-dokáže) · [Jak to funguje](#-jak-to-funguje) · [Instalace](#-instalace)**
+**[Začít za 60 sekund](#-začít-za-60-sekund) · [Co umí](#-co-jarvis-dokáže) · [Jak to funguje](#-jak-to-funguje) · [Instalace](#-instalace) · [📚 Dokumentace](docs/index.md)**
 
 </div>
 
