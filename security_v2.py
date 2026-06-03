@@ -103,7 +103,63 @@ ACTION_PERMISSIONS: Dict[str, PermissionLevel] = {
     "audio_ws":         PermissionLevel.SAFE,
 }
 
-# Nebezpečné patterny v textu příkazů
+# ── Shell Command Security ────────────────────────────────────────────────────
+#
+# BLACKLIST — příkazy blokované vždy, bez ohledu na kontext.
+# LLM (zejména menší 3b/8b) může halucinovat destruktivní příkazy.
+#
+SHELL_BLACKLIST_PATTERNS: list[str] = [
+    # Destruktivní mazání
+    r"rm\s+(-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*)\s*[/~]",  # rm -rf / nebo ~/
+    r"rm\s+-rf\b",
+    r"sudo\s+rm\b",
+    r"find\s+.*-delete",
+    r"find\s+.*-exec\s+rm",
+    # Přepisování disků
+    r"dd\s+if=",
+    r"dd\s+of=/dev/",
+    r">\s*/dev/s[dhmvx][a-z]",    # > /dev/sda, /dev/nvme...
+    r">\s*/dev/nvme",
+    r"shred\s+/dev/",
+    r"wipefs\b",
+    r"mkfs\.",
+    r"fdisk\s+/dev/",
+    r"parted\s+/dev/",
+    # Formátování (Windows/cross-platform)
+    r"format\s+[a-z]:",
+    # Síťové útoky / exfiltrace
+    r"nc\s+.*-e\s+/bin/(ba)?sh",   # reverse shell
+    r"bash\s+-i\s+>&",              # reverse bash shell
+    r"curl\s+.*\|\s*(ba)?sh",       # curl | sh
+    r"wget\s+.*\|\s*(ba)?sh",
+    r"python[23]?\s+-c.*exec\(",    # python exec injection
+    # Systémové destrukce
+    r":(){ :|:& };:",               # fork bomb
+    r"chmod\s+-R\s+777\s+/",
+    r"chmod\s+777\s+/",
+    r"chown\s+-R\s+root\s+/",
+    r":\s*>\s*/etc/(passwd|shadow|sudoers)",
+    r"echo\s+.*>>\s*/etc/(passwd|shadow|sudoers)",
+    # Shutdown/reboot bez explicitní akce
+    r"sudo\s+(shutdown|reboot|halt|poweroff)\s+-[nfh]",
+    # Package managers — globální odstranění
+    r"(apt|dpkg|yum|dnf|pacman)\s+(remove|purge|autoremove)\s+--?yes.*\*",
+    r"pip\s+uninstall\s+-y\s+\*",
+]
+
+# WHITELIST shell příkazů — pouze tyto jsou povoleny pro agentem navrhované shell příkazy.
+# Pokud je seznam prázdný, whitelist se neaplikuje (pouze blacklist).
+SHELL_WHITELIST_PREFIXES: list[str] = [
+    "ls", "pwd", "echo", "cat", "head", "tail", "grep", "find",
+    "git", "python3", "pip", "npm", "node", "code", "xdg-open",
+    "mkdir", "cp", "mv", "touch", "chmod",   # bez -R 777 /
+    "curl", "wget",   # bez | sh
+    "systemctl status", "journalctl",
+    "df", "du", "free", "top", "htop", "ps",
+    "ping", "nslookup", "dig",
+]
+
+# Nebezpečné patterny v textu příkazů (původní seznam + nový shell blacklist)
 DANGEROUS_PATTERNS = [
     r"rm\s+-rf",
     r"sudo\s+rm",
@@ -115,7 +171,39 @@ DANGEROUS_PATTERNS = [
     r"chmod\s+777\s+/",
 ]
 
-_DANGEROUS_RE = [re.compile(p, re.IGNORECASE) for p in DANGEROUS_PATTERNS]
+_DANGEROUS_RE    = [re.compile(p, re.IGNORECASE) for p in DANGEROUS_PATTERNS]
+_BLACKLIST_RE    = [re.compile(p, re.IGNORECASE) for p in SHELL_BLACKLIST_PATTERNS]
+
+
+def check_shell_command(cmd: str) -> tuple[bool, str]:
+    """
+    Zkontroluje shell příkaz podle blacklistu a whitelistu.
+    Vrátí (allowed: bool, reason: str).
+
+    Pořadí kontrol:
+      1. Blacklist (absolutní zákaz) — vrátí False okamžitě
+      2. Whitelist (pokud není prázdný) — povolí jen whitelistované prefixy
+    """
+    cmd_stripped = cmd.strip()
+
+    # 1. Blacklist — zakázáno vždy
+    for pattern in _BLACKLIST_RE:
+        if pattern.search(cmd_stripped):
+            reason = f"Shell příkaz blokován (blacklist): {pattern.pattern[:60]}"
+            logger.warning(f"SecurityManager: BLOCKED shell cmd: {cmd_stripped[:100]} | {reason}")
+            return False, reason
+
+    # 2. Whitelist — pokud je neprázdný, povolí jen povolené prefixy
+    if SHELL_WHITELIST_PREFIXES:
+        for prefix in SHELL_WHITELIST_PREFIXES:
+            if cmd_stripped.startswith(prefix):
+                return True, "whitelist"
+        # Příkaz nespadá do whitelistu — vyžaduje ELEVATED potvrzení
+        reason = f"Shell příkaz není v whitelistu — vyžaduje potvrzení"
+        logger.info(f"SecurityManager: shell cmd vyžaduje potvrzení: {cmd_stripped[:80]}")
+        return False, reason
+
+    return True, "no_whitelist"
 
 
 # ── Audit Log ─────────────────────────────────────────
@@ -232,6 +320,16 @@ class SecurityManager:
                 reason = "Nebezpečný vzor detekován v parametrech"
                 self._audit.log(action, params, False, reason, user_text)
                 return False, reason
+
+        # Shell command security — blacklist + whitelist pro shell/MCP příkazy
+        if action in ("shell", "run_command", "execute_shell", "mcp_tool"):
+            cmd = str(params.get("command", "") or params.get("cmd", "")
+                      or params.get("args", ""))
+            if cmd:
+                allowed, reason = check_shell_command(cmd)
+                if not allowed:
+                    self._audit.log(action, params, False, reason, user_text)
+                    return False, reason
 
         # Whitelist
         if action in self._whitelist:

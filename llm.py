@@ -711,6 +711,13 @@ def ask_vision(prompt: str, image_path: str, model: str = "llava:7b",
         }
         resp = requests.post(url, json=payload, timeout=60)
         resp.raise_for_status()
-        return resp.json().get("message", {}).get("content", "Žádná odpověď.")
+        result = resp.json().get("message", {}).get("content", "Žádná odpověď.")
+        # Uvolni vision model z VRAM ihned po použití
+        try:
+            unload_url = url.replace("/api/chat", "/api/generate")
+            requests.post(unload_url, json={"model": model, "keep_alive": 0}, timeout=5)
+        except Exception:
+            pass
+        return result
     except Exception as e:
         return f"Chyba vision modelu: {e}"

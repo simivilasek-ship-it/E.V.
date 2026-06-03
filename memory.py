@@ -112,10 +112,12 @@ class _SQLiteMemoryStore:
         expires_at   REAL NOT NULL DEFAULT 0,
         access_score REAL NOT NULL DEFAULT 0.0
     );
-    CREATE INDEX IF NOT EXISTS idx_importance ON memories(importance);
-    CREATE INDEX IF NOT EXISTS idx_created_at ON memories(created_at);
-    CREATE INDEX IF NOT EXISTS idx_expires_at ON memories(expires_at);
-    CREATE INDEX IF NOT EXISTS idx_priority   ON memories(priority);
+    CREATE INDEX IF NOT EXISTS idx_importance   ON memories(importance);
+    CREATE INDEX IF NOT EXISTS idx_created_at  ON memories(created_at);
+    CREATE INDEX IF NOT EXISTS idx_expires_at  ON memories(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_priority    ON memories(priority);
+    CREATE INDEX IF NOT EXISTS idx_last_access ON memories(last_access);
+    CREATE INDEX IF NOT EXISTS idx_access_score ON memories(access_score);
     """
 
     def __init__(self, path: Path):
@@ -621,6 +623,36 @@ class JarvisMemory:
         self.system = None
         self._store = _SQLiteMemoryStore(mem_dir)
         logger.info(f"SQLite memory inicializován v: {mem_dir}")
+
+        # Background auto-pruning přes scheduler (každou hodinu, ne blokující)
+        self._schedule_background_pruning()
+
+    def _schedule_background_pruning(self) -> None:
+        """Registruje hodinový background pruning do Scheduleru.
+        Nikdy neblokuje uživatelský dotaz — běží jako samostatná úloha.
+        """
+        try:
+            from scheduler import get_scheduler
+            scheduler = get_scheduler()
+
+            def _prune_task():
+                try:
+                    result = self.run_maintenance()
+                    logger.info(f"Background memory pruning: {result}")
+                except Exception as e:
+                    logger.warning(f"Background pruning selhal: {e}")
+
+            # Jednou za hodinu (3600 s), poprvé za 5 minut po startu
+            scheduler._add(
+                fn=_prune_task,
+                args=(), kwargs={},
+                fire_at=time.time() + 300,
+                repeat=3600.0,
+                name="memory_auto_prune",
+            )
+            logger.info("Memory background pruning naplánován (každou hodinu)")
+        except Exception as e:
+            logger.debug(f"Memory pruning scheduling selhal (nevadí): {e}")
 
     # ── Conflict resolution ────────────────────────────
 

@@ -167,6 +167,13 @@ def ask_vision_for_element(
             r.raise_for_status()
             raw = r.json().get("message", {}).get("content", "").strip()
             logger.debug(f"LLaVA odpověď: {raw[:200]}")
+            # Uvolni LLaVA z VRAM ihned po použití (keep_alive=0)
+            try:
+                _unload_url = ollama_url.replace("/api/chat", "/api/generate")
+                _req.post(_unload_url, json={"model": model, "keep_alive": 0}, timeout=5)
+                logger.debug(f"VRAM uvolněna: {model}")
+            except Exception:
+                pass
         except Exception as e:
             logger.error(f"LLaVA selhal: {e}")
             return VisionResult(found=False, description=f"Vision model nedostupný: {e}")

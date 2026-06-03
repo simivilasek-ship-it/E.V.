@@ -10,7 +10,6 @@ import json
 import time
 import threading
 from datetime import datetime, timezone
-
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
     from fastapi.responses import HTMLResponse, JSONResponse
@@ -67,6 +66,44 @@ DASHBOARD_HTML = (_TEMPLATE_DIR / "dashboard.html").read_text(encoding="utf-8")
 
 if HAS_FASTAPI:
     app = FastAPI(title="JARVIS Dashboard", docs_url=None, redoc_url=None)
+
+    class ConnectionManager:
+        """Thread-safe správce WebSocket spojení.
+        Odstraňuje mrtvá spojení při každém broadcastu a při disconnect.
+        """
+        def __init__(self):
+            self._clients: set = set()
+            self._lock = asyncio.Lock()
+
+        async def connect(self, ws: WebSocket):
+            await ws.accept()
+            async with self._lock:
+                self._clients.add(ws)
+
+        async def disconnect(self, ws: WebSocket):
+            async with self._lock:
+                self._clients.discard(ws)
+
+        async def broadcast(self, payload: str):
+            dead: set = set()
+            async with self._lock:
+                clients = set(self._clients)
+            for ws in clients:
+                try:
+                    await ws.send_text(payload)
+                except Exception:
+                    dead.add(ws)
+            if dead:
+                async with self._lock:
+                    self._clients -= dead
+
+        def __len__(self):
+            return len(self._clients)
+
+    _ws_mgr    = ConnectionManager()   # logy
+    _graph_mgr = ConnectionManager()   # graph events
+
+    # zpětná kompatibilita — kód co přistupuje přímo přes _ws_clients / _graph_clients
     _ws_clients: set = set()
     _graph_clients: set = set()
 
@@ -872,7 +909,6 @@ Pravidla pro skill.py:
             while True:
                 raw  = await ws.receive_text()
                 data = json.loads(raw)
-                # Podpora obou field names: "command" (nový) i "text" (starý)
                 text = (data.get("command") or data.get("text") or "").strip()
                 if not text:
                     continue
@@ -881,24 +917,49 @@ Pravidla pro skill.py:
                     from llm import LocalRouter, LLMEngine
                     from config import CONFIG
 
+                    # LocalRouter je rychlý (regex) — OK synchronně
                     msg, action = LocalRouter().route(text)
 
                     if action and action.get("action") not in ("answer", None):
+                        # Blokující OS příkaz → thread aby neblokoval event loop
                         from commands import CommandExecutor
-                        result = CommandExecutor(CONFIG).execute(
-                            action["action"], action.get("params", {}))
+                        def _run_cmd():
+                            return CommandExecutor(CONFIG).execute(
+                                action["action"], action.get("params", {}))
+                        try:
+                            import anyio
+                            result = await anyio.to_thread.run_sync(_run_cmd)
+                        except ImportError:
+                            result = await asyncio.get_event_loop().run_in_executor(
+                                None, _run_cmd)
                         reply = result or msg or "Hotovo."
                         await send({"type": "chunk", "data": reply})
                         await send({"type": "done"})
                     else:
-                        # Streaming LLM odpověď
-                        llm = LLMEngine(CONFIG)
-                        buffer = []
-                        for chunk in llm.stream_ask(text):
-                            if isinstance(chunk, str) and chunk:
-                                buffer.append(chunk)
-                                await send({"type": "chunk", "data": chunk})
-                                await asyncio.sleep(0)  # yield event loop
+                        # stream_ask je synchronní generátor — spusť v threadu,
+                        # výsledky přeposílej přes asyncio.Queue do event loopu
+                        llm    = LLMEngine(CONFIG)
+                        q: asyncio.Queue = asyncio.Queue()
+
+                        def _stream():
+                            try:
+                                for chunk in llm.stream_ask(text):
+                                    if isinstance(chunk, str) and chunk:
+                                        asyncio.run_coroutine_threadsafe(
+                                            q.put(chunk), asyncio.get_event_loop())
+                            finally:
+                                asyncio.run_coroutine_threadsafe(
+                                    q.put(None), asyncio.get_event_loop())
+
+                        loop = asyncio.get_event_loop()
+                        loop.run_in_executor(None, _stream)
+
+                        while True:
+                            chunk = await q.get()
+                            if chunk is None:
+                                break
+                            await send({"type": "chunk", "data": chunk})
+                            await asyncio.sleep(0)
                         await send({"type": "done"})
 
                 except Exception as e:
@@ -906,25 +967,28 @@ Pravidla pro skill.py:
                     await send({"type": "error", "data": str(e)})
 
         except WebSocketDisconnect:
-            pass
+            await _ws_mgr.disconnect(ws)
         except Exception as e:
             logger.warning(f"ws_chat uzavřen: {e}")
+            await _ws_mgr.disconnect(ws)
 
     @app.websocket("/ws/logs")
     async def ws_logs(ws: WebSocket):
         """Live logy přes WebSocket — posílá JSON {level, message, ts}."""
-        await ws.accept()
-        _ws_clients.add(ws)
+        await _ws_mgr.connect(ws)
+        _ws_clients.add(ws)   # zpětná kompatibilita pro broadcast_log
         try:
             while True:
-                # Keep-alive — čekáme na ping od klienta
                 try:
                     await asyncio.wait_for(ws.receive_text(), timeout=30)
                 except asyncio.TimeoutError:
                     await ws.send_text(json.dumps({"type": "ping"}))
         except WebSocketDisconnect:
-            _ws_clients.discard(ws)
+            pass
         except Exception:
+            pass
+        finally:
+            await _ws_mgr.disconnect(ws)
             _ws_clients.discard(ws)
 
     @app.websocket("/ws/audio")
@@ -1005,18 +1069,19 @@ Pravidla pro skill.py:
     async def ws_graph(ws: WebSocket):
         """Streaming stavu Graf agenta — posílá JSON eventi."""
         import json as _json
-        await ws.accept()
-        _graph_clients.add(ws)
+        await _graph_mgr.connect(ws)
+        _graph_clients.add(ws)   # zpětná kompatibilita
         try:
-            # Pošli iniciální stav ihned — komponenta zobrazí graf
             await ws.send_text(_json.dumps({"type": "ready", "status": "idle"}))
             while True:
                 await asyncio.sleep(20)
-                # Keep-alive ping
                 await ws.send_text(_json.dumps({"type": "ping"}))
         except WebSocketDisconnect:
-            _graph_clients.discard(ws)
+            pass
         except Exception:
+            pass
+        finally:
+            await _graph_mgr.disconnect(ws)
             _graph_clients.discard(ws)
 
     @app.get("/api/models")
