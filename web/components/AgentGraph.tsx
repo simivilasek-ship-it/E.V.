@@ -161,6 +161,15 @@ export default function AgentGraph({ active: tabActive }: AgentGraphProps) {
   const [status, setStatus] = useState<'connecting' | 'online' | 'offline'>('connecting')
   const wsRef = useRef<WebSocket | null>(null)
 
+  // Recording / replay state
+  type RecordedEvent = { ts: number; type: 'node_enter'; node: string }
+    | { ts: number; type: 'node_exit' }
+    | { ts: number; type: 'reasoning'; text: string }
+  const [recorded, setRecorded] = useState<RecordedEvent[]>([])
+  const [playing, setPlaying] = useState(false)
+  const [, setPlayIndex] = useState(0)
+  const playTimerRef = useRef<number | null>(null)
+
   useEffect(() => {
     if (!tabActive) return
 
@@ -182,9 +191,18 @@ export default function AgentGraph({ active: tabActive }: AgentGraphProps) {
           try {
             const event = JSON.parse(e.data)
             if (event.type === 'ready')      setStatus('online')
-            if (event.type === 'node_enter') setActiveNode(event.node)
-            if (event.type === 'node_exit')  setActiveNode(null)
-            if (event.type === 'reasoning')  setLog(l => [...l.slice(-9), event.text])
+            if (event.type === 'node_enter') {
+              setActiveNode(event.node)
+              setRecorded(r => [...r, {ts: Date.now(), type: 'node_enter', node: event.node}])
+            }
+            if (event.type === 'node_exit')  {
+              setActiveNode(null)
+              setRecorded(r => [...r, {ts: Date.now(), type: 'node_exit'}])
+            }
+            if (event.type === 'reasoning')  {
+              setLog(l => [...l.slice(-9), event.text])
+              setRecorded(r => [...r, {ts: Date.now(), type: 'reasoning', text: event.text}])
+            }
           } catch {}
         }
 
@@ -207,6 +225,40 @@ export default function AgentGraph({ active: tabActive }: AgentGraphProps) {
       if (wsRef.current) wsRef.current.close()
     }
   }, [tabActive])
+
+  // Playback effect
+  useEffect(() => {
+    if (!playing) {
+      if (playTimerRef.current) {
+        window.clearInterval(playTimerRef.current)
+        playTimerRef.current = null
+      }
+      return
+    }
+    if (recorded.length === 0) return
+    // start timer to advance playIndex
+    playTimerRef.current = window.setInterval(() => {
+      setPlayIndex(i => {
+        const ni = i + 1
+        if (ni >= recorded.length) {
+          setPlaying(false)
+          return recorded.length - 1
+        }
+        const ev = recorded[ni]
+        if (ev.type === 'node_enter') setActiveNode(ev.node)
+        if (ev.type === 'node_exit') setActiveNode(null)
+        if (ev.type === 'reasoning') setLog(l => [...l.slice(-9), ev.text])
+        return ni
+      })
+    }, 800)
+
+    return () => {
+      if (playTimerRef.current) {
+        window.clearInterval(playTimerRef.current)
+        playTimerRef.current = null
+      }
+    }
+  }, [playing, recorded])
 
   if (status === 'offline') {
     return (
@@ -278,6 +330,29 @@ export default function AgentGraph({ active: tabActive }: AgentGraphProps) {
 
       {/* Reasoning log */}
       <div style={{ flex: 1, minWidth: 200 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+          <button onClick={() => setPlaying(p => !p)} style={{ padding: '4px 8px', fontSize: 11 }}>{playing ? '⏸ Pause' : '▶️ Play'}</button>
+          <button onClick={() => {
+            setPlayIndex(i => {
+              const ni = Math.max(0, i - 1)
+              const ev = recorded[ni]
+              if (ev?.type === 'node_enter') setActiveNode(ev.node)
+              else if (ev?.type === 'node_exit') setActiveNode(null)
+              return ni
+            })
+          }} style={{ padding: '4px 8px', fontSize: 11 }}>◀ Step</button>
+          <button onClick={() => {
+            setPlayIndex(i => {
+              const ni = Math.min(recorded.length - 1, i + 1)
+              const ev = recorded[ni]
+              if (ev?.type === 'node_enter') setActiveNode(ev.node)
+              else if (ev?.type === 'node_exit') setActiveNode(null)
+              return ni
+            })
+          }} style={{ padding: '4px 8px', fontSize: 11 }}>Step ▷</button>
+          <div style={{ marginLeft: 'auto', color: '#6b7280', fontSize: 11 }}>Events: {recorded.length}</div>
+        </div>
+
         <div style={{
           fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a',
           fontFamily: "'Courier New', monospace", marginBottom: 8,

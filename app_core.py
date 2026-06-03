@@ -239,7 +239,36 @@ class JarvisApp:
             self.proactive = None
             logger.debug(f"ProactiveEngine init selhal: {e}")
 
-        logger.info("Systémy v4.6 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord, WorkflowEngine)")
+        # ── Autonomous Workers (email, git, calendar, slack, github)
+        try:
+            from autonomous_workers import get_worker_manager
+
+            def _worker_notify(msg: str, urgency: str):
+                """Přepošle worker notifikaci do UI."""
+                try:
+                    if self._notif_engine:
+                        self._notif_engine.notify(
+                            title="JARVIS — Automatická detekce",
+                            body=msg,
+                            urgency=urgency,
+                        )
+                    # Emituj na EventBus pro real-time UI update
+                    self.bus.emit("autonomous_worker_event",
+                                  {"message": msg, "urgency": urgency})
+                except Exception:
+                    pass
+
+            self.worker_manager = get_worker_manager(CONFIG, on_notify=_worker_notify)
+            if CONFIG.get("autonomous_workers_enabled", True):
+                self.worker_manager.start()
+                logger.info("AutonomousWorkers spuštěny")
+            else:
+                logger.info("AutonomousWorkers: vypnuté (autonomous_workers_enabled=false)")
+        except Exception as e:
+            self.worker_manager = None
+            logger.debug(f"AutonomousWorkers init selhal: {e}")
+
+        logger.info("Systémy v4.6 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord, WorkflowEngine, AutonomousWorkers)")
 
     def _load_plugins(self):
         """Načte plugin systém a pluginy"""

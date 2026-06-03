@@ -221,6 +221,7 @@ class OllamaClient:
             "format":   "json",
             "options":  {"temperature": temperature, "num_predict": max_tokens},
         }
+        raw = ""
         try:
             r = requests.post(self.url, json=payload, timeout=timeout)
             r.raise_for_status()
@@ -314,7 +315,15 @@ class LLMEngine:
 
         from llm_router import LLMRouter
         self._llm_router = LLMRouter(self.url, self.model)
-        logger.info(f"LLM: {self.model} @ {self.url} + Neural Memory + LLMRouter + Cache")
+
+        from cloud_router import get_cloud_router
+        self._cloud = get_cloud_router(config)
+        _cloud_tag = "✓ cloud" if self._cloud.enabled else "✗ cloud (bez API klíče)"
+
+        from graph_extractor import get_graph_rag
+        self._graph_rag = get_graph_rag(config)
+
+        logger.info(f"LLM: {self.model} @ {self.url} + Neural Memory + GraphRAG + LLMRouter + Cache + {_cloud_tag}")
 
     def _extract_user_facts(self, text: str) -> None:
         """Zkusí extrahovat fakta o uživateli z jeho zprávy do UserProfile."""
@@ -354,6 +363,14 @@ class LLMEngine:
         system = self._build_system_prompt()
         if context:
             system += f"\n\nRelevantní kontext z paměti:\n{context}"
+
+        # GraphRAG — znalostní kontext z entity grafu
+        try:
+            graph_ctx = self._graph_rag.recall_graph_context(user_text)
+            if graph_ctx:
+                system += f"\n\n{graph_ctx}"
+        except Exception:
+            pass
 
         # Přidej kontext prostředí do system promptu
         try:
@@ -407,6 +424,35 @@ class LLMEngine:
 
         self.history.append({"role": "user", "content": user_text})
         messages, routed_model, temperature, max_tokens = self._build_messages(user_text)
+
+        # ── Cloud routing (Groq / OpenRouter) ────────────────────────────────
+        task = self._llm_router.detect_task(user_text)
+        task_str = task.value if hasattr(task, "value") else str(task)
+        if self._cloud.should_use_cloud(task_str):
+            try:
+                cloud_resp = self._cloud.call(
+                    messages, task_type=task_str,
+                    temperature=temperature, max_tokens=max_tokens,
+                )
+                raw = cloud_resp.content
+                logger.info(f"Cloud: {cloud_resp.provider}/{cloud_resp.model} "
+                            f"{cloud_resp.latency_ms:.0f}ms {cloud_resp.tokens_used}tok")
+                self.history.append({"role": "assistant", "content": raw})
+                self._cache.set(self.model, user_text, raw, {"action": "answer", "params": {}})
+                try:
+                    self.memory.store_conversation(user_text, raw, importance=0.6)
+                except Exception:
+                    pass
+                # GraphRAG extrakce na pozadí
+                try:
+                    self._graph_rag.extract_and_store(user_text, raw)
+                except Exception:
+                    pass
+                return raw, {"action": "answer", "params": {}, "provider": cloud_resp.provider}
+            except Exception as _ce:
+                logger.warning(f"Cloud routing selhal ({_ce}), fallback na Ollama")
+
+        # ── Ollama fallback ───────────────────────────────────────────────────
         payload = {
             "model":    routed_model,
             "messages": messages,
@@ -434,6 +480,11 @@ class LLMEngine:
                 self.memory.store_conversation(user_text, raw, importance=0.6)
             except Exception as _me:
                 logger.warning(f"Memory store chyba (ignorováno): {_me}")
+            # GraphRAG extrakce
+            try:
+                self._graph_rag.extract_and_store(user_text, raw)
+            except Exception:
+                pass
             return raw, {"action": "answer", "params": {}}
         except requests.Timeout:
             self.history.pop()
@@ -467,6 +518,31 @@ class LLMEngine:
         self.history.append({"role": "user", "content": user_text})
         self._stream_resp = None
         messages, routed_model, temperature, max_tokens = self._build_messages(user_text)
+
+        # ── Cloud streaming (Groq / OpenRouter) ──────────────────────────────
+        task = self._llm_router.detect_task(user_text)
+        task_str = task.value if hasattr(task, "value") else str(task)
+        if self._cloud.should_use_cloud(task_str):
+            full_response = ""
+            try:
+                for chunk in self._cloud.call_streaming(
+                    messages, task_type=task_str,
+                    temperature=temperature, max_tokens=max_tokens,
+                ):
+                    full_response += chunk
+                    yield chunk
+                if full_response.strip():
+                    self.history.append({"role": "assistant", "content": full_response.strip()})
+                    try:
+                        self.memory.store_conversation(user_text, full_response.strip(), importance=0.6)
+                    except Exception:
+                        pass
+                return
+            except Exception as _ce:
+                logger.warning(f"Cloud streaming selhal ({_ce}), fallback na Ollama")
+                # Pokud už jsme něco vyieldovali, nemůžeme začít znovu — logujeme jen
+
+        # ── Ollama streaming fallback ─────────────────────────────────────────
         payload = {
             "model":    routed_model,
             "messages": messages,

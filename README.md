@@ -8,31 +8,50 @@
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
 [![Tests](https://img.shields.io/badge/tests-531%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
-[![Version](https://img.shields.io/badge/version-4.7.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.0.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 
 ---
 
-**[Rychlý start](#rychlý-start) • [Co Jarvis umí](#co-jarvis-dokáže) • [Architektura](#architektura) • [Instalace](#instalace) • [Výkon](#výkon-a-optimalizace-v47)**
+**[Rychlý start](#rychlý-start) • [Co Jarvis umí](#co-jarvis-dokáže) • [Architektura](#architektura) • [Instalace](#instalace) • [Novinky v5.0](#novinky-v50)**
 
 </div>
 
 ---
 
+## Novinky v5.0
+
+### ⚡ Hybridní Cloud Router (Groq + OpenRouter)
+Komplexní dotazy (kód, analýza, agenti) automaticky letí na **Groq LLaMA 3.3** — odpověď do **200 ms** místo 5 sekund. Jednoduché dotazy zůstávají lokálně. Fallback Groq → OpenRouter → Ollama, vše transparentně.
+
+### 👁️ Vision-Guided Computer Use
+JARVIS nyní **vidí obrazovku** a ovládá UI jako člověk — kliká na tlačítka popsaná textem, vyplňuje formuláře, scrolluje. Powered by Groq llama-3.2-90b-vision nebo lokální LLaVA. `"Najdi nejlevnější letenky do Tokia a vyplň formulář"` → JARVIS to sám nakliká.
+
+### 🧠 GraphRAG Paměť
+Místo prosté SQLite paměti nyní **znalostní graf** (entity + vztahy). Z každé konverzace se automaticky extrahují trojice `(Petr, pracuje na, projekt Alpha)`. Při dalším dotazu JARVIS ví, co s čím souvisí — i po týdnech.
+
+### 🤖 Autonomní Background Workers
+JARVIS běží na pozadí a **sám vás přeruší** při důležité události: nový e-mail s klíčovým slovem, commit v git repozitáři, blížící se schůzka v kalendáři, zmínka na Slacku, GitHub notifikace. Konfigurovatelný interval, filtrování podle urgence.
+
+### 🎙️ Whisper Live — Real-time Duplex Audio
+Nahrazuje blocking Google STT kontinuálním streamingem: **WebRTC VAD** → **Groq Whisper API** (200 ms) nebo lokální faster-whisper. Plná podpora **barge-in** — přerušíte JARVIS uprostřed věty a on okamžitě naslouchá.
+
+---
+
 ## Proč zvolit JARVIS?
 
-### 🔒 100% Soukromí & Žádný Cloud
-Jarvis běží kompletně na vašem lokálním hardwaru prostřednictvím Ollama. Vaše soubory, hlasové nahrávky, snímky obrazovky i konverzace zůstávají pouze u vás. Žádné předplatné, žádné cloudové API, žádné sledování.
+### 🔒 100% Soukromí & Volitelný Cloud
+Jarvis běží primárně lokálně přes Ollama. Pro rychlost lze zapnout hybridní cloud routing (Groq/OpenRouter) — volba je na vás. Žádné nucené předplatné, žádné sledování.
 
-### 🎙️ Hlasové ovládání & Vision (STT/TTS/LLaVA)
-Ovládejte svůj systém hands-free! Jarvis dokáže převést váš hlas na text pomocí offline knihovny **Whisper** a odpovídat vám přirozeným hlasem přes **Piper TTS**. Díky integraci **LLaVA Vision** navíc vidí vaši obrazovku i webkameru, takže mu můžete říct: *"Podívej se na ten graf na obrazovce a vysvětli mi ho."*
+### 🎙️ Hlasové ovládání & Vision (Whisper Live / LLaVA)
+Ovládejte systém hands-free s **real-time Whisper** transkripcí (latence ~200 ms). Díky integraci **LLaVA Vision** a **vision-guided Computer Use** JARVIS vidí obrazovku a ovládá jakoukoliv aplikaci.
 
 ### 🧠 Pokročilá agentní inteligence (ReAct 2.0 & Supervisor)
-Jarvis není jen hloupý chatovací bot. Je to autonomní agent, který umí:
+Jarvis není jen chatovací bot. Je to autonomní agent, který umí:
 *   **Plánovat (Planning):** Rozložit složitý úkol na logické kroky ještě před spuštěním.
-*   **Sebe-opravovat (Introspection & Rollback):** Pokud se spuštěný nástroj setká s chybou nebo vrátí podezřelý výsledek, Jarvis automaticky vrátí stav zpět a zkusí jinou cestu k řešení.
-*   **Delegovat (Hierarchical Supervisor):** Koordinátor rozděluje komplexní zadání specializovaným sub-agentům s bezpečně odděleným okruhem nástrojů (Researcher, MemorySpecialist, SystemSpecialist).
+*   **Sebe-opravovat (Introspection & Rollback):** Pokud se nástroj setká s chybou, Jarvis vrátí stav zpět a zkusí jinou cestu.
+*   **Delegovat (Hierarchical Supervisor):** Koordinátor rozděluje zadání specializovaným sub-agentům.
 
 ### 💻 Integrace s OS & MCP servery
 Díky podpoře standardu MCP (Model Context Protocol) má Jarvis k dispozici bohatý ekosystém nástrojů:
@@ -41,10 +60,10 @@ Díky podpoře standardu MCP (Model Context Protocol) má Jarvis k dispozici boh
 *   Plnohodnotný prohlížeč Puppeteer (web-scraping, automatizace klikání)
 *   Spouštění lokálních příkazů a monitorování hardwaru
 
-### ⚡ Bleskový výkon (Caching & LLM Router)
-*   **LLM Router v2:** Automaticky vyhodnocuje náročnost vašeho příkazu a přesměruje ho na nejvhodnější lokální model (od ultra-rychlého 1.5B pro drobné úkoly až po 8B reasoning modely).
-*   **Ollama Client Caching:** Opakované dotazy a agentní cykly jsou 2–4× rychlejší díky pokročilému ukládání odpovědí do lokální mezipaměti.
-*   **VRAM Auto-Release:** Vision modely se automaticky uvolňují z paměti grafické karty, jakmile dokončí analýzu, aby neblokovaly výkon systému.
+### ⚡ Bleskový výkon (Cloud Router + Caching)
+*   **Hybrid Cloud Router:** Groq LLaMA 3.3 pro složité dotazy (~200 ms), Ollama lokálně pro jednoduché.
+*   **LLM Router v2:** Směruje mezi lokálními modely podle náročnosti úkolu.
+*   **Ollama Client Caching:** Opakované dotazy 2–4× rychlejší díky lokální mezipaměti.
 
 ---
 

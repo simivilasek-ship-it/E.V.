@@ -107,14 +107,54 @@ DEFAULT_CONFIG = {
     "vad_enabled": True,
     "vad_mode": "auto",  # auto|webrtcvad|rms
     "vad_sample_rate": 16000,
+    "duplex_audio_enabled": False,
+
+    # Vision pipeline
+    "vision_gpu_enabled": False,
+    "vision_cache_enabled": True,
+    "vision_cache_dir": "~/.jarvis/vision_cache",
+    "vision_low_end_mode": False,
 
     # Knowledge Graph extraction
     "graph_extraction_enabled": True,
     # Graph backend note (MVP: sqlite local store). Possible values: sqlite_mvp|neo4j|memgraph
     "graph_backend": "sqlite_mvp",
+    # automatic merging for memory graph (MVP conservative)
+    "memory_graph_auto_merge": False,
+    "memory_graph_merge_threshold": 0.88,
+    "memory_graph_timeline": True,
 
     # MCP auto-install (MVP: only suggestions, installer not automatic)
     "mcp_auto_install_enabled": False,
+
+    # Plugin marketplace features
+    "marketplace_enable_ratings": True,
+    "marketplace_enable_screenshots": True,
+
+    # Whisper Live (real-time duplex STT)
+    "whisper_model_size": "base",      # tiny | base | small | medium | large
+    "whisper_live_enabled": True,      # False = fallback na původní Google STT
+    # Duplex audio
+    "duplex_barge_in": True,           # přerušení TTS řečí
+
+    # Autonomous Workers (email, git, calendar, slack, github)
+    "autonomous_workers_enabled": True,
+    "auto_workers_interval": 900,   # sekundy mezi kontrolami (15 min)
+    "imap_host": "",                # nebo IMAP_HOST v .env
+    "imap_user": "",                # nebo IMAP_USER v .env
+    "imap_pass": "",                # nebo IMAP_PASS v .env
+    "calendar_ical_url": "",        # nebo CALENDAR_ICAL_URL v .env
+    "slack_bot_token": "",          # nebo SLACK_BOT_TOKEN v .env
+    "github_token": "",             # nebo GITHUB_TOKEN v .env
+
+    # Cloud Routing (Groq / OpenRouter)
+    "cloud_routing_enabled": True,
+    # threshold: 'complex' = cloud jen pro kód/reasoning/agenty (doporučeno)
+    #            'always'  = vždy cloud (Ollama = fallback)
+    #            'simple'  = cloud jen pro rychlé dotazy
+    "cloud_routing_threshold": "complex",
+    "groq_api_key": "",           # nebo GROQ_API_KEY v .env
+    "openrouter_api_key": "",     # nebo OPENROUTER_API_KEY v .env
 
     # Shadow Mode (developer assistant)
     "shadow_mode_enabled": False,
@@ -166,6 +206,10 @@ def _load_env() -> Dict[str, Any]:
         "AUDIT_ENABLED": ("audit_enabled", lambda x: x.lower() == "true"),
         "MEMORY_DIR": "memory_dir",
         "BRAVE_API_KEY": "brave_api_key",
+        "GROQ_API_KEY": "groq_api_key",
+        "OPENROUTER_API_KEY": "openrouter_api_key",
+        "CLOUD_ROUTING_ENABLED": ("cloud_routing_enabled", lambda x: x.lower() == "true"),
+        "CLOUD_ROUTING_THRESHOLD": "cloud_routing_threshold",
         "MCP_FILESYSTEM_ENABLED": ("mcp_filesystem_enabled", lambda x: x.lower() == "true"),
         "MCP_GIT_ENABLED":        ("mcp_git_enabled",        lambda x: x.lower() == "true"),
         "MCP_MEMORY_ENABLED":     ("mcp_memory_enabled",     lambda x: x.lower() == "true"),

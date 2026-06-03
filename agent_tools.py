@@ -223,6 +223,43 @@ def build_registry(executor, mcp_bridge=None) -> ToolRegistry:
         examples=["screenshot()"],
     ))
 
+    # ── Vision Computer Use ───────────────────────────────────────
+    reg.register(Tool(
+        name="ui_click",
+        description="Najde UI element popsaný textem na obrazovce a klikne na něj (vision-guided)",
+        params=[ToolParam("element", "Popis elementu, např. 'tlačítko Přihlásit' nebo 'vyhledávací pole'")],
+        fn=lambda element: _vision_click(element),
+        examples=['ui_click(element="tlačítko Odeslat")'],
+    ))
+
+    reg.register(Tool(
+        name="ui_type",
+        description="Napíše text do aktivního pole (po ui_click nebo find_and_fill)",
+        params=[ToolParam("text", "Text k napsání")],
+        fn=lambda text: _vision_type(text),
+        examples=['ui_type(text="hello@example.com")'],
+    ))
+
+    reg.register(Tool(
+        name="ui_fill",
+        description="Najde formulářové pole a vyplní ho hodnotou (vision-guided)",
+        params=[
+            ToolParam("field", "Popis pole, např. 'pole pro e-mail'"),
+            ToolParam("value", "Hodnota k vyplnění"),
+        ],
+        fn=lambda field, value: _vision_fill(field, value),
+        examples=['ui_fill(field="pole pro e-mail", value="user@example.com")'],
+    ))
+
+    reg.register(Tool(
+        name="ui_task",
+        description="Autonomně splní UI úkol: otevře prohlížeč, kliká, vyplňuje formuláře",
+        params=[ToolParam("task", "Popis úkolu, např. 'Najdi nejlevnější letenky do Paříže'")],
+        fn=lambda task: _vision_task(task),
+        examples=['ui_task(task="Otevři gmail.com a přečti první nepřečtený e-mail")'],
+    ))
+
+
     reg.register(Tool(
         name="wiki_search",
         description="Vyhledá na Wikipedii a vrátí shrnutí",
@@ -253,3 +290,44 @@ def build_registry(executor, mcp_bridge=None) -> ToolRegistry:
         ))
 
     return reg
+
+
+# ── Vision Computer Use helpers (module-level) ────────────────────────────────
+
+def _vision_click(element: str) -> str:
+    try:
+        from vision_computer_use import get_vision_agent
+        r = get_vision_agent().click(element)
+        return "ok" if r.success else f"Selhalo: {r.error}"
+    except ImportError:
+        return "vision_computer_use: pyautogui není nainstalováno (pip install pyautogui pillow)"
+    except Exception as e:
+        return f"Chyba: {e}"
+
+
+def _vision_type(text: str) -> str:
+    try:
+        from vision_computer_use import get_vision_agent
+        r = get_vision_agent().type_text(text)
+        return "ok" if r.success else f"Selhalo: {r.error}"
+    except Exception as e:
+        return f"Chyba: {e}"
+
+
+def _vision_fill(field: str, value: str) -> str:
+    try:
+        from vision_computer_use import get_vision_agent
+        r = get_vision_agent().find_and_fill(field, value)
+        return "ok" if r.success else f"Selhalo: {r.error}"
+    except Exception as e:
+        return f"Chyba: {e}"
+
+
+def _vision_task(task: str) -> str:
+    try:
+        from vision_computer_use import get_vision_agent
+        return get_vision_agent().run_task(task)
+    except ImportError:
+        return "vision_computer_use: pyautogui není nainstalováno (pip install pyautogui pillow)"
+    except Exception as e:
+        return f"Chyba: {e}"
