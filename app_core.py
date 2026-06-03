@@ -268,7 +268,27 @@ class JarvisApp:
             self.worker_manager = None
             logger.debug(f"AutonomousWorkers init selhal: {e}")
 
-        logger.info("Systémy v4.6 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord, WorkflowEngine, AutonomousWorkers)")
+        # ── Mission Manager (dlouhodobé autonomní mise)
+        try:
+            from mission_manager import get_mission_manager
+
+            def _mission_notify(msg: str, urgency: str):
+                try:
+                    if self._notif_engine:
+                        self._notif_engine.notify(title="JARVIS — Mise", body=msg, urgency=urgency)
+                    self.bus.emit("mission_event", {"message": msg, "urgency": urgency})
+                except Exception:
+                    pass
+
+            self.mission_manager = get_mission_manager(CONFIG, on_notify=_mission_notify)
+            if CONFIG.get("missions_enabled", True):
+                self.mission_manager.start()
+                logger.info("MissionManager spuštěn")
+        except Exception as e:
+            self.mission_manager = None
+            logger.debug(f"MissionManager init selhal: {e}")
+
+        logger.info("Systémy v5.0 inicializovány (EventBus, Agents, Scheduler, Security, WakeWord, WorkflowEngine, AutonomousWorkers, MissionManager)")
 
     def _load_plugins(self):
         """Načte plugin systém a pluginy"""

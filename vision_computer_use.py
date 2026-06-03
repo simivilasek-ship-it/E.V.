@@ -448,6 +448,26 @@ class VisionAgent:
         return list(self._history)
 
 
+    def smart_click(self, description: str) -> ScreenAction:
+        """
+        Inteligentní klik: nejdříve zkusí OCR-based find (~50 ms),
+        pokud nenajde → fallback na LLaVA vision (~2 s).
+        """
+        try:
+            from vision_v2 import get_planner
+            planner = get_planner()
+            result = planner.find_and_click(description)
+            if result.found:
+                logger.info("smart_click: nalezeno '%s' na (%d, %d) metodou %s",
+                            result.matched_text, result.x, result.y, result.method)
+                return self._click_at(result.x, result.y)
+            logger.warning("smart_click: OCR nenašlo '%s', zkouším vision", description)
+        except Exception as e:
+            logger.debug(f"smart_click OCR selhal ({e}), zkouším vision fallback")
+        # Fallback: LLaVA/Groq vision
+        return self.click(description)
+
+
 # Singleton
 _vision_agent: Optional[VisionAgent] = None
 

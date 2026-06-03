@@ -751,6 +751,80 @@ if HAS_FASTAPI:
         ok = get_workflow_engine().remove(workflow_id)
         return {"ok": ok}
 
+    # ── Mission Manager API ───────────────────────────
+
+    @app.get("/api/missions")
+    async def list_missions():
+        try:
+            from mission_manager import get_mission_manager
+            return {"missions": get_mission_manager().list_missions()}
+        except Exception as e:
+            return {"missions": [], "error": str(e)}
+
+    @app.post("/api/missions")
+    async def create_mission(request: Request):
+        try:
+            from mission_manager import get_mission_manager
+            import asyncio
+            data = await request.json()
+            mgr  = get_mission_manager()
+            mission = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: mgr.create_mission(
+                    data["title"], data.get("description", ""),
+                    data.get("deadline")))
+            return {"ok": True, "mission": mission}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @app.put("/api/missions/{mission_id}/pause")
+    async def pause_mission(mission_id: str):
+        try:
+            from mission_manager import get_mission_manager
+            get_mission_manager().pause_mission(mission_id)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @app.put("/api/missions/{mission_id}/resume")
+    async def resume_mission(mission_id: str):
+        try:
+            from mission_manager import get_mission_manager
+            get_mission_manager().resume_mission(mission_id)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @app.delete("/api/missions/{mission_id}")
+    async def delete_mission(mission_id: str):
+        try:
+            from mission_manager import get_mission_manager
+            get_mission_manager().delete_mission(mission_id)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    # ── Vision v2 API ─────────────────────────────────
+
+    @app.get("/api/vision/analyze")
+    async def vision_analyze():
+        """Pořídí screenshot, spustí OCR+UI analýzu, vrátí JSON."""
+        try:
+            from vision_v2 import VisionOCRPipeline
+            import asyncio
+            pipeline = VisionOCRPipeline()
+            if not pipeline.available:
+                return {"error": "OCR pipeline nedostupná (pip install pytesseract opencv-python)"}
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, pipeline.analyze)
+            return {
+                "ocr_text":        result.ocr_text,
+                "active_app":      result.active_app,
+                "ui_elements":     [{"role": e.role, "name": e.name, "x": e.bbox[0], "y": e.bbox[1]} for e in result.ui_elements],
+                "clickable_count": len(result.clickable_regions),
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
     # ── Agent Timeline ────────────────────────────────
     # ── Agent Timeline — SQLite persistence ──────────
     import sqlite3 as _sqlite3
