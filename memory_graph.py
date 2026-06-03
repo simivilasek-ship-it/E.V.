@@ -182,11 +182,90 @@ class SQLiteGraphStore:
         with self._lock:
             nodes = list(self._conn.execute("SELECT id, name FROM entities ORDER BY id DESC LIMIT ?", (limit_nodes,)).fetchall())
             links = list(self._conn.execute(
-                "SELECT r.subject_id as s, r.object_id as o, r.predicate as p FROM relations r ORDER BY r.ts DESC LIMIT ?",
+                "SELECT r.id, r.subject_id as s, r.object_id as o, r.predicate as p, r.ts as ts, r.source as source, r.confidence as confidence FROM relations r ORDER BY r.ts DESC LIMIT ?",
                 (limit_links,)).fetchall())
-        nds = [{'id': str(n['id']), 'label': n['name'], 'group': 'entity', 'importance': 0.5} for n in nodes]
-        lks = [{'source': str(l['s']), 'target': str(l['o']), 'label': l['p']} for l in links]
+        nds = []
+        # approximate node ts by earliest relation ts where node participates
+        node_ts_map = {}
+        for l in links:
+            s = str(l['s']); o = str(l['o'])
+            node_ts_map.setdefault(s, l['ts'])
+            node_ts_map.setdefault(o, l['ts'])
+            # take latest (max) or min? keep latest
+            node_ts_map[s] = max(node_ts_map[s], l['ts'])
+            node_ts_map[o] = max(node_ts_map[o], l['ts'])
+        for n in nodes:
+            nid = str(n['id'])
+            nds.append({
+                'id': nid,
+                'label': n['name'],
+                'group': 'entity',
+                'importance': 0.5,
+                'ts': node_ts_map.get(nid, 0),
+            })
+        lks = [{'id': l['id'], 'source': str(l['s']), 'target': str(l['o']), 'label': l['p'], 'ts': l['ts'], 'source_meta': l['source'], 'confidence': l['confidence']} for l in links]
         return {'nodes': nds, 'links': lks}
+
+    def merge_entities(self, target_id: int, source_id: int) -> int:
+        """Merge source entity into target entity. Moves relations and deletes source. Returns target_id."""
+        with self._lock:
+            # reassign relations where source_id is subject or object
+            self._conn.execute("UPDATE relations SET subject_id=? WHERE subject_id=?", (target_id, source_id))
+            self._conn.execute("UPDATE relations SET object_id=? WHERE object_id=?", (target_id, source_id))
+            # delete source entity
+            self._conn.execute("DELETE FROM entities WHERE id=?", (source_id,))
+            self._conn.commit()
+        return target_id
+
+    def auto_merge_by_embedding(self, threshold: float = 0.85) -> list:
+        """Find entity pairs with embedding cosine similarity >= threshold and merge them.
+        Returns list of merged pairs [(target_id, source_id, score)].
+        """
+        merged = []
+        # load all entities with embeddings
+        with self._lock:
+            rows = list(self._conn.execute("SELECT id, embedding FROM entities WHERE embedding IS NOT NULL").fetchall())
+        if not rows:
+            return merged
+        # build vectors
+        vecs = []
+        for r in rows:
+            try:
+                v = json.loads(r['embedding'])
+                vecs.append((int(r['id']), v))
+            except Exception:
+                continue
+        # naive O(n^2) compare (MVP)
+        def cos(a, b):
+            import math
+            if not a or not b: return 0.0
+            da = math.sqrt(sum(x*x for x in a))
+            db = math.sqrt(sum(x*x for x in b))
+            if da == 0 or db == 0: return 0.0
+            return sum(x*y for x,y in zip(a,b)) / (da*db)
+        used = set()
+        for i in range(len(vecs)):
+            id1, v1 = vecs[i]
+            if id1 in used: continue
+            best = None
+            best_score = 0.0
+            for j in range(i+1, len(vecs)):
+                id2, v2 = vecs[j]
+                if id2 in used: continue
+                score = cos(v1, v2)
+                if score > best_score:
+                    best_score = score
+                    best = id2
+            if best and best_score >= threshold:
+                # merge best into id1
+                try:
+                    self.merge_entities(id1, best)
+                    merged.append((id1, best, best_score))
+                    used.add(best)
+                    used.add(id1)
+                except Exception:
+                    pass
+        return merged
 
 
 # Thin compatibility wrapper
@@ -205,3 +284,9 @@ class GraphStore:
 
     def dump(self):
         return self._store.dump_graph()
+
+    def auto_merge_by_embedding(self, threshold: float = 0.88):
+        try:
+            return self._store.auto_merge_by_embedding(threshold)
+        except Exception:
+            return []

@@ -27,8 +27,9 @@ def _ollama_unload(model: str = "llava:7b") -> None:
 
 def _ask_vision(image_path: str, prompt: str) -> str:
     try:
-        from llm import ask_vision
-        result = ask_vision(prompt, image_path, model="llava:7b")
+        # Use vision_pipeline wrapper (GPU selection, fallback)
+        from vision_pipeline import describe_with_llava
+        result = describe_with_llava(image_path, prompt, model="llava:7b")
         # Po dokončení inference uvolni LLaVA z VRAM
         _ollama_unload("llava:7b")
         return result
@@ -76,18 +77,16 @@ class VisionEngine:
     """Multimodální vizuální schopnosti: OCR, popis obrazovky, kamera."""
 
     def screen_ocr(self) -> str:
-        """Screenshot + pytesseract OCR → text na obrazovce."""
+        """Screenshot + pytesseract OCR → text na obrazovce. Uses cache for performance."""
         try:
-            import pytesseract
-        except ImportError:
-            return "pytesseract není nainstalován"
+            from vision_pipeline import ocr_with_cache
+        except Exception:
+            return "OCR helper není dostupný"
 
         try:
             tmp = _take_screenshot()
             try:
-                from PIL import Image
-                img = Image.open(tmp)
-                text = pytesseract.image_to_string(img, lang="ces+eng")
+                text = ocr_with_cache(tmp)
                 return text.strip() or "Na obrazovce nebyl rozpoznán žádný text."
             finally:
                 try:
@@ -99,7 +98,7 @@ class VisionEngine:
             return f"Chyba OCR: {e}"
 
     def screen_describe(self) -> str:
-        """Screenshot → LLaVA popis obrazovky."""
+        """Screenshot → LLaVA popis obrazovky. Chooses GPU/CPU based on config and hardware."""
         try:
             tmp = _take_screenshot()
             try:

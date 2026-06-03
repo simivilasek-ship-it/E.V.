@@ -453,7 +453,27 @@ if HAS_FASTAPI:
 
             # Limit s total_count
             total = len(nodes)
-            return {"nodes": nodes[:80], "links": links[:120], "total": total}
+            result = {"nodes": nodes[:80], "links": links[:120], "total": total}
+            try:
+                from config import CONFIG
+                if CONFIG.get('memory_graph_timeline', True):
+                    # timeline: recent relation events (ts, subject, predicate, object)
+                    timeline = []
+                    for l in links:
+                        if l.get('ts'):
+                            timeline.append({
+                                'ts': l.get('ts'),
+                                'subject_id': l.get('source'),
+                                'object_id': l.get('target'),
+                                'predicate': l.get('label'),
+                                'source': l.get('source_meta'),
+                                'confidence': l.get('confidence'),
+                            })
+                    timeline.sort(key=lambda x: x['ts'], reverse=True)
+                    result['timeline'] = timeline[:80]
+            except Exception:
+                pass
+            return result
         except Exception as e:
             return {"nodes": [], "links": [], "error": str(e)}
 

@@ -646,6 +646,16 @@ class JarvisMemory:
                 try:
                     if getattr(self, 'graph_store', None):
                         self.graph_store.add_relation(s, p, o, ts=meta['ts'], source=meta['source'], confidence=0.9)
+                        # Optionally run auto-merge (conservative, opt-in via config)
+                        try:
+                            from config import CONFIG
+                            if CONFIG.get('memory_graph_auto_merge', False):
+                                thr = float(CONFIG.get('memory_graph_merge_threshold', 0.88))
+                                merged = self.graph_store.auto_merge_by_embedding(thr)
+                                if merged:
+                                    logger.info(f"MemoryGraph: auto-merged {len(merged)} pairs")
+                        except Exception:
+                            pass
                 except Exception:
                     pass
         except Exception:

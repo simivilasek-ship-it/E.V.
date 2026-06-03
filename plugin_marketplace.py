@@ -99,6 +99,12 @@ class PluginMarketplace:
     def __init__(self, plugins_dir: str = None):
         from pathlib import Path
         self.plugins_dir = Path(plugins_dir or "plugins/custom")
+        # ratings stored per marketplace in plugins_dir/.ratings.json
+        self._ratings_file = self.plugins_dir.parent / "marketplace_ratings.json"
+        try:
+            self._ratings = json.loads(self._ratings_file.read_text(encoding='utf-8')) if self._ratings_file.exists() else {}
+        except Exception:
+            self._ratings = {}
 
     def list_available(self) -> str:
         """Vrátí seznam pluginů z REGISTRY s ratingem a verzí."""
@@ -159,8 +165,11 @@ class PluginMarketplace:
         return parse(a) > parse(b)
 
     def install(self, name: str) -> str:
-        """Stáhne plugin z GitHub jako ZIP, nebo zkopíruje vestavěný plugin."""
+        """Stáhne plugin z GitHub jako ZIP, nebo zkopíruje vestavěný plugin.
+        If MCP auto-install is enabled in config and plugin has tag 'mcp', delegate to mcp_installer.
+        """
         import zipfile, io, requests, shutil
+        from config import CONFIG
         info = self.REGISTRY.get(name.lower())
         if not info:
             available = ", ".join(self.REGISTRY.keys())
@@ -176,6 +185,24 @@ class PluginMarketplace:
                 shutil.copytree(src, dest)
                 return f"Plugin '{name}' nainstalován (builtin). Restartuj JARVIS pro aktivaci."
             return f"Vestavěný plugin '{name}' nebyl nalezen v {src}."
+
+        # If this is an MCP plugin and auto-install is enabled, use mcp_installer
+        tags = info.get("tags", [])
+        if "mcp" in tags and CONFIG.get("mcp_auto_install_enabled", False):
+            try:
+                from mcp_installer import install_from_zip_bytes
+                repo = info["repo"]
+                if not repo:
+                    return f"Plugin '{name}' nemá repo pro MCP instalaci."
+                url = f"https://github.com/{repo}/archive/refs/heads/main.zip"
+                r = requests.get(url, timeout=20)
+                r.raise_for_status()
+                plan = install_from_zip_bytes(name, r.content)
+                if plan.get("ok"):
+                    return f"MCP server '{name}' nainstalován do {plan.get('path')}. Restartuj JARVIS pro aktivaci."
+                return f"MCP instalace selhala: {plan.get('error')}"
+            except Exception as e:
+                return f"MCP instalace se nepovedla: {e}"
 
         repo = info["repo"]
         if not repo:
@@ -196,6 +223,19 @@ class PluginMarketplace:
                         rel = member[len(prefix):]
                         (dest / rel).parent.mkdir(parents=True, exist_ok=True)
                         (dest / rel).write_bytes(data)
+            # try to save screenshots from manifest if present
+            try:
+                manifest = dest / 'manifest.json'
+                if manifest.exists():
+                    import json as _json
+                    m = _json.loads(manifest.read_text(encoding='utf-8'))
+                    ss = m.get('screenshots') or m.get('screenshot')
+                    if ss:
+                        # store first screenshot url/text into registry
+                        info['screenshot'] = ss if isinstance(ss, str) else (ss[0] if isinstance(ss, list) else None)
+            except Exception:
+                pass
+
             return f"Plugin '{name}' nainstalován. Restartuj JARVIS pro aktivaci."
         except Exception as e:
             if dest.exists():
@@ -209,6 +249,22 @@ class PluginMarketplace:
             return f"Plugin '{name}' není nainstalován."
         shutil.rmtree(dest)
         return f"Plugin '{name}' odinstalován."
+
+    def rate_plugin(self, name: str, rating: float) -> str:
+        """Rate a plugin (1.0 - 5.0). Stores rating in marketplace_ratings.json."""
+        try:
+            r = float(rating)
+            if r < 1.0 or r > 5.0:
+                return "Rating musí být mezi 1.0 a 5.0"
+        except Exception:
+            return "Neplatný rating"
+        self._ratings[name] = self._ratings.get(name, []) + [r]
+        try:
+            self._ratings_file.parent.mkdir(parents=True, exist_ok=True)
+            self._ratings_file.write_text(json.dumps(self._ratings, ensure_ascii=False, indent=2), encoding='utf-8')
+        except Exception:
+            pass
+        return f"Díky za hodnocení: {name} → {r}"
 
     def update(self, name: str) -> str:
         self.uninstall(name)
