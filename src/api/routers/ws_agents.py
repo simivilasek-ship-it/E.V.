@@ -6,6 +6,7 @@ import json
 import time
 
 import psutil
+from fastapi import WebSocket, WebSocketDisconnect
 
 from src.api.deps import (
     HAS_LOGURU,

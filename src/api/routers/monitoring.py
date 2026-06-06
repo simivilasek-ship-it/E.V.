@@ -76,6 +76,29 @@ def register(app):
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/app", status_code=302)
 
+    @app.get("/api/context")
+    async def pc_context():
+        """Živý kontext PC pro UI — okna, systém, schránka (Copilot awareness)."""
+        import asyncio
+
+        def _collect():
+            try:
+                from context_orchestrator import get_context_orchestrator
+                orch = get_context_orchestrator()
+                raw = orch.get_context_data()
+                return {
+                    "formatted": orch.get_context(),
+                    "active_window": raw.get("active", ""),
+                    "windows": raw.get("windows", []),
+                    "clipboard": raw.get("clipboard", ""),
+                    "system": raw.get("system", {}),
+                    "time": raw.get("time", ""),
+                }
+            except Exception as e:
+                return {"error": str(e), "formatted": ""}
+
+        return await asyncio.get_event_loop().run_in_executor(None, _collect)
+
     @app.get("/api/system")
     async def system_metrics():
         import psutil, asyncio

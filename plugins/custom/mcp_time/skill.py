@@ -130,7 +130,7 @@ def _handle_time(text: str):
     if not m:
         return None, None
     if not _available():
-        return "MCP Time není dostupný.", {"action": "answer", "params": {}}
+        return None, None  # fallback na lokální get_time v LocalRouter
     tz = _find_timezone(text)
     result = _call("get_current_time", {"timezone": tz})
     label = tz.split("/")[-1].replace("_", " ")

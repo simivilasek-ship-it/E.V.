@@ -2,6 +2,10 @@
 
 JARVIS obsahuje tři typy agentů, každý vhodný pro jiný typ úkolů. Všichni sdílí stejné nástroje a paměťový systém.
 
+Agenti se spouštějí **automaticky** z `CommandRouter` (`routing.py`) — po LocalRouteru a pluginech, **před** Copilot LLM. Web chat (`process_for_web`) používá stejnou logiku.
+
+Nový nástroj: **`get_pc_overview()`** — agent může získat přehled o PC.
+
 ---
 
 ## Přehled agentů

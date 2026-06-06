@@ -1,11 +1,19 @@
 set dotenv-load := true
 
 @default:
-  just --list
+  just start
+
+# Jeden příkaz — backend + UI na http://localhost:8002/app
+start:
+  python3 dashboard.py
 
 backend:
-  python -m pip install -r requirements.txt
-  python dashboard.py
+  python3 -m pip install -r requirements.txt
+  python3 dashboard.py --no-open
+
+# Volitelně: Next.js HMR (dva procesy, jeden skript)
+dev-hmr:
+  bash scripts/dev.sh
 
 web-dev:
   cd web && npm ci && npm run dev
@@ -24,7 +32,7 @@ python-lint:
   ruff format --check .
 
 python-test:
-  python -m pytest tests/ test_jarvis.py -v
+  python3 -m pytest tests/ test_jarvis.py -v
 
 docker-build:
   docker build -t jarvis:local .

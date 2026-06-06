@@ -20,6 +20,7 @@ from .media  import (cmd_screenshot, cmd_type_key, cmd_write_text, cmd_media,
                      cmd_youtube_info, cmd_youtube_subtitles,
                      cmd_screen_describe, cmd_screen_ocr, cmd_webcam_describe)
 from .system import (cmd_get_time, cmd_get_date, cmd_system_info,
+                     cmd_pc_overview,
                      cmd_shutdown, cmd_restart, cmd_sleep_pc,
                      cmd_update_system, cmd_volume, cmd_set_brightness,
                      cmd_hardware_info, cmd_disk_space,
@@ -164,6 +165,7 @@ class CommandExecutor:
     def _cmd_get_time(self, **_):             return cmd_get_time()
     def _cmd_get_date(self, **_):             return cmd_get_date()
     def _cmd_system_info(self, **_):          return cmd_system_info()
+    def _cmd_pc_overview(self, **_):          return cmd_pc_overview()
     def _cmd_shutdown(self, delay=0, **_):    return cmd_shutdown(delay)
     def _cmd_restart(self, delay=0, **_):     return cmd_restart(delay)
     def _cmd_sleep_pc(self, **_):             return cmd_sleep_pc()

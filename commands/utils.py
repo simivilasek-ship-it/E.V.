@@ -248,6 +248,22 @@ def cmd_reminder_set(text: str, time_str: str = "1 minuta") -> str:
     return f"Připomínka nastavena: {text}"
 
 
+def _normalize_city_name(city: str) -> str:
+    """Převod českých sklonění / překlepů na správný název města."""
+    key = (city or "").strip().lower().rstrip("?.,!")
+    aliases = {
+        "praha": "Praha", "praze": "Praha", "prague": "Praha",
+        "ostrava": "Ostrava", "ostrave": "Ostrava",
+        "brno": "Brno", "brne": "Brno",
+        "opava": "Opava", "opave": "Opava",
+        "plzen": "Plzeň", "plzni": "Plzeň", "plzeň": "Plzeň",
+        "bratislava": "Bratislava", "bratislave": "Bratislava",
+        "olomouc": "Olomouc", "olomouci": "Olomouc",
+        "liberec": "Liberec", "liberci": "Liberec",
+    }
+    return aliases.get(key, city.strip().title() if city else "Praha")
+
+
 def cmd_weather(city: str = "") -> str:
     """Počasí přes Open-Meteo (free, bez API klíče) + wttr.in fallback."""
     import requests
@@ -266,19 +282,22 @@ def cmd_weather(city: str = "") -> str:
         95: ("⛈️","Bouřka"), 96: ("⛈️","Bouřka s krupobitím"), 99: ("⛈️","Silná bouřka"),
     }
 
-    target = city.strip() or "Praha"
+    target = _normalize_city_name(city)
 
     try:
-        # 1. Geokódování
+        # 1. Geokódování — preferuj ČR u známých českých měst
         geo = requests.get(
             "https://geocoding-api.open-meteo.com/v1/search",
-            params={"name": target, "count": 1, "language": "cs", "format": "json"},
+            params={"name": target, "count": 5, "language": "cs", "format": "json"},
             timeout=3,
         ).json()
-        results = geo.get("results")
+        results = geo.get("results") or []
         if not results:
             return f"Město '{target}' nenalezeno."
-        loc  = results[0]
+        loc = next(
+            (r for r in results if r.get("country_code") == "CZ"),
+            results[0],
+        )
         lat, lon = loc["latitude"], loc["longitude"]
         name = loc.get("name", target)
         country = loc.get("country", "")

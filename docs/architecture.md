@@ -146,18 +146,54 @@ JARVIS je vrstvená aplikace složená z Python backendu, Next.js frontendu a de
 
 ## Datové toky
 
+### Unified runtime (web + desktop)
+
+```
+POST /api/chat  nebo  WS /ws/chat
+       │
+       ▼
+src/api/runtime.py  →  process_chat()
+       │
+       ▼
+JarvisApp (singleton, web_mode=true)
+       │
+       ▼
+CommandRouter.process_for_web()  [routing.py]
+       │
+   ┌───┴────────────┬────────────────┐
+   ▼                ▼                ▼
+LocalRouter      Agent pipeline    Copilot LLM
+(priorita)    (Hierarchical/Graph/ReAct)  (+ ContextOrchestrator)
+   │                │                │
+   ▼                ▼                ▼
+CommandExecutor   agent_tools     stream_ask()
+```
+
+**Pořadí fast path:** LocalRouter → pluginy (MCP) → agenti.  
+**Copilot fallback:** LLM se systémovým promptem + `Kontext prostředí` z `context_orchestrator.py`.
+
+Klíčové soubory: `src/api/runtime.py`, `src/api/lifespan.py`, `routing.py`, `app_core.py`.
+
+---
+
 ### Tok textového příkazu
 
 ```
 Uživatel zadá text
        │
        ▼
-LocalRouter.route(text)
+CommandRouter._fast_path() / process_for_web()
+       │
+       ▼
+LocalRouter.route(text)   ← priorita před pluginy
        │
    ┌───┴───────────────────────────────┐
    │ Regex match?                       │
    ▼ ANO                               ▼ NE
-CommandExecutor.execute()        LLMEngine.ask(text)
+CommandExecutor.execute()        Agent? → agent_*.py
+                                       │
+                                       ▼ NE
+                               LLMEngine.stream_ask()  [Copilot]
    │                                   │
    ▼                               ┌───┴─────────────────────┐
 Výsledek                          │ CloudRouter.should_use?  │

@@ -1,6 +1,6 @@
-# JARVIS v5.0 — Dokumentace
+# JARVIS v5 — Dokumentace
 
-Vítejte v kompletní dokumentaci JARVIS — autonomního AI asistenta který ovládá váš počítač.
+Vítejte v dokumentaci JARVIS — lokálního AI asistenta ve stylu **Copilot / Gemini**, s **agentním** plánováním a **plnou správou PC**.
 
 ---
 
@@ -18,48 +18,81 @@ Vítejte v kompletní dokumentaci JARVIS — autonomního AI asistenta který ov
 
 ---
 
+## Tři režimy (automaticky)
+
+Jeden chat — systém sám vybere režim:
+
+### 1. Copilot (konverzace)
+- Odpovídá LLM (Ollama / Groq) se **živým kontextem PC**
+- Vidí: aktivní okno, otevřená okna, CPU/RAM/disk, schránku, čas
+- V UI: status *„Copilot…"*
+- Příklady: *„vysvětli asyncio"*, *„na čem právě pracuju?"*
+
+### 2. Akce (správa PC)
+- Lokální router (`local_router.py`) — regex/fuzzy, **&lt; 1 ms**, bez LLM
+- Priorita před MCP pluginy (čas, počasí, obrazovka vždy lokálně)
+- Příklady: *„otevři chrome"*, *„screenshot"*, *„přehled o PC"*, *„co mám na obrazovce?"*
+
+### 3. Agent (vícekrokové úkoly)
+- Hierarchical → Graph → ReAct pipeline
+- V UI: status *„Agent pracuje…"* + kroky přes WebSocket
+- Příklady: *„najdi X a ulož"*, *„zkontroluj repo a shrň"*
+
+---
+
+## Spuštění
+
+```bash
+python3 dashboard.py              # jeden příkaz: backend + UI
+python3 dashboard.py --restart    # restart po změně kódu (port 8002)
+python3 dashboard.py --rebuild    # vynutit rebuild Next.js → web_dist/
+```
+
+UI: **http://localhost:8002/app**
+
+---
+
 ## Co je JARVIS?
 
-JARVIS (v5.0) je lokální AI asistent s těmito schopnostmi:
+JARVIS je lokální AI asistent s těmito schopnostmi:
 
 ### Mluví a slyší v reálném čase
-Whisper Live: WebRTC VAD → Groq Whisper API (200 ms) nebo faster-whisper lokálně. Web UI má mikrofon přes Web Speech API. Plná barge-in podpora — přerušíte JARVISe uprostřed věty.
+Whisper Live, Web Speech API v prohlížeči, barge-in.
 
 ### Vidí obrazovku a ovládá UI
-Screenshot → OCR (pytesseract, ~50 ms) → kliknutí přesně na popsaný element. Fallback na LLaVA vision (~2 s). Funguje v jakékoliv aplikaci.
+OCR (~50 ms), vision AI fallback, `screen_describe` z reálných oken (bez halucinací).
+
+### Přehled o počítači
+`ContextOrchestrator` + příkaz `pc_overview` — CPU, RAM, disk, okna, procesy. API: `GET /api/context`.
 
 ### Pamatuje si přes týdny
-GraphRAG knowledge graph automaticky extrahuje entity a vztahy z každé konverzace. JARVIS ví že "ten projekt z úterý" = "projekt Alpha" = "Petr".
+GraphRAG + SQLite paměť.
 
-### Plánuje a provádí dlouhodobé mise
-Mission Manager rozdělí vícedenní úkol na kroky s daty, provádí je autonomně přes ReAct agenta a vyhodnotí výsledek.
+### Plánuje dlouhodobé mise
+Mission Manager — vícedenní autonomní úkoly.
 
-### Hlídá za vás na pozadí
-Autonomous Workers každých 15 minut kontrolují e-mail, git repozitáře, kalendář, Slack a GitHub. Přijde sám pokud se něco důležitého stane.
+### Hlídá na pozadí
+Autonomous Workers — e-mail, git, Slack, GitHub.
 
-### Rychlý jako cloud, soukromý jako lokál
-Hybridní router automaticky směruje složité dotazy na Groq (~200 ms) a jednoduché ponechá lokálně v Ollama. Bez API klíče = 100% lokální.
+### Hybridní rychlost
+Groq (~200 ms) pro složité dotazy, Ollama lokálně bez API klíče.
 
 ---
 
 ## Architektura v kostce
 
 ```
-Hlas/Text → Local Router (regex, < 1ms)
-                │ komplex
-                ▼
-         Hybrid LLM Router
-          ├── Groq (200ms)     ← kód, analýza, agenti
-          └── Ollama (1-2s)    ← chat, překlad, příkazy
-                │
-                ▼
-     GraphRAG kontext + SQLite paměť
-                │
-                ▼
-        LLM odpověď / Agent akce
+Text/Hlas → CommandRouter (routing.py)
+              │
+    ┌─────────┼─────────┐
+    ▼         ▼         ▼
+ LocalRouter  Agenti   Copilot LLM
+ (akce)    (multi-step) (+ kontext PC)
 ```
 
-Viz [Architektura](architecture.md) pro kompletní datové toky.
+Web API používá stejný pipeline přes `src/api/runtime.py` → `JarvisApp` singleton.
+
+Viz [Architektura](architecture.md).
 
 ---
 
@@ -70,9 +103,9 @@ Viz [Architektura](architecture.md) pro kompletní datové toky.
 | AI | Ollama, Groq API, OpenRouter |
 | STT | Whisper Live, faster-whisper, Vosk |
 | TTS | Edge-TTS streaming |
-| Vision | LLaVA, pytesseract, OpenCV |
-| Backend | FastAPI, WebSocket, asyncio |
-| Frontend | Next.js, TypeScript, Tailwind |
+| Vision | LLaVA, pytesseract, Xlib okna |
+| Backend | FastAPI, WebSocket, unified runtime |
+| Frontend | Next.js static export → `/app` |
 | Desktop | pywebview |
 | Paměť | SQLite, sentence-transformers, GraphRAG |
 | Nástroje | MCP (Model Context Protocol) |
@@ -81,4 +114,4 @@ Viz [Architektura](architecture.md) pro kompletní datové toky.
 
 ## Verze
 
-Aktuální: **v5.0** — viz [CHANGELOG](../CHANGELOG.md) pro kompletní historii změn.
+Aktuální: **v5.3.0** — viz [CHANGELOG](../CHANGELOG.md).

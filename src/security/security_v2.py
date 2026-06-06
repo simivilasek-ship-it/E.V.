@@ -35,6 +35,7 @@ ACTION_PERMISSIONS: Dict[str, PermissionLevel] = {
     "get_time":         PermissionLevel.SAFE,
     "get_date":         PermissionLevel.SAFE,
     "system_info":      PermissionLevel.SAFE,
+    "pc_overview":      PermissionLevel.SAFE,
     "hardware_info":    PermissionLevel.SAFE,
     "disk_space":       PermissionLevel.SAFE,
     "list_directory":   PermissionLevel.SAFE,

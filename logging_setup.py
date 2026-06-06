@@ -93,8 +93,8 @@ def setup_logging(log_file: str = "jarvis.log",
                 "function": record["function"],
                 "line": record["line"],
                 "message": _mask_secrets(record["message"]),
-                "process_id": record["process"]["id"],
-                "thread_id": record["thread"]["id"],
+                "process_id": getattr(record["process"], "id", None),
+                "thread_id": getattr(record["thread"], "id", None),
             }
             
             # Přidej exception info pokud existuje
@@ -167,11 +167,13 @@ def _redirect_logging_to_loguru() -> None:
             except ValueError:
                 level = record.levelno
             
-            # Loguj s contextem
-            loguru_logger.log(level, record.getMessage(), extra={
-                "logger": record.name,
-                "module": record.module,
-            })
+            # raw=True — zprávy z logging mohou obsahovat {} (např. dict params)
+            loguru_logger.bind(
+                logger=record.name,
+                module=record.module,
+            ).opt(exception=record.exc_info, depth=6, raw=True).log(
+                level, record.getMessage(),
+            )
     
     # Odeber standardní handlery a přidej LoguruHandler
     for handler in logging.root.handlers[:]:

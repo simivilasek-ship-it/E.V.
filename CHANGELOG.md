@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## [5.3.0] - 2026-06-06
+
+### Added
+- **Unified runtime** — `src/api/runtime.py` + `src/api/runner.py`; web chat = stejný pipeline jako desktop
+- **Copilot + Agent + PC Manager** — automatické tři režimy v `routing.py` (status v UI)
+- **`pc_overview`** — kompletní přehled PC (CPU, RAM, disk, okna, top procesy)
+- **`GET /api/context`** — živý kontext prostředí pro dashboard
+- LocalRouter patterny: *co mám na obrazovce*, *přehled o PC*, počasí v Praze (CZ geocoding)
+
+### Changed
+- **Pořadí routingu:** LocalRouter má prioritu před MCP pluginy (čas, počasí bez „MCP není dostupný")
+- **ContextOrchestrator** — hostname, OS, disk, RAM GB; Xlib fallback bez ewmh
+- **SYSTEM_PROMPT** — Copilot/Gemini styl s vědomím o PC
+- **Logging** — oprava crash při `{}` v log zprávách (`logging_setup.py`, `app_core.py`)
+- `python3 dashboard.py --restart` — restart bez konfliktu portu 8002
+- WebSocket chat: `chunk`, `agent_step`, `status`, `done`
+
+### Fixed
+- WebSocket 403 (chybějící `WebSocket` import v routerech)
+- Screen describe halucinace — faktický popis z oken
+- Plugin calculator nechytá „kolik je hodin"
+- MCP Time fallback na lokální `get_time`
+
+---
+
 ## [5.2.0] - 2026-06-06
 
 ### Added

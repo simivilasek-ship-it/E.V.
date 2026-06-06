@@ -24,6 +24,33 @@ Rychlý status check backendu.
 
 ---
 
+### `GET /api/context`
+
+Živý kontext PC pro Copilot a dashboard — okna, systém, schránka.
+
+**Response:**
+```json
+{
+  "formatted": "Aktuální čas: 21:29...\nAktivní okno: Cursor\n...",
+  "active_window": "Cursor Agents",
+  "windows": ["Firefox — Copilot", "simi@host:~"],
+  "clipboard": "",
+  "system": {
+    "hostname": "simi-System-Product-Name",
+    "os": "Linux 7.0.0-15-generic",
+    "cpu": 12.5,
+    "ram": 32.2,
+    "ram_used_gb": 9.7,
+    "ram_total_gb": 30.0,
+    "disk": 9.9,
+    "disk_free_gb": 801.2
+  },
+  "time": "21:29, Saturday 06.06.2026"
+}
+```
+
+---
+
 ### `GET /api/system`
 
 Aktuální systémové metriky (CPU, RAM, GPU, disk, síť).
@@ -71,6 +98,24 @@ Detailní status všech JARVIS subsystémů.
 
 ## Chat a příkazy
 
+### `POST /api/chat`
+
+Hlavní REST chat — stejný unified pipeline jako WebSocket (Copilot + Agent + akce).
+
+**Request:**
+```json
+{ "text": "přehled o pc" }
+```
+
+**Response:**
+```json
+{ "response": "🖥️ hostname — Linux...\n📊 CPU 8% | RAM 32%..." }
+```
+
+Režim se vybírá automaticky: lokální příkaz → agent → Copilot LLM.
+
+---
+
 ### `POST /api/command`
 
 Odešle příkaz a čeká na synchronní odpověď (max 60s).
@@ -110,6 +155,10 @@ nebo starý formát:
 
 **Přijímané zprávy:**
 ```json
+{ "type": "status", "data": "💬 Copilot…" }
+{ "type": "status", "data": "⚡ Provádím akci…" }
+{ "type": "status", "data": "🤖 Agent pracuje…" }
+{ "type": "agent_step", "data": "Hledám soubory…" }
 { "type": "chunk", "data": "Transformer architektura" }
 { "type": "chunk", "data": " je typ neuronové sítě..." }
 { "type": "done" }

@@ -8,7 +8,7 @@ cd "$ROOT"
 source venv/bin/activate 2>/dev/null || true
 
 echo "==> Spouštím backend (port 8002)..."
-python -c "
+python3 -c "
 import uvicorn, sys
 sys.path.insert(0, '.')
 from dashboard import app

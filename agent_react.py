@@ -38,12 +38,14 @@ MAX_TOKENS  = 600    # max tokenů na jeden LLM call
 
 _MULTI_STEP = re.compile(
     r"\b("
-    r"(najdi|vyhledej|zjisti).{0,40}(uloz|zapis|poznamen|rekni|otevre|posli)"
-    r"|(uloz|zapis).{0,40}(co|ktery|jaky|nalezl|vysledek)"
-    r"|(porovnej|srovnej).{1,60}(cen|model|verz)"
-    r"|(zkontroluj|over).{1,50}(a\s+pak|potom|nasledne)"
-    r"|(udel|proved).{1,30}(a\s+potom|a\s+taky|a\s+take)"
+    r"(najdi|vyhledej|zjisti|search|find).{0,40}(uloz|zapis|poznamen|rekni|otevre|posli|open|save)"
+    r"|(uloz|zapis|save).{0,40}(co|ktery|jaky|nalezl|vysledek|result)"
+    r"|(porovnej|srovnej|compare).{1,60}(cen|model|verz|price)"
+    r"|(zkontroluj|over|check).{1,50}(a\s+pak|potom|nasledne|then|and)"
+    r"|(udel|proved|do|execute|run).{1,30}(a\s+potom|a\s+taky|a\s+take|then)"
     r"|(kolik\s+stoji|cena).{1,50}(uloz|zapamatuj|poznamen)"
+    r"|(analyzuj|analyz|analyze|oprav|fix|navrhni|suggest).{1,60}"
+    r"|(otevri|open).{1,30}(a\s+|and\s+)(najdi|search|precti|read)"
     r")",
     re.IGNORECASE | re.UNICODE,
 )

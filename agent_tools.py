@@ -184,6 +184,14 @@ def build_registry(executor, mcp_bridge=None) -> ToolRegistry:
     ))
 
     reg.register(Tool(
+        name="get_pc_overview",
+        description="Kompletní přehled PC — CPU, RAM, disk, okna, procesy",
+        params=[],
+        fn=lambda: ex.execute("pc_overview", {}),
+        examples=["get_pc_overview()"],
+    ))
+
+    reg.register(Tool(
         name="get_weather",
         description="Vrátí aktuální počasí pro město",
         params=[ToolParam("city", "Název města", required=False)],

@@ -33,47 +33,61 @@ if HAS_FASTAPI:
     register_all(app)
 
 
-def _mount_web_app():
-    """Připojí React build jako statické soubory na /app."""
-    if not HAS_FASTAPI:
-        return
+_web_mounted = False
+
+
+def mount_web_app() -> bool:
+    """Připojí Next.js static export (web_dist/) na /app."""
+    global _web_mounted
+    if not HAS_FASTAPI or _web_mounted:
+        return _web_mounted
+
     web_dist = ROOT / "web_dist"
-    if not web_dist.exists():
-        return
+    index = web_dist / "index.html"
+    if not index.is_file():
+        return False
+
     try:
         from fastapi.responses import FileResponse
         from fastapi.staticfiles import StaticFiles
 
-        app.mount(
-            "/app/assets",
-            StaticFiles(directory=str(web_dist / "assets")),
-            name="web_assets",
-        )
+        if (web_dist / "_next").is_dir():
+            app.mount(
+                "/app/_next",
+                StaticFiles(directory=str(web_dist / "_next")),
+                name="web_next",
+            )
+
+        @app.get("/app", include_in_schema=False)
+        @app.get("/app/", include_in_schema=False)
+        async def web_app_root():
+            return FileResponse(str(index))
 
         @app.get("/app/{full_path:path}", include_in_schema=False)
         async def web_app(full_path: str):
-            return FileResponse(str(web_dist / "index.html"))
+            target = web_dist / full_path
+            if target.is_file():
+                return FileResponse(str(target))
+            return FileResponse(str(index))
 
-        @app.get("/app", include_in_schema=False)
-        async def web_app_root():
-            return FileResponse(str(web_dist / "index.html"))
+        _web_mounted = True
+        return True
 
     except Exception as e:
         import logging as _log
 
         _log.getLogger(__name__).warning(f"Web app mount selhal: {e}")
+        return False
 
 
 if HAS_FASTAPI:
-    _mount_web_app()
+    mount_web_app()
 
 
 def run_dashboard(port: int = 8002):
     if not HAS_FASTAPI:
         print("FastAPI není nainstalováno: pip install fastapi uvicorn")
         return
-    print(f"JARVIS Web Chat  → http://localhost:{port}/app")
-    print(f"JARVIS Dashboard → http://localhost:{port}/app")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
 
 

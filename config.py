@@ -3,7 +3,7 @@ JARVIS — Konfigurace
 Načítání a validace z .env, config.json s fallbackem na defaults
 """
 
-__version__ = "5.2.0"
+__version__ = "5.3.0"
 
 import os
 import json
@@ -27,6 +27,9 @@ AVAILABLE_OLLAMA_MODELS = [
 DEFAULT_CONFIG = {
     "ollama_url": "http://localhost:11434/api/chat",
     "ollama_model": "qwen2.5:3b",
+    "vision_model": "llava:7b",
+    "web_mode": False,
+    "missions_enabled": True,
     "tts_enabled": True,
     "tts_voice": "cs-CZ-AntoninNeural",
     "tts_rate": 170,

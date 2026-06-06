@@ -92,6 +92,8 @@ _FUZZY_COMMANDS = [
     ("jake je datum",    "get_date",        lambda: {}),
     ("screenshot",       "screenshot",      lambda: {}),
     ("info o systemu",   "system_info",     lambda: {}),
+    ("prehled o pc",     "pc_overview",     lambda: {}),
+    ("stav pocitace",    "pc_overview",     lambda: {}),
     ("rekni komponenty", "hardware_info",   lambda: {}),
     ("jaky mas hardware","hardware_info",   lambda: {}),
     ("moje pc komponenty","hardware_info",  lambda: {}),
@@ -379,7 +381,15 @@ class LocalRouter:
 
         # ── VISION ───────────────────────────────────
         if t in ("co vidis", "popis obrazovky", "co je na obrazovce") or \
-           re.search(r"\b(popís|popis|describe)\s+(obrazovku|screen)\b", text, re.I):
+           re.search(r"\b(popís|popis|popiš|describe)\s+(obrazovku|screen|pc)\b", text, re.I) or \
+           re.search(r"\bco\s+(mam|máš|je)\s+na\s+obrazovce\b", t, re.I) or \
+           re.search(
+               r"\b(co\s+(mam|máš|je|vidis|vidíš)|jaká\s+okna?)\b.*\b(obrazovk|screen|pc|počítač|pocitac)\b",
+               t, re.I) or \
+           re.search(
+               r"\b(obrazovk|screen|pc|počítač|pocitac)\b.*\b(co\s+(mam|máš|je|vidis|vidíš)|otevren|otevřen)\b",
+               t, re.I) or \
+           re.search(r"\b(na\s+cem\s+pracuju|co\s+mam\s+(otevren|otevřen|spusten|spuštěn)|co\s+delam)\b", t, re.I):
             return "Popisuji obrazovku.", {"action": "screen_describe", "params": {}}
 
         if re.search(r"\b(precti|prečti)\s+(text|obrazovku)|ocr\b", t, re.I):
@@ -462,6 +472,18 @@ class LocalRouter:
             path_m = re.search(r"(/\S+|~/\S+)", text)
             path = path_m.group(1) if path_m else ""
             return "Zjišťuji info o souboru...", {"action": "file_info", "params": {"path": path}}
+
+        # ── PC PŘEHLED (Copilot-style awareness) ─────
+        if re.search(
+            r"\b(prehled\s+(o\s+)?(pc|pocitaci|systemu|počítači)"
+            r"|stav\s+(pc|pocitace|počítače|systemu)"
+            r"|jak\s+je\s+na\s+tom\s+(pc|pocitac|počítač)"
+            r"|co\s+(bezi|běží)\s+na\s+(pc|pocitaci|počítači)"
+            r"|co\s+se\s+deje\s+na\s+(pc|pocitaci)"
+            r"|spravuj\s+pc|pc\s+overview|system\s+overview)\b",
+            t, re.I,
+        ):
+            return "Přehled o počítači:", {"action": "pc_overview", "params": {}}
 
         # ── SYSTEM INFO ───────────────────────────────
         if re.search(r"\b(využití\s+(cpu|ram|disk)|system\s+info|stav\s+systému|kolik\s+ram)\b", t):
@@ -576,15 +598,21 @@ class LocalRouter:
             return "Načítám sportovní výsledky...", {"action": "sports", "params": {"query": query}}
 
         # ── POČASÍ ────────────────────────────────────
-        if re.search(r"\b(pocasi|weather|bude\s+prset|teplota\s+v)\b", t):
-            # "pocasi Praha" nebo "Praha pocasi" nebo "pocasi v Praze"
-            m = re.search(r"\b(pocasi|weather)\b\s+(?:v\s+)?(\w+)", t)
-            if not m:
-                # Město PŘED slovem počasí: "Ostrava pocasi"
-                m = re.search(r"\b(\w+)\s+(?:pocasi|weather)\b", t)
-            city = m.group(2 if m and m.lastindex >= 2 else 1).capitalize() if m else ""
-            # Ignoruj stopslova jako trigger slova
-            if city.lower() in ("pocasi", "weather", "dnes", "zitra", "bude"):
+        if re.search(r"\b(pocasi|počasí|weather|bude\s+prset|teplota\s+v|jake\s+je\s+pocasi)\b", t):
+            city = ""
+            # "jake je pocasi v praze" / "pocasi v ostrave"
+            m = re.search(r"\b(?:v|ve)\s+([a-záčďéěíňóřšťúůýž]+)", t)
+            if m:
+                city = m.group(1)
+            if not city:
+                m = re.search(r"\b(?:pocasi|počasí|weather)\b\s+(?:v\s+)?([a-záčďéěíňóřšťúůýž]+)", t)
+                if m:
+                    city = m.group(1)
+            if not city:
+                m = re.search(r"\b([a-záčďéěíňóřšťúůýž]+)\s+(?:pocasi|počasí|weather)\b", t)
+                if m:
+                    city = m.group(1)
+            if city.lower() in ("pocasi", "počasí", "weather", "dnes", "zitra", "bude", "jake", "je"):
                 city = ""
             return f"Počasí{' — ' + city if city else ''}:", {
                 "action": "weather", "params": {"city": city}}

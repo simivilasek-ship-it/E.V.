@@ -38,34 +38,33 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════
 
 SYSTEM_PROMPT = f"""Jsi JARVIS — lokální AI asistent uživatele {_USER}. Komunikuješ česky.
+Funguješ jako Copilot / Gemini: chytrý konverzační parťák s plným vědomím o jeho počítači.
 
-TVOJE ROLE:
-Odpovídáš na otázky, píšeš kód, vysvětluješ pojmy, překládáš, počítáš, pomáháš s analýzou.
-Systémové příkazy (otevři aplikaci, změň hlasitost, udělej screenshot…) zpracovává lokální router — ty se jimi nezabývej.
+TŘI REŽIMY (automaticky):
+1. COPILOT — konverzace, kód, vysvětlení, brainstorming. Odpovídáš ty (tady).
+2. AKCE — uživatel řekne příkaz přirozeně (otevři chrome, screenshot, hlasitost 50, přehled PC…)
+   → provede lokální router. Ty jen poradíš co říct, pokud se ptá.
+3. AGENT — složité úkoly (najdi X a ulož, zkontroluj a pak…, analyzuj projekt…)
+   → řeší agentní pipeline. Ty můžeš navrhnout formulaci úkolu.
 
-CO VIDÍŠ (kontext prostředí):
-Před každou odpovědí dostaneš sekci "Kontext prostředí" s:
-- Aktivní okno: co má uživatel právě otevřené v popředí
-- Otevřená okna: seznam všech otevřených aplikací/oken
-- Schránka: obsah clipboardu pokud existuje
-- Systém: CPU %, RAM %
-- Čas: aktuální datum a čas
+CO VIDÍŠ (Kontext prostředí — živá data z PC):
+- Aktivní okno, otevřená okna, schránka
+- CPU, RAM, disk, hostname, OS, čas
+Tato data JSOU přesná — používej je aktivně, nevymýšlej.
+Cursor = Cursor (NE VS Code). Když kontext chybí, přiznej to.
 
-Tato data JSOU přesná a aktuální — pochází přímo ze systému. Klidně je zmiň v odpovědi.
-Například: "Vidím, že máš otevřený VS Code s..." nebo "V popředí je Chromium..."
+JAK SE CHOVAT (Copilot styl):
+- Odpovídej konkrétně podle toho, co uživatel právě dělá (aktivní okno).
+- Navrhuj akce: „Chceš otevřít…", „Můžu udělat screenshot", „Řekni přehled o PC".
+- Buď stručný, přátelský, bez „Jako AI model…" nebo „Nemám přístup k obrazovce" když kontext máš.
 
-CO NEVIDÍŠ:
-- Internet, RSS, live API (kurzy, zprávy, sportovní výsledky z webu)
-- Pro tyto dotazy doporuč: "Řekni 'vyhledej [dotaz]'" → JARVIS to vyhledá
+CO NEVIDÍŠ přímo (ale JARVIS umí na požádání):
+- Live web data → uživatel: „vyhledej [dotaz]" nebo „jaké je počasí v Praze"
+- Hluboký HW detail → „řekni komponenty" / „přehled o PC"
 
-FORMÁT:
-- Stručné odpovědi, kód v markdown bloky
-- Nezačínej odpověď "Jako AI..." nebo "Nemám přístup..."
-- Pokud vidíš kontext okna, použij ho konkrétně
+FORMÁT: markdown pro kód, jinak stručná prose.
 
-PAMĚŤ:
-Máš přístup k relevantnímu kontextu z předchozích konverzací (viz sekce níže).
-Využij ho pro osobnější odpovědi."""
+PAMĚŤ: využij relevantní kontext z předchozích konverzací."""
 
 
 
@@ -686,21 +685,80 @@ class LLMEngine:
 
 import base64
 
+
+def _ollama_base(url: str) -> str:
+    return url.replace("/api/chat", "").replace("/api/generate", "").rstrip("/")
+
+
+def _ollama_installed_models(ollama_url: str) -> list[str]:
+    base = _ollama_base(ollama_url)
+    try:
+        r = requests.get(f"{base}/api/tags", timeout=3)
+        r.raise_for_status()
+        return [m.get("name", "") for m in r.json().get("models", []) if m.get("name")]
+    except Exception:
+        return []
+
+
+def _pick_vision_model(preferred: str, ollama_url: str) -> str | None:
+    installed = _ollama_installed_models(ollama_url)
+    if not installed:
+        return None
+    candidates = [preferred]
+    for name in installed:
+        low = name.lower()
+        if any(k in low for k in ("llava", "moondream", "bakllava", "minicpm-v", "vision")):
+            candidates.append(name)
+    seen: set[str] = set()
+    for cand in candidates:
+        if cand in seen:
+            continue
+        seen.add(cand)
+        if cand in installed:
+            return cand
+        stem = cand.split(":")[0]
+        for name in installed:
+            if name == stem or name.startswith(f"{stem}:"):
+                return name
+    return None
+
+
+def _describe_via_ocr_llm(image_path: str, prompt: str) -> str:
+    """Fallback bez vision modelu — fakta z oken + OCR, bez halucinací."""
+    try:
+        from vision import (
+            _collect_desktop_context,
+            _format_factual_screen_report,
+            _ocr_snippet,
+        )
+
+        ctx = _collect_desktop_context()
+        ocr = _ocr_snippet(image_path)
+        return _format_factual_screen_report(ctx, ocr, prompt)
+    except Exception as e:
+        return f"Popis obrazovky selhal: {e}"
+
+
 def ask_vision(prompt: str, image_path: str, model: str = "llava:7b",
                ollama_url: str = None) -> str:
     """
     Pošle screenshot + otázku do multimodálního modelu (LLaVA).
-    Použití: ask_vision("Co vidíš na obrazovce?", "/tmp/screen.png")
+    Pokud model chybí, použije OCR + textový LLM.
     """
     try:
         from config import CONFIG
         url = ollama_url or CONFIG.get("ollama_url", "http://localhost:11434/api/chat")
+        model = model or CONFIG.get("vision_model", "llava:7b")
+
+        picked = _pick_vision_model(model, url)
+        if not picked:
+            return _describe_via_ocr_llm(image_path, prompt)
 
         with open(image_path, "rb") as f:
             img_b64 = base64.b64encode(f.read()).decode()
 
         payload = {
-            "model": model,
+            "model": picked,
             "messages": [{
                 "role": "user",
                 "content": prompt,
@@ -709,15 +767,19 @@ def ask_vision(prompt: str, image_path: str, model: str = "llava:7b",
             "stream": False,
             "options": {"temperature": 0.2},
         }
-        resp = requests.post(url, json=payload, timeout=60)
+        resp = requests.post(url, json=payload, timeout=90)
+        if resp.status_code == 404:
+            return _describe_via_ocr_llm(image_path, prompt)
         resp.raise_for_status()
         result = resp.json().get("message", {}).get("content", "Žádná odpověď.")
-        # Uvolni vision model z VRAM ihned po použití
         try:
             unload_url = url.replace("/api/chat", "/api/generate")
-            requests.post(unload_url, json={"model": model, "keep_alive": 0}, timeout=5)
+            requests.post(unload_url, json={"model": picked, "keep_alive": 0}, timeout=5)
         except Exception:
             pass
         return result
     except Exception as e:
+        err = str(e)
+        if "404" in err or "not found" in err.lower():
+            return _describe_via_ocr_llm(image_path, prompt)
         return f"Chyba vision modelu: {e}"

@@ -16,6 +16,9 @@ _IGNORE_NAMES = {
     "horní panel", "spodní panel", "pracovní plocha", "desktop",
     "top panel", "bottom panel", "panel",
 }
+_IGNORE_SUBSTR = (
+    "uložit snímek", "save screenshot", "screenshot", "snímek obrazovky",
+)
 
 
 class ContextOrchestrator:
@@ -55,6 +58,11 @@ class ContextOrchestrator:
         self._last_update = now
         return formatted
 
+    def get_context_data(self) -> dict:
+        """Strukturovaná data kontextu (po get_context refresh)."""
+        self.get_context()
+        return dict(self._cache.get("data", {}))
+
     # ── Čas ───────────────────────────────────────────
 
     def _get_time(self) -> str:
@@ -69,7 +77,60 @@ class ContextOrchestrator:
                 return raw.decode("utf-8").strip()
             except UnicodeDecodeError:
                 return raw.decode("latin-1", errors="replace").strip()
+        if isinstance(raw, (list, tuple)) and raw:
+            return self._decode_wm_name(raw[0])
         return str(raw or "").strip()
+
+    def _should_ignore_window(self, name: str) -> bool:
+        low = name.lower().strip()
+        if not low or low in _IGNORE_NAMES:
+            return True
+        return any(s in low for s in _IGNORE_SUBSTR)
+
+    def _xlib_window_title(self, d, win_id: int) -> str:
+        from Xlib import X
+
+        try:
+            win = d.create_resource_object("window", int(win_id))
+            for atom in ("_NET_WM_NAME", "WM_NAME"):
+                prop = win.get_full_property(d.intern_atom(atom), X.AnyPropertyType)
+                if prop and prop.value:
+                    title = self._decode_wm_name(prop.value)
+                    if title:
+                        return title[:100]
+        except Exception:
+            pass
+        return ""
+
+    def _xlib_desktop_windows(self) -> tuple[str, list[str]]:
+        """Čistý Xlib EWMH fallback (bez balíčku ewmh)."""
+        for disp in [os.environ.get("DISPLAY", ""), ":0.0", ":0", ":1"]:
+            if not disp:
+                continue
+            try:
+                from Xlib import display as _xlib_display, X
+
+                d = _xlib_display.Display(disp)
+                root = d.screen().root
+
+                active = ""
+                ap = root.get_full_property(d.intern_atom("_NET_ACTIVE_WINDOW"), X.AnyPropertyType)
+                if ap and ap.value:
+                    active = self._xlib_window_title(d, int(ap.value[0]))
+
+                names: list[str] = []
+                cp = root.get_full_property(d.intern_atom("_NET_CLIENT_LIST"), X.AnyPropertyType)
+                if cp and cp.value:
+                    for wid in cp.value:
+                        title = self._xlib_window_title(d, int(wid))
+                        if title and not self._should_ignore_window(title):
+                            names.append(title[:80])
+
+                if active or names:
+                    return active, names
+            except Exception:
+                pass
+        return "", []
 
     def _get_active_window(self) -> str:
         # 1. ewmh
@@ -117,6 +178,11 @@ class ContextOrchestrator:
         except Exception:
             pass
 
+        # 4. čistý Xlib (bez ewmh balíčku)
+        active, _ = self._xlib_desktop_windows()
+        if active:
+            return active
+
         return ""
 
     def _get_open_windows(self) -> list[str]:
@@ -135,7 +201,7 @@ class ContextOrchestrator:
                 for w in e.getClientList():
                     try:
                         name = self._decode_wm_name(e.getWmName(w))
-                        if name and name.lower() not in _IGNORE_NAMES:
+                        if name and not self._should_ignore_window(name):
                             names.append(name[:80])
                     except Exception:
                         pass
@@ -156,10 +222,15 @@ class ContextOrchestrator:
                     parts = line.split(None, 3)
                     if len(parts) >= 4:
                         name = parts[3].strip()
-                        if name.lower() not in _IGNORE_NAMES:
+                        if not self._should_ignore_window(name):
                             names.append(name[:80])
         except Exception:
             pass
+
+        # 3. čistý Xlib
+        _, names = self._xlib_desktop_windows()
+        if names:
+            return names
 
         return names
 
@@ -192,10 +263,21 @@ class ContextOrchestrator:
 
     def _get_system_quick(self) -> dict:
         try:
+            import platform
             import psutil
+            import socket
+
+            vm = psutil.virtual_memory()
+            disk = psutil.disk_usage("/")
             return {
+                "hostname": socket.gethostname(),
+                "os": f"{platform.system()} {platform.release()}",
                 "cpu": round(psutil.cpu_percent(interval=0), 1),
-                "ram": round(psutil.virtual_memory().percent, 1),
+                "ram": round(vm.percent, 1),
+                "ram_used_gb": round(vm.used / 2**30, 1),
+                "ram_total_gb": round(vm.total / 2**30, 1),
+                "disk": round(disk.percent, 1),
+                "disk_free_gb": round(disk.free / 2**30, 1),
             }
         except Exception:
             return {}
@@ -226,7 +308,16 @@ class ContextOrchestrator:
 
         sys_info = ctx.get("system", {})
         if sys_info:
-            parts.append(f"Systém: CPU {sys_info.get('cpu', 0)}%, RAM {sys_info.get('ram', 0)}%")
+            host = sys_info.get("hostname", "")
+            os_name = sys_info.get("os", "")
+            prefix = f"{host} ({os_name})" if host else "Systém"
+            parts.append(
+                f"{prefix}: CPU {sys_info.get('cpu', 0)}%, "
+                f"RAM {sys_info.get('ram', 0)}% "
+                f"({sys_info.get('ram_used_gb', '?')}/{sys_info.get('ram_total_gb', '?')} GB), "
+                f"Disk {sys_info.get('disk', 0)}% "
+                f"(volno {sys_info.get('disk_free_gb', '?')} GB)"
+            )
 
         return "\n".join(parts)
 

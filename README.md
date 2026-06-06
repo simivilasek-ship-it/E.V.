@@ -9,7 +9,7 @@
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.3-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-531%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
@@ -83,13 +83,35 @@ Built on [Model Context Protocol](https://modelcontextprotocol.io/) — the same
 
 ---
 
+## Copilot · Agent · PC Manager
+
+One chat, three automatic modes:
+
+| Mode | When | Examples |
+|------|------|----------|
+| **Copilot** | Conversation, code, explanations | *"Explain asyncio"*, *"What am I working on?"* |
+| **Action** | OS commands (regex router, &lt;1 ms) | *"Open Chrome"*, *"Screenshot"*, *"Weather in Prague"* |
+| **Agent** | Multi-step tasks | *"Find X and save a note"*, *"Check repo and summarize"* |
+
+JARVIS always sees your **live PC context** — active window, open apps, CPU/RAM/disk, clipboard — injected into every Copilot reply (no hallucinated apps).
+
+```bash
+"PC overview"          # full system snapshot + windows + top processes
+"What's on my screen?" # factual window list (Cursor, Firefox, …)
+```
+
+---
+
 ## Quickstart
 
 ```bash
 git clone https://github.com/simivilasek-ship-it/Jarvis.git
 cd Jarvis && ./install.sh
-bash start_desktop.sh
+python3 dashboard.py          # backend + UI → http://localhost:8002/app
+python3 dashboard.py --restart   # kill old process on :8002, reload code
 ```
+
+Alternativa s nativním oknem: `bash scripts/start.sh` · Makefile: `just start`
 
 Add speed (optional — free API key at [console.groq.com](https://console.groq.com)):
 ```bash
@@ -139,7 +161,7 @@ src/
 
 Backend: **FastAPI** (`src/api/routers/`) · Frontend: **Next.js** · Desktop: **pywebview**
 
-**Web dashboard (v5):** Agent Graph V2 (Alt+5), Plugin Marketplace (Alt+3), Workflow Editor (Alt+0) with test run, Vision Sandbox dry-run (Alt+V), Multi-agent Missions (Alt+M), voice in chat, security confirmation modal, audit log in Settings.
+**Web dashboard (v5):** Unified runtime (`src/api/runtime.py`) — web chat uses the same pipeline as desktop (LocalRouter → Agents → Copilot LLM). Agent Graph V2 (Alt+5), Plugin Marketplace (Alt+3), Workflow Editor (Alt+0), Vision Sandbox (Alt+V), Missions (Alt+M), live PC context API (`GET /api/context`), voice in chat, security confirmation modal.
 
 → Full docs: **[docs/index.md](docs/index.md)** · Web UI: **[web/README.md](web/README.md)** · API: **[docs/api-reference.md](docs/api-reference.md)**
 

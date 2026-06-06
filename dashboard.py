@@ -8,4 +8,6 @@ from src.api.app import app, run, run_dashboard, run_dashboard_background
 __all__ = ["app", "run", "run_dashboard", "run_dashboard_background"]
 
 if __name__ == "__main__":
-    run_dashboard()
+    from src.api.runner import main
+
+    main()

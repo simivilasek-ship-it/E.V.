@@ -36,6 +36,10 @@ def _safe_eval(expr: str) -> str:
 
 
 def _handle_calc(text: str):
+    # Čas/datum nech na LocalRouter (kolik je hodin, jaky je cas)
+    if re.search(r"\b(hodin|hodiny|cas|čas|time|datum|date|minut|sekund)\b", text, re.I):
+        return None, None
+
     # Procento: "15% z 200"
     pm = _PERCENT_RE.search(text)
     if pm:

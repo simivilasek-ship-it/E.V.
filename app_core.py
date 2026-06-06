@@ -147,13 +147,14 @@ class JarvisApp:
         self.gui.on_tts_rate_change = self._on_tts_rate_change
         logger.info("Headless mód — GUI je Next.js na localhost:3000")
 
-        signal.signal(signal.SIGINT,  self._sig)
-        signal.signal(signal.SIGTERM, self._sig)
+        if not CONFIG.get("web_mode", False):
+            signal.signal(signal.SIGINT,  self._sig)
+            signal.signal(signal.SIGTERM, self._sig)
 
         self.gui._clear_mem = self._clear_memory
 
-        # Ollama check s krátkým zpožděním (jako dříve root.after(800, ...))
-        self.gui.root.after(800, self._check_ollama)
+        if not CONFIG.get("web_mode", False):
+            self.gui.root.after(800, self._check_ollama)
         self._schedule_memory_maintenance()
         logger.info("JARVIS připraven.")
 
@@ -193,26 +194,27 @@ class JarvisApp:
         # ── Security Manager ─────────────────────────
         self.security = get_security_manager()
 
-        # ── Wake Word ─────────────────────────────────
-        self.wake_word = WakeWordDetector(
-            wake_word=CONFIG.get("wake_word", "jarvis"),
-            on_wake=self._on_wake_word,
-        )
-        if CONFIG.get("wake_word_enabled", True):
-            self.wake_word.start()
-
-        # Global Hotkey (Alt+Space) — opt-in, tiše selže bez pynput
-        try:
-            from global_hotkey import start_global_hotkey
-            self._global_hotkey = start_global_hotkey(
-                callback=self._on_hotkey_input,
-                hotkey="<alt>+<space>"
+        # ── Wake Word (přeskoč v web módu — bez mikrofonu) ──
+        self.wake_word = None
+        self._global_hotkey = None
+        if not CONFIG.get("web_mode", False):
+            self.wake_word = WakeWordDetector(
+                wake_word=CONFIG.get("wake_word", "jarvis"),
+                on_wake=self._on_wake_word,
             )
-            if self._global_hotkey.available:
-                logger.info("GlobalHotkey: Alt+Space aktivní")
-        except Exception as e:
-            self._global_hotkey = None
-            logger.debug(f"GlobalHotkey init selhal (normální pokud chybí pynput): {e}")
+            if CONFIG.get("wake_word_enabled", True):
+                self.wake_word.start()
+
+            try:
+                from global_hotkey import start_global_hotkey
+                self._global_hotkey = start_global_hotkey(
+                    callback=self._on_hotkey_input,
+                    hotkey="<alt>+<space>",
+                )
+                if self._global_hotkey.available:
+                    logger.info("GlobalHotkey: Alt+Space aktivní")
+            except Exception as e:
+                logger.debug(f"GlobalHotkey init selhal: {e}")
 
         # ── Workflow Engine ───────────────────────────
         from workflow_engine import get_workflow_engine
@@ -621,7 +623,7 @@ class JarvisApp:
                 self._speak(message)
 
         if action not in ("answer", ""):
-            logger.info(f"Akce: {action} {params}")
+            logger.info("Akce: %s %s", action, params)
             try:
                 # Zkus plugin akci (nové)
                 if self.plugin_manager:
@@ -633,14 +635,14 @@ class JarvisApp:
                             logger.warning(f"Plugin akce '{action}' selhala: {err}")
                         elif result and result != "ok":
                             self._gui(lambda r=result: self.gui.set_status(f"↳ {r}"))
-                            logger.info(f"Plugin výsledek: {result}")
+                            logger.info("Plugin výsledek: %s", result)
                         return
 
                 # Fallback na CommandExecutor
                 result = self.cmds.execute(action, params)
                 if result and result != "ok":
                     self._gui(lambda r=result: self.gui.set_status(f"↳ {r}"))
-                    logger.info(f"Výsledek: {result}")
+                    logger.info("Výsledek: %s", result)
             except Exception as e:
                 logger.error(f"Chyba akce {action}: {e}")
                 self.error_handler.log_error(
@@ -774,7 +776,8 @@ class JarvisApp:
 
         # Zastav wake word
         try:
-            self.wake_word.stop()
+            if self.wake_word:
+                self.wake_word.stop()
         except Exception:
             pass
 

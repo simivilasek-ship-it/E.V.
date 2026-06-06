@@ -44,4 +44,19 @@ async def lifespan(application):
     except Exception as e:
         logger.warning(f"Dashboard: confirmation bridge init failed: {e}")
 
+    # Plný JARVIS runtime — Copilot + Agent pipeline
+    try:
+        from src.api.runtime import init_runtime
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, init_runtime)
+    except Exception as e:
+        logger.error(f"JARVIS runtime start selhal: {e}")
+
     yield
+
+    try:
+        from src.api.runtime import shutdown_runtime
+        shutdown_runtime()
+    except Exception as e:
+        logger.debug(f"Runtime shutdown: {e}")

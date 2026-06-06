@@ -34,6 +34,61 @@ def cmd_system_info() -> str:
     )
 
 
+def cmd_pc_overview() -> str:
+    """Kompletní přehled PC — jako Copilot/Gemini s vědomím o systému."""
+    import socket
+    import time as _time
+
+    lines: list[str] = []
+    host = socket.gethostname()
+    lines.append(f"🖥️ {host} — {platform.system()} {platform.release()}")
+
+    uptime_h = int((_time.time() - psutil.boot_time()) // 3600)
+    lines.append(f"⏱️ Uptime: {uptime_h} hodin")
+
+    cpu = psutil.cpu_percent(interval=0.3)
+    ram = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+    lines.append(
+        f"📊 CPU {cpu:.0f}% | RAM {ram.percent:.0f}% "
+        f"({ram.used // 2**30}/{ram.total // 2**30} GB) | "
+        f"Disk {disk.percent:.0f}% (volno {disk.free // 2**30} GB)"
+    )
+
+    try:
+        bat = psutil.sensors_battery()
+        if bat is not None:
+            plug = "nabíjí se" if bat.power_plugged else "na baterii"
+            lines.append(f"🔋 Baterie {bat.percent:.0f}% ({plug})")
+    except Exception:
+        pass
+
+    try:
+        from context_orchestrator import get_context_orchestrator
+        ctx = get_context_orchestrator().get_context()
+        if ctx:
+            lines.append("")
+            lines.append(ctx)
+    except Exception:
+        pass
+
+    try:
+        procs: list[tuple[float, str]] = []
+        for p in psutil.process_iter(["name", "cpu_percent"]):
+            try:
+                procs.append((p.info.get("cpu_percent") or 0.0, p.info.get("name") or "?"))
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        procs.sort(reverse=True)
+        top = [f"{n} ({c:.0f}%)" for c, n in procs[:5] if c > 0.5]
+        if top:
+            lines.append(f"🔥 Top procesy: {', '.join(top)}")
+    except Exception:
+        pass
+
+    return "\n".join(lines)
+
+
 def cmd_shutdown(delay: int = 0) -> str:
     if _IS_WINDOWS:
         safe_run(["shutdown", "/s", "/t", str(delay)], timeout=5)

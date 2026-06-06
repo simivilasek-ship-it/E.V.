@@ -129,14 +129,14 @@ export const useJarvis = create<JarvisState>((set, get) => ({
     const { _ws, _attempt } = get()
     if (_ws?.readyState === WebSocket.OPEN) return
     if (_attempt >= MAX_ATTEMPTS) {
-      set({ connStatus: 'failed', connError: `Backend nedostupný po ${MAX_ATTEMPTS} pokusech. Spusť: python dashboard.py` })
+      set({ connStatus: 'failed', connError: `Backend nedostupný po ${MAX_ATTEMPTS} pokusech. Spusť: python3 dashboard.py` })
       return
     }
     if (_attempt === 0) {
       set({ connStatus: 'connecting', connError: null })
       const up = await get().checkBackend()
       if (!up) {
-        set({ connStatus: 'error', connError: 'Backend není dostupný. Spusť: python dashboard.py' })
+        set({ connStatus: 'error', connError: 'Backend není dostupný. Spusť: python3 dashboard.py' })
         get()._scheduleReconnect(); return
       }
     }
@@ -274,6 +274,20 @@ export const useJarvis = create<JarvisState>((set, get) => ({
             if (last?.streaming) msgs[msgs.length - 1] = { ...last, text: last.text + (msg.text || msg.data || '') }
             return { messages: msgs }
           })
+        } else if (msg.type === 'agent_step') {
+          get().setOrbState('thinking')
+          const step = msg.data || msg.text || ''
+          set(s => {
+            const msgs = [...s.messages]
+            const last = msgs[msgs.length - 1]
+            if (last?.streaming) {
+              const prefix = last.text ? last.text + '\n' : ''
+              msgs[msgs.length - 1] = { ...last, text: prefix + `▸ ${step}` }
+            }
+            return { messages: msgs }
+          })
+        } else if (msg.type === 'status') {
+          get().setOrbState('thinking')
         } else if (msg.type === 'done') {
           set(s => {
             const msgs = [...s.messages]
