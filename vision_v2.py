@@ -472,6 +472,29 @@ class VisualActionPlanner:
             logger.debug("Vision fallback selhal: %s", e)
         return None
 
+    def locate(self, instruction: str, screenshot_path: Optional[str] = None) -> tuple[ClickAction, Optional[str]]:
+        """Najde souřadnice bez kliknutí. Vrátí (ClickAction, cesta ke screenshotu)."""
+        tmp = screenshot_path
+        if tmp is None:
+            tmp = self._pipeline._take_screenshot_to_file()
+        if tmp is None or not os.path.exists(tmp):
+            return ClickAction(found=False, error="Nelze poridit screenshot"), None
+
+        try:
+            result = self._ocr_find(instruction, tmp)
+            if result:
+                x, y, text = result
+                return ClickAction(found=True, x=x, y=y, matched_text=text, method="ocr"), tmp
+
+            result = self._vision_find(instruction, tmp)
+            if result:
+                x, y, text = result
+                return ClickAction(found=True, x=x, y=y, matched_text=text, method="vision"), tmp
+
+            return ClickAction(found=False, error="Element nenalezen: '" + instruction + "'"), tmp
+        except Exception as e:
+            return ClickAction(found=False, error=str(e)), tmp
+
     def find_and_click(self, instruction: str) -> ClickAction:
         """
         1. Poridi screenshot
@@ -479,30 +502,13 @@ class VisualActionPlanner:
         3. Fallback: LLaVA vision (~2s)
         Vrati ClickAction s koordinaty.
         """
-        tmp = self._pipeline._take_screenshot_to_file()
-        if tmp is None:
-            return ClickAction(found=False, error="Nelze poridit screenshot")
-
-        try:
-            result = self._ocr_find(instruction, tmp)
-            if result:
-                x, y, text = result
-                return ClickAction(found=True, x=x, y=y, matched_text=text, method="ocr")
-
-            result = self._vision_find(instruction, tmp)
-            if result:
-                x, y, text = result
-                return ClickAction(found=True, x=x, y=y, matched_text=text, method="vision")
-
-            return ClickAction(found=False, error="Element nenalezen: '" + instruction + "'")
-        except Exception as e:
-            return ClickAction(found=False, error=str(e))
-        finally:
-            if tmp and os.path.exists(tmp):
-                try:
-                    os.unlink(tmp)
-                except Exception:
-                    pass
+        action, path = self.locate(instruction)
+        if path and os.path.exists(path):
+            try:
+                os.unlink(path)
+            except Exception:
+                pass
+        return action
 
 
 # ── Singleton helpers ─────────────────────────────────────────────────────────

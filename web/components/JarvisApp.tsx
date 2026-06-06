@@ -20,11 +20,13 @@ const MemoryGraph  = dynamic(() => import('./MemoryGraph'),  { ssr: false })
 const SkillGenerator = dynamic(() => import('./SkillGenerator'), { ssr: false })
 const WorkflowEditor = dynamic(() => import('./WorkflowEditor'), { ssr: false })
 const SettingsPanel  = dynamic(() => import('./SettingsPanel'),  { ssr: false })
+const MissionPanel   = dynamic(() => import('./MissionPanel'), { ssr: false })
+const VisionSandboxPanel = dynamic(() => import('./VisionSandboxPanel'), { ssr: false })
 
 const NAV_KEYS: Record<string, Tab> = {
   '1': 'CHAT', '2': 'SYSTEM', '3': 'PLUGINS', '4': 'SKILL',
   '5': 'AGENT', '6': 'TIMELINE', '7': 'MEMORY', '8': 'DASHBOARD',
-  '9': 'SETTINGS', '0': 'WORKFLOW',
+  '9': 'SETTINGS', '0': 'WORKFLOW', 'm': 'MISSIONS', 'v': 'VISION',
 }
 
 function useTheme() {
@@ -132,6 +134,12 @@ export default function JarvisApp() {
                   <ErrorBoundary><AgentGraphV2 active={tab === 'AGENT'} /></ErrorBoundary>
                 </div>
               </PageWrapper>
+            )}
+            {tab === 'MISSIONS' && (
+              <PageWrapper><ErrorBoundary><MissionPanel /></ErrorBoundary></PageWrapper>
+            )}
+            {tab === 'VISION' && (
+              <PageWrapper><ErrorBoundary><VisionSandboxPanel /></ErrorBoundary></PageWrapper>
             )}
             {tab === 'WORKFLOW' && (
               <PageWrapper>

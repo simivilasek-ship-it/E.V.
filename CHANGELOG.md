@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [5.2.0] - 2026-06-06
+
+### Added
+- **Vision Sandbox** — dry-run náhled kliknutí (`vision_sandbox.py`, panel Alt+V, API `/api/vision/sandbox/*`)
+- **Multi-agent mise** — režimy `single` | `multi` | `parallel` (`MissionPanel`, Alt+M)
+- **Workflow UX** — zoom, snap grid, undo, duplikát, test run (`POST /api/workflows/graph/test`)
+
+### Changed
+- `VisualActionPlanner.locate()` — hledání bez kliknutí
+- `mission_manager` — `agent_mode` sloupec v SQLite
+
+---
+
 ## [5.1.0] - 2026-06-06
 
 ### Added

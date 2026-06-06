@@ -1,72 +1,50 @@
-"""Auto-migrated from dashboard.py — missions routes."""
+"""Mission Manager API routes."""
 from __future__ import annotations
 
-import asyncio
-import json
-import time
+from fastapi import Request
 
-import psutil
+from src.api.deps import logger
 
-from src.api.deps import (
-    HAS_LOGURU,
-    __version__,
-    get_scheduler,
-    get_security_manager,
-    logger,
-    logger_module_available,
-    start_time,
-)
-from src.api.paths import ROOT
-from src.api.ws import (
-    confirm_mgr,
-    graph_clients,
-    graph_mgr,
-    ws_clients,
-    ws_mgr,
-)
 
-if logger_module_available:
-    pass  # imports satisfied above
-else:
-    def get_scheduler():  # type: ignore
-        raise RuntimeError("scheduler unavailable")
-
-    def get_security_manager():  # type: ignore
-        raise RuntimeError("security unavailable")
+def _mission_mgr():
+    from config import CONFIG
+    from mission_manager import get_mission_manager
+    return get_mission_manager(CONFIG)
 
 
 def register(app):
 
-    # ── Mission Manager API ───────────────────────────
-
     @app.get("/api/missions")
     async def list_missions():
         try:
-            from mission_manager import get_mission_manager
-            return {"missions": get_mission_manager().list_missions()}
+            return {"missions": _mission_mgr().list_missions()}
         except Exception as e:
             return {"missions": [], "error": str(e)}
 
     @app.post("/api/missions")
     async def create_mission(request: Request):
         try:
-            from mission_manager import get_mission_manager
             import asyncio
             data = await request.json()
-            mgr  = get_mission_manager()
+            mgr = _mission_mgr()
             mission = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: mgr.create_mission(
-                    data["title"], data.get("description", ""),
-                    data.get("deadline")))
+                None,
+                lambda: mgr.create_mission(
+                    data["title"],
+                    data.get("description", ""),
+                    data.get("deadline"),
+                    agent_mode=data.get("agent_mode", "single"),
+                ),
+            )
             return {"ok": True, "mission": mission}
         except Exception as e:
+            logger.debug(f"create_mission: {e}")
             return {"ok": False, "error": str(e)}
 
     @app.put("/api/missions/{mission_id}/pause")
     async def pause_mission(mission_id: str):
         try:
-            from mission_manager import get_mission_manager
-            get_mission_manager().pause_mission(mission_id)
+            _mission_mgr().pause_mission(mission_id)
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
@@ -74,8 +52,7 @@ def register(app):
     @app.put("/api/missions/{mission_id}/resume")
     async def resume_mission(mission_id: str):
         try:
-            from mission_manager import get_mission_manager
-            get_mission_manager().resume_mission(mission_id)
+            _mission_mgr().resume_mission(mission_id)
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
@@ -83,10 +60,7 @@ def register(app):
     @app.delete("/api/missions/{mission_id}")
     async def delete_mission(mission_id: str):
         try:
-            from mission_manager import get_mission_manager
-            get_mission_manager().delete_mission(mission_id)
+            _mission_mgr().delete_mission(mission_id)
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
-
-

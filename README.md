@@ -139,7 +139,7 @@ src/
 
 Backend: **FastAPI** (`src/api/routers/`) · Frontend: **Next.js** · Desktop: **pywebview**
 
-**Web dashboard (v5):** Agent Graph V2 (Alt+5), Plugin Marketplace (Alt+3), Workflow Editor (Alt+0), voice input in chat (Web Speech API), security confirmation modal, audit log in Settings.
+**Web dashboard (v5):** Agent Graph V2 (Alt+5), Plugin Marketplace (Alt+3), Workflow Editor (Alt+0) with test run, Vision Sandbox dry-run (Alt+V), Multi-agent Missions (Alt+M), voice in chat, security confirmation modal, audit log in Settings.
 
 → Full docs: **[docs/index.md](docs/index.md)** · Web UI: **[web/README.md](web/README.md)** · API: **[docs/api-reference.md](docs/api-reference.md)**
 

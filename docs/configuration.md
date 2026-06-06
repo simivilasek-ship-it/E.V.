@@ -40,6 +40,31 @@ Konfigurace se načítá v pořadí: `DEFAULT_CONFIG` → `config.json` → `.en
 
 ---
 
+## Vision Sandbox (dry-run)
+
+| Klíč | Výchozí | Popis |
+|------|---------|-------|
+| `vision_sandbox_enabled` | `true` | Agent nejdřív ukáže náhled kliknutí, neprovede hned |
+| `vision_sandbox_auto_execute` | `false` | Pokud `true`, náhled se hned provede (jen pro dev) |
+
+UI: panel **Vision** (Alt+V) · API: `POST /api/vision/sandbox/preview`, `POST /api/vision/sandbox/execute`
+
+---
+
+## Multi-agent mise
+
+| Pole API | Hodnoty | Popis |
+|----------|---------|-------|
+| `agent_mode` | `single`, `multi`, `parallel` | Režim executoru pro kroky mise |
+
+- `single` — ReAct agent (výchozí)
+- `multi` — MultiAgentOrchestrator (Planner→Critic)
+- `parallel` — paralelní vlny sub-agentů
+
+UI: panel **Mise** (Alt+M)
+
+---
+
 ## Web UI & bezpečnost
 
 | Klíč / Env | Výchozí | Popis |

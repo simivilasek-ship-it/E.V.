@@ -296,8 +296,17 @@ def build_registry(executor, mcp_bridge=None) -> ToolRegistry:
 
 def _vision_click(element: str) -> str:
     try:
+        from vision_sandbox import click_with_sandbox, sandbox_enabled
+        if sandbox_enabled():
+            sb = click_with_sandbox(element)
+            if sb.get("requires_approval"):
+                return sb.get("message", "SANDBOX: vyžaduje schválení v UI")
+            if sb.get("executed"):
+                return "ok"
+            if not sb.get("ok"):
+                return f"Selhalo: {sb.get('error', 'neznámá chyba')}"
         from vision_computer_use import get_vision_agent
-        r = get_vision_agent().click(element)
+        r = get_vision_agent().click(element, force=True)
         return "ok" if r.success else f"Selhalo: {r.error}"
     except ImportError:
         return "vision_computer_use: pyautogui není nainstalováno (pip install pyautogui pillow)"

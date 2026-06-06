@@ -59,4 +59,41 @@ def register(app):
         except Exception as e:
             return {"error": str(e)}
 
+    @app.post("/api/vision/sandbox/preview")
+    async def vision_sandbox_preview(body: dict):
+        """Dry-run: ukáže kam by agent klikl, bez provedení akce."""
+        import asyncio
+        target = (body.get("target") or body.get("description") or "").strip()
+        if not target:
+            return {"found": False, "error": "Chybí target"}
+        try:
+            from vision_sandbox import preview_click
+            return await asyncio.get_event_loop().run_in_executor(None, lambda: preview_click(target))
+        except Exception as e:
+            return {"found": False, "error": str(e)}
+
+    @app.get("/api/vision/sandbox/{preview_id}")
+    async def vision_sandbox_get(preview_id: str):
+        try:
+            from vision_sandbox import get_preview
+            data = get_preview(preview_id)
+            return data if data else {"error": "Náhled nenalezen"}
+        except Exception as e:
+            return {"error": str(e)}
+
+    @app.post("/api/vision/sandbox/execute")
+    async def vision_sandbox_execute(body: dict):
+        """Schválí nebo zamítne dříve vytvořený sandbox náhled."""
+        import asyncio
+        preview_id = (body.get("preview_id") or body.get("id") or "").strip()
+        if not preview_id:
+            return {"ok": False, "error": "Chybí preview_id"}
+        approved = bool(body.get("approved", True))
+        try:
+            from vision_sandbox import execute_preview
+            return await asyncio.get_event_loop().run_in_executor(
+                None, lambda: execute_preview(preview_id, approved=approved))
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
 

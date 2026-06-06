@@ -264,8 +264,31 @@ class VisionAgent:
             self._ollama_url, self._vision_model, self._groq_key,
         )
 
-    def click(self, description: str, double: bool = False) -> ScreenAction:
-        """Najde element popsaný textem a klikne na něj."""
+    def click(self, description: str, double: bool = False, force: bool = False) -> ScreenAction:
+        """Najde element popsaný textem a klikne na něj (nebo vrátí sandbox náhled)."""
+        if not force:
+            try:
+                from vision_sandbox import click_with_sandbox, sandbox_enabled
+                if sandbox_enabled():
+                    sb = click_with_sandbox(description, force=False)
+                    if sb.get("requires_approval"):
+                        return ScreenAction(
+                            action="click",
+                            x=int(sb.get("x") or 0),
+                            y=int(sb.get("y") or 0),
+                            success=False,
+                            error=sb.get("message", "SANDBOX: vyžaduje schválení"),
+                        )
+                    if sb.get("executed"):
+                        return ScreenAction(
+                            action="click",
+                            x=int(sb.get("x") or 0),
+                            y=int(sb.get("y") or 0),
+                            success=True,
+                        )
+            except ImportError:
+                pass
+
         result = self.find_element(description)
         if not result.found:
             logger.warning(f"VisionAgent.click: element nenalezen: {description!r}")

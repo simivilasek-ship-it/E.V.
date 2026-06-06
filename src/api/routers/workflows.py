@@ -64,4 +64,59 @@ def register(app):
         ok = get_workflow_engine().remove(workflow_id)
         return {"ok": ok}
 
+    @app.post("/api/workflows/graph/test")
+    async def test_workflow_graph(body: dict):
+        """Projde graf workflow a spustí action uzly jako příkazy (test run)."""
+        import asyncio
+        nodes = body.get("nodes") or []
+        edges = body.get("edges") or []
+        if not nodes:
+            return {"ok": False, "error": "Prázdný workflow"}
+
+        by_id = {n["id"]: n for n in nodes if isinstance(n, dict) and n.get("id")}
+        children: dict[str, list[str]] = {nid: [] for nid in by_id}
+        indeg: dict[str, int] = {nid: 0 for nid in by_id}
+        for e in edges:
+            if not isinstance(e, dict):
+                continue
+            f, t = e.get("from"), e.get("to")
+            if f in by_id and t in by_id:
+                children[f].append(t)
+                indeg[t] = indeg.get(t, 0) + 1
+
+        queue = [nid for nid, d in indeg.items() if d == 0]
+        order: list[str] = []
+        while queue:
+            nid = queue.pop(0)
+            order.append(nid)
+            for ch in children.get(nid, []):
+                indeg[ch] -= 1
+                if indeg[ch] == 0:
+                    queue.append(ch)
+
+        results = []
+        for nid in order:
+            node = by_id.get(nid, {})
+            if node.get("type") != "action":
+                continue
+            cmd = (node.get("config") or {}).get("command") or node.get("label") or ""
+            cmd = str(cmd).strip()
+            if not cmd:
+                results.append({"node": nid, "skipped": True})
+                continue
+            try:
+                from llm import LocalRouter
+                from config import CONFIG
+                from commands import CommandExecutor
+                msg, action = LocalRouter().route(cmd)
+                if action and action.get("action") not in ("answer", None):
+                    out = CommandExecutor(CONFIG).execute(action["action"], action.get("params", {}))
+                    results.append({"node": nid, "command": cmd, "result": out or msg})
+                else:
+                    results.append({"node": nid, "command": cmd, "result": msg or "(routed to LLM)"})
+            except Exception as ex:
+                results.append({"node": nid, "command": cmd, "error": str(ex)})
+
+        return {"ok": True, "order": order, "results": results}
+
 

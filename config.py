@@ -3,7 +3,7 @@ JARVIS — Konfigurace
 Načítání a validace z .env, config.json s fallbackem na defaults
 """
 
-__version__ = "5.1.0"
+__version__ = "5.2.0"
 
 import os
 import json
@@ -108,6 +108,10 @@ DEFAULT_CONFIG = {
     "vad_mode": "auto",  # auto|webrtcvad|rms
     "vad_sample_rate": 16000,
     "duplex_audio_enabled": False,
+
+    # Vision sandbox (dry-run před kliknutím)
+    "vision_sandbox_enabled": True,
+    "vision_sandbox_auto_execute": False,
 
     # Vision pipeline
     "vision_gpu_enabled": False,

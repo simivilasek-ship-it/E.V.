@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useJarvis } from '@/store/jarvis'
 import { Icons } from './Icons'
 
-export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW'
+export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW' | 'MISSIONS' | 'VISION'
 
 interface NavItem { id: Tab; label: string; icon: React.ReactNode; key: string; hint: string }
 interface NavGroup { label: string | null; items: NavItem[] }
@@ -20,6 +20,8 @@ const NAV_GROUPS: NavGroup[] = [
   ]},
   { label: 'INTELIGENCE', items: [
     { id: 'AGENT',     label: 'Agent',     icon: Icons.agent,    key: '5', hint: 'Graf agentů' },
+    { id: 'MISSIONS',  label: 'Mise',      icon: Icons.mission,  key: 'm', hint: 'Multi-agent mise' },
+    { id: 'VISION',    label: 'Vision',    icon: Icons.eye,      key: 'v', hint: 'Sandbox dry-run' },
     { id: 'TIMELINE',  label: 'Timeline',  icon: Icons.timeline, key: '6', hint: 'Historie akcí' },
     { id: 'MEMORY',    label: 'Paměť',     icon: Icons.memory,   key: '7', hint: 'Knowledge graph' },
   ]},

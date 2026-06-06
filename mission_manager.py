@@ -57,6 +57,7 @@ def _init_db() -> None:
             description TEXT NOT NULL,
             deadline    TEXT,
             status      TEXT NOT NULL DEFAULT 'active',
+            agent_mode  TEXT NOT NULL DEFAULT 'single',
             report      TEXT,
             created_at  TEXT NOT NULL,
             updated_at  TEXT NOT NULL
@@ -88,6 +89,12 @@ def _init_db() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_events_mission ON mission_events(mission_id);
         """)
+        try:
+            conn.execute(
+                "ALTER TABLE missions ADD COLUMN agent_mode TEXT NOT NULL DEFAULT 'single'"
+            )
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
 
 
@@ -172,18 +179,20 @@ class MissionPlanner:
         return [{"description": description, "due_date": deadline}]
 
     def create_mission(self, title: str, description: str,
-                       deadline: Optional[str] = None) -> Dict[str, Any]:
+                       deadline: Optional[str] = None,
+                       agent_mode: str = "single") -> Dict[str, Any]:
         """Uloží misi + kroky do DB, vrátí mission dict."""
         mission_id = str(uuid.uuid4())[:12]
         now = _now()
+        mode = agent_mode if agent_mode in ("single", "multi", "parallel") else "single"
 
         steps_plan = self.plan_steps(title, description, deadline)
 
         with _get_conn() as conn:
             conn.execute(
-                "INSERT INTO missions (id, title, description, deadline, status, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, 'active', ?, ?)",
-                (mission_id, title, description, deadline, now, now),
+                "INSERT INTO missions (id, title, description, deadline, status, agent_mode, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, 'active', ?, ?, ?)",
+                (mission_id, title, description, deadline, mode, now, now),
             )
             step_rows = []
             for i, sp in enumerate(steps_plan):
@@ -213,6 +222,7 @@ class MissionPlanner:
             "description": description,
             "deadline": deadline,
             "status": "active",
+            "agent_mode": mode,
             "steps": step_rows,
             "created_at": now,
         }
@@ -251,11 +261,44 @@ class MissionExecutor:
             logger.error(f"ReAct agent selhal pro krok '{step_description[:60]}': {e}")
             return f"CHYBA: {e}"
 
+    def _run_multi_agent(self, step_description: str) -> str:
+        """Multi-agent orchestrace (Planner→Researcher→Executor→Critic)."""
+        try:
+            from agent_roles import MultiAgentOrchestrator
+            from commands import CommandExecutor
+            url = self._config.get("ollama_url", "http://localhost:11434/api/chat")
+            model = self._config.get("ollama_model", "qwen2.5:3b")
+            orch = MultiAgentOrchestrator(url, model, executor=CommandExecutor(self._config))
+            return orch.run(step_description, max_steps=5)
+        except Exception as e:
+            logger.error(f"Multi-agent selhal: {e}")
+            return f"CHYBA: {e}"
+
+    def _run_parallel(self, step_description: str) -> str:
+        """Paralelní multi-agent vlny."""
+        try:
+            from agent_roles import MultiAgentOrchestrator
+            from commands import CommandExecutor
+            url = self._config.get("ollama_url", "http://localhost:11434/api/chat")
+            model = self._config.get("ollama_model", "qwen2.5:3b")
+            orch = MultiAgentOrchestrator(url, model, executor=CommandExecutor(self._config))
+            return orch.run_parallel(step_description, max_steps=6)
+        except Exception as e:
+            logger.error(f"Parallel multi-agent selhal: {e}")
+            return f"CHYBA: {e}"
+
+    def _run_step_agent(self, step_description: str, agent_mode: str) -> str:
+        if agent_mode == "multi":
+            return self._run_multi_agent(step_description)
+        if agent_mode == "parallel":
+            return self._run_parallel(step_description)
+        return self._run_react(step_description)
+
     def _due_steps(self, conn: sqlite3.Connection) -> List[sqlite3.Row]:
         today = datetime.utcnow().date().isoformat()
         return conn.execute(
             """
-            SELECT s.*, m.status AS mission_status
+            SELECT s.*, m.status AS mission_status, m.agent_mode AS agent_mode
             FROM mission_steps s
             JOIN missions m ON m.id = s.mission_id
             WHERE s.status = 'pending'
@@ -303,7 +346,8 @@ class MissionExecutor:
             logger.error(f"DB update step running selhal: {e}")
             return
 
-        result = self._run_react(desc)
+        agent_mode = step.get("agent_mode") or "single"
+        result = self._run_step_agent(desc, agent_mode)
         success = not result.startswith("CHYBA:")
         now = _now()
         new_attempts = attempts + 1
@@ -528,8 +572,9 @@ class MissionManager:
     # ── Public API ───────────────────────────────────────────────────────────
 
     def create_mission(self, title: str, description: str,
-                       deadline: Optional[str] = None) -> Dict[str, Any]:
-        return self._planner.create_mission(title, description, deadline)
+                       deadline: Optional[str] = None,
+                       agent_mode: str = "single") -> Dict[str, Any]:
+        return self._planner.create_mission(title, description, deadline, agent_mode=agent_mode)
 
     def list_missions(self) -> List[Dict[str, Any]]:
         try:

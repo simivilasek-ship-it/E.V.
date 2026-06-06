@@ -46,6 +46,16 @@ const NODE_LABELS: Record<NodeType, string> = {
   notify:    'NOTIFY',
 }
 
+const NODE_HINTS: Record<NodeType, string> = {
+  trigger:   'Spouští workflow (event, čas, manuálně)',
+  condition: 'Větev podle výrazu (true/false)',
+  action:    'Příkaz pro JARVIS (jako v chatu)',
+  delay:     'Pauza před dalším krokem (sekundy)',
+  notify:    'Desktop notifikace uživateli',
+}
+
+const GRID = 20
+
 function jitterOffset(): number {
   return (Math.random() - 0.5) * 80
 }
@@ -60,6 +70,33 @@ const NODE_CONFIG_FIELDS: Record<NodeType, { key: string; label: string }[]> = {
 
 function genId(): string {
   return Math.random().toString(36).slice(2, 10)
+}
+
+function snap(v: number, grid = GRID): number {
+  return Math.round(v / grid) * grid
+}
+
+function topoOrder(nodes: WorkflowNode[], edges: WorkflowEdge[]): WorkflowNode[] {
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]))
+  const indeg: Record<string, number> = Object.fromEntries(nodes.map(n => [n.id, 0]))
+  const ch: Record<string, string[]> = Object.fromEntries(nodes.map(n => [n.id, []]))
+  for (const e of edges) {
+    if (byId[e.from] && byId[e.to]) {
+      ch[e.from].push(e.to)
+      indeg[e.to] = (indeg[e.to] || 0) + 1
+    }
+  }
+  const q = nodes.filter(n => indeg[n.id] === 0).map(n => n.id)
+  const order: WorkflowNode[] = []
+  while (q.length) {
+    const id = q.shift()!
+    if (byId[id]) order.push(byId[id])
+    for (const t of ch[id] || []) {
+      indeg[t] -= 1
+      if (indeg[t] === 0) q.push(t)
+    }
+  }
+  return order.length === nodes.length ? order : nodes
 }
 
 function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
@@ -89,9 +126,45 @@ export default function WorkflowEditor() {
   const [connecting, setConnecting] = useState<ConnectState | null>(null)
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const [saveStatus, setSaveStatus] = useState<string>('')
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [snapGrid, setSnapGrid] = useState(true)
+  const [testLog, setTestLog] = useState<string[]>([])
+  const [history, setHistory] = useState<Workflow[]>([])
   const svgRef = useRef<SVGSVGElement>(null)
 
   const selectedNode = workflow.nodes.find(n => n.id === selectedId) ?? null
+  const execOrder = topoOrder(workflow.nodes, workflow.edges)
+
+  function pushHistory() {
+    setHistory(h => [...h.slice(-24), JSON.parse(JSON.stringify(workflow)) as Workflow])
+  }
+
+  function undo() {
+    setHistory(h => {
+      if (!h.length) return h
+      const prev = h[h.length - 1]
+      setWorkflow(prev)
+      return h.slice(0, -1)
+    })
+  }
+
+  function duplicateSelected() {
+    if (!selectedId) return
+    pushHistory()
+    const src = workflow.nodes.find(n => n.id === selectedId)
+    if (!src) return
+    const copy: WorkflowNode = {
+      ...src,
+      id: genId(),
+      x: src.x + 40,
+      y: src.y + 40,
+      label: `${src.label} copy`,
+      config: { ...src.config },
+    }
+    setWorkflow(w => ({ ...w, nodes: [...w.nodes, copy] }))
+    setSelectedId(copy.id)
+  }
 
   function toSvgCoords(clientX: number, clientY: number): { x: number; y: number } {
     const svg = svgRef.current
@@ -126,6 +199,16 @@ export default function WorkflowEditor() {
   }, [drag])
 
   function handleSvgMouseUp() {
+    if (drag && snapGrid) {
+      setWorkflow(w => ({
+        ...w,
+        nodes: w.nodes.map(n =>
+          n.id === drag.nodeId
+            ? { ...n, x: snap(n.x), y: snap(n.y) }
+            : n,
+        ),
+      }))
+    }
     setDrag(null)
   }
 
@@ -156,6 +239,7 @@ export default function WorkflowEditor() {
   }
 
   function addNode(type: NodeType) {
+    pushHistory()
     const svg = svgRef.current
     const cx = svg ? svg.clientWidth / 2 : 300
     const cy = svg ? svg.clientHeight / 2 : 250
@@ -172,6 +256,7 @@ export default function WorkflowEditor() {
 
   function deleteSelected() {
     if (!selectedId) return
+    pushHistory()
     setWorkflow(w => ({
       ...w,
       nodes: w.nodes.filter(n => n.id !== selectedId),
@@ -196,6 +281,30 @@ export default function WorkflowEditor() {
         n.id === selectedId ? { ...n, config: { ...n.config, [key]: value } } : n,
       ),
     }))
+  }
+
+  async function handleTestRun() {
+    setTestLog(['Spouštím test run…'])
+    try {
+      const res = await fetch('/api/workflows/graph/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodes: workflow.nodes, edges: workflow.edges }),
+      })
+      const data = await res.json()
+      if (!data.ok) {
+        setTestLog([data.error || 'Test selhal'])
+        return
+      }
+      const lines = (data.results || []).map((r: { node: string; command?: string; result?: string; error?: string; skipped?: boolean }) => {
+        if (r.skipped) return `• ${r.node}: přeskočeno`
+        if (r.error) return `• ${r.command}: CHYBA ${r.error}`
+        return `• ${r.command}: ${String(r.result).slice(0, 120)}`
+      })
+      setTestLog(lines.length ? lines : ['Žádné action uzly k provedení'])
+    } catch {
+      setTestLog(['API nedostupné'])
+    }
   }
 
   async function handleSave() {
@@ -267,10 +376,13 @@ export default function WorkflowEditor() {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return
-      if (!selectedId) return
       const tag = (e.target as HTMLElement).tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      const inField = tag === 'INPUT' || tag === 'TEXTAREA'
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); return }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') { e.preventDefault(); duplicateSelected(); return }
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); handleSave(); return }
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      if (!selectedId || inField) return
       deleteSelected()
     }
     window.addEventListener('keydown', onKey)
@@ -309,6 +421,12 @@ export default function WorkflowEditor() {
         <button style={btnStyle} onClick={handleExport}>Export JSON</button>
         <button style={btnStyle} onClick={handleImport}>Import JSON</button>
         <button style={{ ...btnStyle, color: '#f97316', borderColor: '#3a2010' }} onClick={handleClear}>Clear</button>
+        <button style={{ ...btnStyle, color: '#00e5a0', borderColor: '#0a4030' }} onClick={handleTestRun}>▶ Test</button>
+        <button style={btnStyle} onClick={undo} title="Ctrl+Z">Undo</button>
+        <button style={btnStyle} onClick={() => setSnapGrid(s => !s)}>{snapGrid ? 'Snap ✓' : 'Snap'}</button>
+        <button style={btnStyle} onClick={() => setZoom(z => Math.min(2, +(z + 0.1).toFixed(1)))}>+</button>
+        <button style={btnStyle} onClick={() => setZoom(z => Math.max(0.5, +(z - 0.1).toFixed(1)))}>−</button>
+        <span style={{ fontSize: 10, color: '#4a6a8a' }}>{Math.round(zoom * 100)}%</span>
         {saveStatus && (
           <span style={{ fontSize: 11, color: saveStatus.includes('✓') ? '#00e5a0' : '#f97316' }}>
             {saveStatus}
@@ -330,19 +448,21 @@ export default function WorkflowEditor() {
             <button
               key={type}
               onClick={() => addNode(type)}
+              title={NODE_HINTS[type]}
               style={{
                 background: `${NODE_COLORS[type]}15`,
                 border: `1px solid ${NODE_COLORS[type]}44`,
                 borderRadius: 5, color: NODE_COLORS[type],
                 padding: '7px 4px', fontSize: 10, cursor: 'pointer',
-                letterSpacing: '0.1em', ...mono,
+                letterSpacing: '0.1em', ...mono, textAlign: 'left',
               }}
             >
-              {NODE_LABELS[type]}
+              <div>{NODE_LABELS[type]}</div>
+              <div style={{ fontSize: 7, opacity: 0.7, marginTop: 2, letterSpacing: 0 }}>{NODE_HINTS[type]}</div>
             </button>
           ))}
           <div style={{ marginTop: 'auto', fontSize: 8, color: '#2a4060', lineHeight: 1.5 }}>
-            Klikni pro přidání uzlu na canvas
+            Ctrl+Z undo · Ctrl+D duplikát · Ctrl+S uložit
           </div>
         </div>
 
@@ -357,7 +477,12 @@ export default function WorkflowEditor() {
           onMouseMove={handleSvgMouseMove}
           onMouseUp={handleSvgMouseUp}
           onClick={handleSvgClick}
+          onWheel={e => {
+            e.preventDefault()
+            setZoom(z => Math.min(2, Math.max(0.5, +(z - e.deltaY * 0.001).toFixed(2))))
+          }}
         >
+          <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
           <defs>
             <pattern id="wf-hex" x="0" y="0" width="30" height="26" patternUnits="userSpaceOnUse">
               <path d="M15 0 L30 8 L30 18 L15 26 L0 18 L0 8 Z"
@@ -511,6 +636,7 @@ export default function WorkflowEditor() {
               KLIKNI NA TYP UZLU VLEVO PRO PŘIDÁNÍ
             </text>
           )}
+          </g>
         </svg>
 
         {/* Right Panel */}
@@ -577,6 +703,26 @@ export default function WorkflowEditor() {
             <div style={{ fontSize: 10, color: '#2a4060' }}>
               Vyber uzel pro editaci.{'\n'}Klikni na output dot (pravý kroužek) a přetáhni na input dot (levý kroužek) jiného uzlu pro propojení.
             </div>
+          )}
+
+          <div style={{ height: 1, background: '#1a3050', margin: '4px 0' }} />
+          <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a', marginBottom: 2 }}>
+            EXEC ORDER ({execOrder.length})
+          </div>
+          {execOrder.map((n, i) => (
+            <div key={n.id} style={{ fontSize: 9, color: NODE_COLORS[n.type], opacity: 0.9 }}>
+              {i + 1}. {n.label} <span style={{ color: '#4a6a8a' }}>({n.type})</span>
+            </div>
+          ))}
+
+          {testLog.length > 0 && (
+            <>
+              <div style={{ height: 1, background: '#1a3050', margin: '4px 0' }} />
+              <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a' }}>TEST LOG</div>
+              {testLog.map((line, i) => (
+                <div key={i} style={{ fontSize: 8, color: '#5a7a9a', lineHeight: 1.4 }}>{line}</div>
+              ))}
+            </>
           )}
 
           {workflow.edges.length > 0 && (
