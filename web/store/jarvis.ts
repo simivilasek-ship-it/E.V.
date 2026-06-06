@@ -21,6 +21,13 @@ export interface SystemMetrics {
   ram_gb?: number; ram_total?: number
 }
 
+export interface PendingConfirm {
+  id: string
+  action: string
+  params: Record<string, unknown>
+  timeout_s?: number
+}
+
 interface JarvisState {
   // Connection
   orbState:    OrbState
@@ -35,6 +42,7 @@ interface JarvisState {
   connStatus:  ConnStatus
   connError:   string | null
   isMicActive: boolean
+  pendingConfirm: PendingConfirm | null
   quickActionHistory: string[]
 
   // Internal
@@ -43,6 +51,8 @@ interface JarvisState {
   _retryId:   ReturnType<typeof setTimeout> | null
   _metricsWs: WebSocket | null
   _chatWs:    WebSocket | null
+  _confirmWs: WebSocket | null
+  _recognition: SpeechRecognition | null
 
   // Actions
   connect:        () => Promise<void>
@@ -50,6 +60,9 @@ interface JarvisState {
   retry:          () => void
   connectMetrics: () => void
   connectChat:    () => void
+  connectConfirm: () => void
+  respondConfirm: (approved: boolean) => void
+  toggleMic:      () => void
   sendCommand:    (text: string) => Promise<void>
   addMessage:     (text: string, sender: 'user' | 'jarvis', extra?: Partial<Message>) => void
   updateLastMessage: (patch: Partial<Message>) => void
@@ -99,8 +112,10 @@ export const useJarvis = create<JarvisState>((set, get) => ({
   system: { cpu: 0, ram: 0, disk: 0, cpu_temp: null, net: null, gpu: null },
   agents: {}, plugins: [], currentModel: '',
   isConnected: false, connStatus: 'disconnected', connError: null, isMicActive: false,
+  pendingConfirm: null,
   quickActionHistory: [],
-  _ws: null, _attempt: 0, _retryId: null, _metricsWs: null, _chatWs: null,
+  _ws: null, _attempt: 0, _retryId: null, _metricsWs: null, _chatWs: null, _confirmWs: null,
+  _recognition: null,
 
   async checkBackend() {
     try {
@@ -196,6 +211,52 @@ export const useJarvis = create<JarvisState>((set, get) => ({
       if (get().isConnected) setTimeout(() => get().connectMetrics(), 5000)
     }
     set({ _metricsWs: ws })
+  },
+
+  connectConfirm() {
+    const existing = get()._confirmWs
+    if (existing && existing.readyState <= WebSocket.OPEN) return
+    let ws: WebSocket
+    try { ws = new WebSocket(`${getWsBase()}/ws/confirm`) } catch { return }
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data)
+        if (msg.type === 'confirm_request') {
+          set({
+            pendingConfirm: {
+              id: msg.id,
+              action: msg.action,
+              params: msg.params || {},
+              timeout_s: msg.timeout_s,
+            },
+          })
+        } else if (msg.type === 'confirm_resolved' || msg.type === 'confirm_timeout') {
+          set({ pendingConfirm: null })
+        }
+      } catch {}
+    }
+    ws.onclose = () => {
+      set({ _confirmWs: null })
+      if (get().isConnected) setTimeout(() => get().connectConfirm(), 3000)
+    }
+    set({ _confirmWs: ws })
+  },
+
+  respondConfirm(approved: boolean) {
+    const pending = get().pendingConfirm
+    if (!pending) return
+    const payload = JSON.stringify({ type: 'confirm_response', id: pending.id, approved })
+    const ws = get()._confirmWs
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(payload)
+    } else {
+      fetch(`${getApiBase()}/api/confirm/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pending.id, approved }),
+      }).catch(() => {})
+    }
+    set({ pendingConfirm: null })
   },
 
   connectChat() {
@@ -309,5 +370,48 @@ export const useJarvis = create<JarvisState>((set, get) => ({
       const d = await fetch(`${getApiBase()}/api/plugins`).then(r => r.json())
       get().setPlugins(d.plugins || [])
     } catch {}
+  },
+
+  toggleMic() {
+    const { isMicActive, _recognition } = get()
+    if (isMicActive && _recognition) {
+      _recognition.stop()
+      set({ isMicActive: false, _recognition: null, orbState: 'idle' })
+      return
+    }
+
+    const SR = typeof window !== 'undefined'
+      ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+      : undefined
+    if (!SR) {
+      get().addToast('Hlas není podporován v tomto prohlížeči (zkus Chrome)', 'error')
+      return
+    }
+
+    const rec = new SR()
+    rec.lang = 'cs-CZ'
+    rec.interimResults = false
+    rec.maxAlternatives = 1
+
+    rec.onstart = () => {
+      set({ isMicActive: true, _recognition: rec, orbState: 'listening' })
+    }
+    rec.onresult = (ev: SpeechRecognitionEvent) => {
+      const text = ev.results?.[0]?.[0]?.transcript?.trim()
+      if (text) get().sendCommand(text)
+    }
+    rec.onerror = () => {
+      set({ isMicActive: false, _recognition: null, orbState: 'idle' })
+      get().addToast('Chyba rozpoznávání hlasu', 'error')
+    }
+    rec.onend = () => {
+      set({ isMicActive: false, _recognition: null, orbState: 'idle' })
+    }
+
+    try {
+      rec.start()
+    } catch {
+      get().addToast('Mikrofon nelze spustit — zkontroluj oprávnění', 'error')
+    }
   },
 }))

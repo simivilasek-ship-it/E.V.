@@ -3,7 +3,7 @@ JARVIS — Konfigurace
 Načítání a validace z .env, config.json s fallbackem na defaults
 """
 
-__version__ = "4.6.0"
+__version__ = "5.1.0"
 
 import os
 import json
@@ -103,7 +103,7 @@ DEFAULT_CONFIG = {
     "computer_use_backend": "auto",  # auto|windows_uia|macos_ax|linux_atspi
 
     # Live audio / duplex
-    "audio_ws_enabled": False,
+    "audio_ws_enabled": True,
     "vad_enabled": True,
     "vad_mode": "auto",  # auto|webrtcvad|rms
     "vad_sample_rate": 16000,

@@ -404,7 +404,15 @@ def confirm_action(action: str, params: Dict[str, Any], parent=None) -> bool:
     except Exception:
         pass
 
-    # Headless fallback — konzolové potvrzení
+    # Web UI confirmation (headless with connected browser)
+    try:
+        from confirmation_bridge import has_active_clients, request_confirmation
+        if has_active_clients():
+            return request_confirmation(action, params, timeout=60.0)
+    except ImportError:
+        pass
+
+    # Headless fallback — env opt-in only
     import os
     approve_env = str(os.environ.get("JARVIS_HEADLESS_APPROVE_ELEVATED", "")).lower() in ("1", "true", "yes")
 

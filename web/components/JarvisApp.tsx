@@ -6,23 +6,25 @@ import ChatPanel from './ChatPanel'
 import ToastContainer from './Toast'
 import ErrorBoundary from './ErrorBoundary'
 import Spotlight from './Spotlight'
+import ConfirmModal from './ConfirmModal'
 import dynamic from 'next/dynamic'
 import { JarvisStatusBar } from './HeroPanel'
 
 // Lazy load heavy panels
 const SystemPanel  = dynamic(() => import('./SystemPanel'),  { ssr: false })
 const DashboardPanel = dynamic(() => import('./DashboardPanel'), { ssr: false })
-const PluginStore  = dynamic(() => import('./PluginStore'),  { ssr: false })
-const AgentGraph   = dynamic(() => import('./AgentGraph'),   { ssr: false })
+const PluginMarketplace = dynamic(() => import('./PluginMarketplace'), { ssr: false })
+const AgentGraphV2 = dynamic(() => import('./AgentGraphV2'), { ssr: false })
 const AgentTimeline = dynamic(() => import('./AgentTimeline'), { ssr: false })
 const MemoryGraph  = dynamic(() => import('./MemoryGraph'),  { ssr: false })
 const SkillGenerator = dynamic(() => import('./SkillGenerator'), { ssr: false })
+const WorkflowEditor = dynamic(() => import('./WorkflowEditor'), { ssr: false })
 const SettingsPanel  = dynamic(() => import('./SettingsPanel'),  { ssr: false })
 
 const NAV_KEYS: Record<string, Tab> = {
   '1': 'CHAT', '2': 'SYSTEM', '3': 'PLUGINS', '4': 'SKILL',
   '5': 'AGENT', '6': 'TIMELINE', '7': 'MEMORY', '8': 'DASHBOARD',
-  '9': 'SETTINGS',
+  '9': 'SETTINGS', '0': 'WORKFLOW',
 }
 
 function useTheme() {
@@ -47,6 +49,7 @@ export default function JarvisApp() {
   const connect        = useJarvis(s => s.connect)
   const connectMetrics = useJarvis(s => s.connectMetrics)
   const connectChat    = useJarvis(s => s.connectChat)
+  const connectConfirm = useJarvis(s => s.connectConfirm)
   const connError      = useJarvis(s => s.connError)
   const clearMessages  = useJarvis(s => s.clearMessages)
   const retry          = useJarvis(s => s.retry)
@@ -55,7 +58,9 @@ export default function JarvisApp() {
   const [spotlightOpen, setSpotlightOpen] = useState(false)
   const [theme, toggleTheme] = useTheme()
 
-  useEffect(() => { connect(); connectMetrics(); connectChat() }, [connect, connectMetrics, connectChat])
+  useEffect(() => {
+    connect(); connectMetrics(); connectChat(); connectConfirm()
+  }, [connect, connectMetrics, connectChat, connectConfirm])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -118,13 +123,20 @@ export default function JarvisApp() {
             )}
             {tab === 'PLUGINS' && (
               <PageWrapper>
-                <div className="card p-5"><ErrorBoundary><PluginStore /></ErrorBoundary></div>
+                <div className="card p-5"><ErrorBoundary><PluginMarketplace /></ErrorBoundary></div>
               </PageWrapper>
             )}
             {tab === 'AGENT' && (
               <PageWrapper>
                 <div className="card p-0 overflow-hidden">
-                  <ErrorBoundary><AgentGraph active={tab === 'AGENT'} /></ErrorBoundary>
+                  <ErrorBoundary><AgentGraphV2 active={tab === 'AGENT'} /></ErrorBoundary>
+                </div>
+              </PageWrapper>
+            )}
+            {tab === 'WORKFLOW' && (
+              <PageWrapper>
+                <div className="card p-0 overflow-hidden">
+                  <ErrorBoundary><WorkflowEditor /></ErrorBoundary>
                 </div>
               </PageWrapper>
             )}
@@ -153,10 +165,11 @@ export default function JarvisApp() {
         </div>
 
         <ToastContainer />
+        <ConfirmModal />
       <Spotlight
         open={spotlightOpen}
         onClose={() => setSpotlightOpen(false)}
-        onCommand={(cmd) => { setTab('CHAT'); setSpotlightOpen(false) }}
+        onCommand={() => { setTab('CHAT'); setSpotlightOpen(false) }}
       />
         {paletteOpen && (
           <div className="fixed inset-0 z-50 flex items-start justify-center pt-28"

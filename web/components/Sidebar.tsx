@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useJarvis } from '@/store/jarvis'
 import { Icons } from './Icons'
 
-export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS'
+export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW'
 
 interface NavItem { id: Tab; label: string; icon: React.ReactNode; key: string; hint: string }
 interface NavGroup { label: string | null; items: NavItem[] }
@@ -14,8 +14,9 @@ const NAV_GROUPS: NavGroup[] = [
   ]},
   { label: 'NÁSTROJE', items: [
     { id: 'SYSTEM',    label: 'Systém',    icon: Icons.system,   key: '2', hint: 'CPU/RAM metriky' },
-    { id: 'PLUGINS',   label: 'Pluginy',   icon: Icons.plugins,  key: '3', hint: 'Plugin store' },
+    { id: 'PLUGINS',   label: 'Pluginy',   icon: Icons.plugins,  key: '3', hint: 'Marketplace' },
     { id: 'SKILL',     label: 'Skill Gen', icon: Icons.skill,    key: '4', hint: 'Generátor skillů' },
+    { id: 'WORKFLOW',  label: 'Workflow',  icon: Icons.workflow, key: '0', hint: 'Automatizace' },
   ]},
   { label: 'INTELIGENCE', items: [
     { id: 'AGENT',     label: 'Agent',     icon: Icons.agent,    key: '5', hint: 'Graf agentů' },

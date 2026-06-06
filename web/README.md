@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# JARVIS Web UI (Next.js)
 
-## Getting Started
+Frontend pro JARVIS v5 — HUD dashboard napojený na FastAPI backend (`:8002`).
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** + **React 19** + **TypeScript**
+- **Tailwind CSS 4** + glassmorphism theme (dark/light)
+- **Zustand** — global state + WebSocket connections
+
+## Spuštění (dev)
 
 ```bash
+# Terminal 1 — backend
+python dashboard.py
+
+# Terminal 2 — frontend
+cd web
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Otevři [http://localhost:3000](http://localhost:3000). API/WS proxy v dev módu jde přímo na `127.0.0.1:8002`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Produkční build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+bash scripts/build.sh   # vytvoří ../web_dist
+python dashboard.py     # UI na http://localhost:8002/app
+```
 
-## Learn More
+## Panely (Alt+1..0)
 
-To learn more about Next.js, take a look at the following resources:
+| Klávesa | Panel | Komponenta |
+|---------|-------|------------|
+| Alt+1 | Chat | `ChatPanel` — streaming WS, mikrofon |
+| Alt+2 | Systém | `SystemPanel` |
+| Alt+3 | Pluginy | `PluginMarketplace` |
+| Alt+4 | Skill Gen | `SkillGenerator` |
+| Alt+5 | Agent | `AgentGraphV2` — live graph + reasoning |
+| Alt+6 | Timeline | `AgentTimeline` |
+| Alt+7 | Paměť | `MemoryGraph` |
+| Alt+8 | Dashboard | `DashboardPanel` |
+| Alt+9 | Nastavení | `SettingsPanel` + `AuditLogPanel` |
+| Alt+0 | Workflow | `WorkflowEditor` |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## WebSocket kanály
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Endpoint | Účel |
+|----------|------|
+| `/ws/chat` | Streaming LLM odpovědi |
+| `/ws/logs` | Live logy |
+| `/ws/agents` | CPU/RAM metriky (2s) |
+| `/ws/graph` | Agent graph events |
+| `/ws/confirm` | Potvrzování nebezpečných akcí |
+| `/ws/audio` | VAD / duplex audio (backend) |
 
-## Deploy on Vercel
+## Voice v prohlížeči
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Tlačítko mikrofonu v chatu používá **Web Speech API** (nejlepší v Chrome).
+Pro plný duplex STT/TTS použij desktop mód (`whisper_live.py`).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Skripty
+
+```bash
+npm run dev        # dev server :3000
+npm run build      # static export → web/out
+npm run lint       # ESLint
+npm run typecheck  # tsc --noEmit
+```
+
+## Struktura
+
+```
+web/
+├── app/              # Next.js App Router
+├── components/       # UI panely
+├── store/jarvis.ts   # Zustand + WS
+└── lib/api.ts        # API base helper
+```
+
+→ Backend API: [docs/api-reference.md](../docs/api-reference.md)

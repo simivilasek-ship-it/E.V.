@@ -40,6 +40,17 @@ Konfigurace se načítá v pořadí: `DEFAULT_CONFIG` → `config.json` → `.en
 
 ---
 
+## Web UI & bezpečnost
+
+| Klíč / Env | Výchozí | Popis |
+|------------|---------|-------|
+| `audio_ws_enabled` | `true` | WebSocket `/ws/audio` pro VAD/duplex |
+| `JARVIS_HEADLESS_APPROVE_ELEVATED` | *(unset)* | Opt-in auto-schválení ELEVATED v headless bez web UI |
+
+Pokud je otevřený web dashboard, nebezpečné akce čekají na modal v prohlížeči (`/ws/confirm`).
+
+---
+
 ## Whisper Live (real-time STT)
 
 | Klíč | Výchozí | Popis |

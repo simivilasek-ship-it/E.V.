@@ -46,6 +46,10 @@ const NODE_LABELS: Record<NodeType, string> = {
   notify:    'NOTIFY',
 }
 
+function jitterOffset(): number {
+  return (Math.random() - 0.5) * 80
+}
+
 const NODE_CONFIG_FIELDS: Record<NodeType, { key: string; label: string }[]> = {
   trigger:   [{ key: 'event', label: 'Event name' }],
   condition: [{ key: 'expression', label: 'Expression' }],
@@ -157,8 +161,8 @@ export default function WorkflowEditor() {
     const cy = svg ? svg.clientHeight / 2 : 250
     const newNode: WorkflowNode = {
       id: genId(), type,
-      x: cx + (Math.random() - 0.5) * 80,
-      y: cy + (Math.random() - 0.5) * 80,
+      x: cx + jitterOffset(),
+      y: cy + jitterOffset(),
       label: NODE_LABELS[type],
       config: {},
     }

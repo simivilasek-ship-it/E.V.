@@ -345,6 +345,14 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
     }
   }, [replaying])
 
+  const [timelineNow, setTimelineNow] = useState(0)
+  useEffect(() => {
+    const tick = () => setTimelineNow(Date.now())
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+
   // ── Offline state ──────────────────────────────────────────────────────────
   if (status === 'offline') {
     return (
@@ -364,7 +372,6 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
 
   // Timeline: last 30 min, show last 60 entries max
   const timelineSlice = timeline.slice(-60)
-  const now = Date.now()
   const timelineWindowMs = 30 * 60 * 1000
 
   return (
@@ -582,7 +589,7 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
             </span>
           ))}
           {timelineSlice.map(entry => {
-            const age = now - entry.ts
+            const age = timelineNow - entry.ts
             if (age > timelineWindowMs) return null
             const leftPct = ((timelineWindowMs - age) / timelineWindowMs) * 100
             return (

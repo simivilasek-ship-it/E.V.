@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "jarvis-assistant"
-version = "4.6.0"
+version = "5.1.0"
 description = "Lokální AI asistent — ovládej celý PC hlasem nebo textem, 100 % offline"
 readme = "README.md"
 license = { text = "MIT" }
@@ -86,6 +86,20 @@ jarvis-desktop = "app_desktop:main"
 jarvis-setup   = "setup_wizard:run"
 jarvis-dash    = "dashboard:run_dashboard"
 
+[tool.coverage.run]
+omit = [
+    "test_*",
+    "setup.py",
+    "web/*",
+    "gui_legacy/*",
+    "scripts/split_dashboard.py",
+    "src/api/dashboard.py",
+]
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true
+
 [project.urls]
 Homepage     = "https://github.com/simivilasek-ship-it/Jarvis"
 Repository   = "https://github.com/simivilasek-ship-it/Jarvis"
@@ -94,7 +108,7 @@ Changelog    = "https://github.com/simivilasek-ship-it/Jarvis/blob/main/CHANGELO
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["commands*", "gui*"]
+include = ["commands*", "gui*", "src*"]
 
 [tool.ruff]
 line-length = 100

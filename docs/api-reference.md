@@ -547,6 +547,32 @@ Odešle desktopovou notifikaci.
 
 ---
 
+## Audit log
+
+### `GET /api/audit`
+
+Vrátí poslední security záznamy z `~/.jarvis_audit.jsonl`.
+
+Query: `limit` (1–500, default 50)
+
+```json
+[
+  {
+    "timestamp": 1717654321.5,
+    "action": "shell_exec",
+    "params": {"cmd": "ls"},
+    "allowed": false,
+    "reason": "Shell příkaz není v whitelistu",
+    "user_text": "spusť ls",
+    "result": ""
+  }
+]
+```
+
+UI: panel **Nastavení → Security audit log** (auto-refresh 15s).
+
+---
+
 ## Logy
 
 ### `WS /ws/logs`
@@ -556,6 +582,28 @@ Live log stream — každý záznam jako JSON:
 ```json
 { "level": "INFO",  "message": "LLM: odpověď vygenerována za 234ms", "ts": 1748901234.5 }
 { "level": "ERROR", "message": "Groq timeout po 30s, fallback na Ollama", "ts": 1748901240.1 }
+```
+
+---
+
+## Potvrzování akcí (Security)
+
+### `WS /ws/confirm`
+
+Kanál pro schvalování ELEVATED/RESTRICTED akcí ve web UI.
+
+```
+Server → Klient: { "type": "confirm_request", "id": "abc", "action": "delete_file", "params": {...}, "timeout_s": 60 }
+Klient → Server: { "type": "confirm_response", "id": "abc", "approved": true }
+Server → Klient: { "type": "confirm_resolved", "id": "abc", "approved": true }
+```
+
+### `POST /api/confirm/respond`
+
+REST fallback pro confirmation modal.
+
+```json
+{ "id": "abc123", "approved": true }
 ```
 
 ---

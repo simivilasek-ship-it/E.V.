@@ -30,7 +30,7 @@ def main():
         description=f"JARVIS v{__version__} — lokální AI asistent",
     )
     parser.add_argument("--gui",       action="store_true",
-                        help="[LEGACY] Tkinter GUI (přesunuto do gui_legacy/; výchozí je Next.js web UI)")
+                        help="[LEGACY] Tkinter GUI (deprecated; výchozí je Next.js web UI na /app)")
     parser.add_argument("--webview",   action="store_true",
                         help="Nativní pywebview okno (místo prohlížeče)")
     parser.add_argument("--tray",      action="store_true",

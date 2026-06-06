@@ -52,7 +52,8 @@ jobs:
         run: |
           python -m pytest tests/ test_jarvis.py -q --timeout=30 \
             --cov=. --cov-report=xml --cov-report=term-missing \
-            --cov-omit="test_*,setup.py,web/*"
+            --cov-fail-under=70 \
+            --cov-omit="test_*,setup.py,web/*,gui_legacy/*,scripts/split_dashboard.py"
         env:
           DISPLAY: ":99"
 

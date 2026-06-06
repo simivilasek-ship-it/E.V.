@@ -140,6 +140,8 @@ export default function ChatPanel() {
   const sendCmd   = useJarvis(s => s.sendCommand)
   const clearMsgs = useJarvis(s => s.clearMessages)
   const orbState  = useJarvis(s => s.orbState)
+  const isMicActive = useJarvis(s => s.isMicActive)
+  const toggleMic = useJarvis(s => s.toggleMic)
   const bottomRef = useRef<HTMLDivElement>(null)
   const taRef     = useRef<HTMLTextAreaElement>(null)
   const [hist, setHist] = useState<string[]>([])
@@ -286,6 +288,21 @@ export default function ChatPanel() {
         {/* Textarea box */}
         <div className="flex gap-2 items-end rounded-[14px] px-4 py-2 transition-all"
           style={{ background: 'rgba(6,12,26,.85)', border: '1px solid rgba(0,200,255,.16)', boxShadow: '0 4px 24px rgba(0,0,0,.35)' }}>
+          <button
+            type="button"
+            onClick={toggleMic}
+            disabled={busy}
+            title={isMicActive ? 'Zastavit mikrofon' : 'Mluvit (Web Speech API)'}
+            className="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center transition-all"
+            style={{
+              background: isMicActive ? 'rgba(244,63,94,.15)' : 'rgba(255,255,255,.04)',
+              border: isMicActive ? '1px solid rgba(244,63,94,.35)' : '1px solid rgba(255,255,255,.08)',
+              color: isMicActive ? 'var(--red)' : 'var(--muted)',
+              cursor: busy ? 'not-allowed' : 'pointer',
+              boxShadow: isMicActive ? '0 0 14px rgba(244,63,94,.25)' : 'none',
+            }}>
+            {Icons.mic}
+          </button>
           <textarea
             ref={taRef}
             value={input}
@@ -318,7 +335,7 @@ export default function ChatPanel() {
         </div>
 
         <div className="text-center font-mono text-[9px]" style={{ color: 'var(--muted)' }}>
-          ↵ odeslat · ⇧↵ nový řádek · ↑↓ historie
+          ↵ odeslat · 🎤 hlas (Chrome) · ⇧↵ nový řádek · ↑↓ historie
         </div>
       </div>
     </div>

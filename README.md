@@ -137,9 +137,11 @@ src/
 └── audio/     Whisper Live · Duplex · VAD · Edge-TTS
 ```
 
-Backend: **FastAPI** · Frontend: **Next.js** · Desktop: **pywebview**
+Backend: **FastAPI** (`src/api/routers/`) · Frontend: **Next.js** · Desktop: **pywebview**
 
-→ Full docs: **[docs/index.md](docs/index.md)**
+**Web dashboard (v5):** Agent Graph V2 (Alt+5), Plugin Marketplace (Alt+3), Workflow Editor (Alt+0), voice input in chat (Web Speech API), security confirmation modal, audit log in Settings.
+
+→ Full docs: **[docs/index.md](docs/index.md)** · Web UI: **[web/README.md](web/README.md)** · API: **[docs/api-reference.md](docs/api-reference.md)**
 
 ---
 
@@ -147,8 +149,9 @@ Backend: **FastAPI** · Frontend: **Next.js** · Desktop: **pywebview**
 
 - Shell commands go through a **blacklist** (`rm -rf /`, `dd`, reverse shells, fork bombs — always blocked)
 - Agent actions require **permission levels** — destructive ops need user confirmation
+- **Web UI confirmation modal** — when the browser is connected, ELEVATED actions wait for approve/deny (`/ws/confirm`)
 - Every action is **audit-logged** to `~/.jarvis_audit.jsonl`
-- Headless/CI mode blocks `ELEVATED` actions by default
+- Headless/CI without web client blocks `ELEVATED` by default (opt-in: `JARVIS_HEADLESS_APPROVE_ELEVATED=1`)
 
 ---
 

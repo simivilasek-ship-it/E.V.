@@ -23,7 +23,7 @@ Vítejte v kompletní dokumentaci JARVIS — autonomního AI asistenta který ov
 JARVIS (v5.0) je lokální AI asistent s těmito schopnostmi:
 
 ### Mluví a slyší v reálném čase
-Whisper Live: WebRTC VAD → Groq Whisper API (200 ms) nebo faster-whisper lokálně. Plná barge-in podpora — přerušíte JARVISe uprostřed věty.
+Whisper Live: WebRTC VAD → Groq Whisper API (200 ms) nebo faster-whisper lokálně. Web UI má mikrofon přes Web Speech API. Plná barge-in podpora — přerušíte JARVISe uprostřed věty.
 
 ### Vidí obrazovku a ovládá UI
 Screenshot → OCR (pytesseract, ~50 ms) → kliknutí přesně na popsaný element. Fallback na LLaVA vision (~2 s). Funguje v jakékoliv aplikaci.

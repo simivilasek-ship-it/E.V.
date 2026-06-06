@@ -22,6 +22,10 @@ JARVIS je vrstvená aplikace složená z Python backendu, Next.js frontendu a de
 │                   FastAPI Backend :8002                          │
 │                                                                  │
 │   POST /api/command   WS /ws/chat   WS /ws/graph   WS /ws/audio │
+│   WS /ws/confirm (ELEVATED action approval)                     │
+│                                                                 │
+│   FastAPI routes: src/api/routers/{monitoring,chat,plugins,...} │
+│   Entrypoint shim: dashboard.py → src/api/app.py                │
 └──────────────────────────────┬──────────────────────────────────┘
                                │
                                ▼

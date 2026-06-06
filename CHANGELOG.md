@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## [5.1.0] - 2026-06-06
+
+### Added
+- **Fáze 2 — produkční kvalita**
+- `src/api/routers/*` — rozdělený FastAPI backend (17 router modulů)
+- **Audit log panel** v Nastavení (`AuditLogPanel.tsx`, `GET /api/audit?limit=`)
+- CI **coverage gate ≥70 %**
+
+### Changed
+- `dashboard.py` → tenký shim nad `src/api/app.py`
+- `GET /` přesměrovává na `/app` (legacy HTML dashboard odstraněn)
+- `pyproject.toml` — balíček `src*`
+
+### Removed
+- `gui_legacy/` — nepoužívaná duplicita Tkinter GUI
+- `templates/dashboard.html` — nahrazeno Next.js UI
+- `src/api/dashboard.py` — stará duplicitní kopie
+
+---
+
+## [5.0.1] - 2026-06-06
+
+### Added
+- **Web confirmation modal** — ELEVATED/RESTRICTED akce čekají na schválení v prohlížeči (`/ws/confirm`, `ConfirmModal.tsx`)
+- **Voice input v chatu** — tlačítko mikrofonu přes Web Speech API (Chrome)
+- **V2 UI zapojeno** — `AgentGraphV2`, `PluginMarketplace`, `WorkflowEditor` (Alt+0) v hlavní navigaci
+- `confirmation_bridge.py` + testy `tests/test_confirmation_bridge.py`
+
+### Changed
+- Verze sjednocena na **5.0.0** (`config.py`, `pyproject.toml`)
+- `audio_ws_enabled` default `true` (VAD websocket připraven pro duplex)
+- Dokumentace aktualizována (`README`, `web/README`, `docs/`)
+
+### Security
+- Headless režim: pokud je připojen web klient, `confirm_action()` čeká na UI místo tichého zamítnutí
+
+---
+
 ## [5.0] - 2026-06-03
 
 ### Added

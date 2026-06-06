@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useJarvis } from '@/store/jarvis'
 import { apiUrl } from '@/lib/api'
+import AuditLogPanel from '@/components/AuditLogPanel'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -594,6 +595,8 @@ export default function SettingsPanel() {
           </div>
         )}
       </Section>
+
+      <AuditLogPanel />
     </div>
   )
 }
