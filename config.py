@@ -3,7 +3,7 @@ JARVIS — Konfigurace
 Načítání a validace z .env, config.json s fallbackem na defaults
 """
 
-__version__ = "5.5.0"
+__version__ = "5.6.0"
 
 import os
 import json
@@ -68,6 +68,7 @@ DEFAULT_CONFIG = {
     # Security
     "audit_log_file": "audit.log",
     "audit_enabled": True,
+    "api_bind_host": "127.0.0.1",
     "api_token": "",
     "api_auth_required": False,
     # Memory
@@ -214,6 +215,7 @@ def _load_env() -> Dict[str, Any]:
         "RATE_LIMIT_MAX": ("rate_limit_max", int),
         "AUDIT_LOG_FILE": "audit_log_file",
         "AUDIT_ENABLED": ("audit_enabled", lambda x: x.lower() == "true"),
+        "JARVIS_BIND_HOST": "api_bind_host",
         "JARVIS_API_TOKEN": "api_token",
         "JARVIS_API_AUTH_REQUIRED": (
             "api_auth_required",

@@ -34,13 +34,14 @@ class TestCommandExecutor:
         result = command_executor.execute("unknown_action_xyz", {})
         assert "Neznámá akce" in result or "error" in result.lower()
     
-    @patch('commands.utils.subprocess.Popen')
-    def test_open_app_chrome(self, mock_popen, command_executor):
+    @patch("commands.apps.safe_run", return_value={"rc": 0})
+    @patch("commands.apps.shutil.which", return_value="/usr/bin/google-chrome")
+    def test_open_app_chrome(self, _mock_which, mock_safe_run, command_executor):
         """Test opening Chrome application"""
         with patch("commands.apps.find_app", return_value="chrome"):
             result = command_executor._cmd_open_app(app="chrome")
             assert result == "ok"
-            mock_popen.assert_called_once()
+            assert mock_safe_run.called
     
     def test_open_app_not_found(self, command_executor):
         """Test that open_app always returns a string."""

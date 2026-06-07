@@ -82,13 +82,14 @@ class TestCmdHardwareInfo:
     def test_hardware_info_structure(self, mock_parts, mock_mem, mock_freq, mock_cc, mock_run):
         mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="")
         mock_freq.return_value = MagicMock(max=5000.0)
-        mock_mem.return_value  = MagicMock(total=32 * 1024**3, percent=40.0)
+        mock_mem.return_value  = MagicMock(total=32 * 1024**3, percent=40.0, available=16 * 1024**3)
         mock_parts.return_value = []
         from commands.system import cmd_hardware_info
         result = cmd_hardware_info()
-        assert "CPU" in result or "neznámý" in result
-        assert "RAM" in result
-        assert "OS" in result
+        assert "###" in result
+        assert "**Procesor**" in result
+        assert "**Paměť RAM**" in result
+        assert "**Operační systém**" in result
 
     def test_hardware_routing(self):
         from local_router import LocalRouter

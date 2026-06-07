@@ -90,7 +90,15 @@ def run_dashboard(port: int = 8002):
     if not HAS_FASTAPI:
         print("FastAPI není nainstalováno: pip install fastapi uvicorn")
         return
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    from config import CONFIG
+
+    host = CONFIG.get("api_bind_host", "127.0.0.1")
+    if host == "0.0.0.0":
+        logger.warning(
+            "API bound to all interfaces (0.0.0.0). "
+            "For LAN access set JARVIS_API_AUTH_REQUIRED=1 and JARVIS_API_TOKEN."
+        )
+    uvicorn.run(app, host=host, port=port, log_level="warning")
 
 
 run = run_dashboard

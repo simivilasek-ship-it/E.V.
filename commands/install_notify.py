@@ -53,7 +53,11 @@ def _to_ws_payload(event) -> str:
         "stage": data.get("stage", ""),
         "message": message,
         "method": data.get("method"),
+        "progress": data.get("progress"),
         "errors": data.get("errors"),
+        "error_code": data.get("error_code"),
+        "error_detail": data.get("error_detail"),
+        "launched": data.get("launched"),
         "ts": int(time.time() * 1000),
     }
     return json.dumps(payload, ensure_ascii=False)

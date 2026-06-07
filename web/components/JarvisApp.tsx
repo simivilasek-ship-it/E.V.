@@ -8,6 +8,7 @@ import ToastContainer from './Toast'
 import ErrorBoundary from './ErrorBoundary'
 import Spotlight from './Spotlight'
 import ConfirmModal from './ConfirmModal'
+import OnboardingWizard from './OnboardingWizard'
 import dynamic from 'next/dynamic'
 import { JarvisStatusBar } from './HeroPanel'
 
@@ -175,6 +176,7 @@ export default function JarvisApp() {
 
         <ToastContainer />
         <ConfirmModal />
+        <OnboardingWizard />
       <Spotlight
         open={spotlightOpen}
         onClose={() => setSpotlightOpen(false)}

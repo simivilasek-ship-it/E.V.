@@ -6,30 +6,39 @@ import { Icons } from './Icons'
 export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW' | 'MISSIONS' | 'VISION'
 
 interface NavItem { id: Tab; label: string; icon: React.ReactNode; key: string }
-interface NavGroup { label: string | null; items: NavItem[] }
 
-const NAV_GROUPS: NavGroup[] = [
-  { label: null, items: [
-    { id: 'CHAT', label: 'Chat', icon: Icons.chat, key: '1' },
-  ]},
-  { label: 'Nástroje', items: [
-    { id: 'SYSTEM', label: 'Systém', icon: Icons.system, key: '2' },
-    { id: 'PLUGINS', label: 'Pluginy', icon: Icons.plugins, key: '3' },
-    { id: 'SKILL', label: 'Skill Gen', icon: Icons.skill, key: '4' },
-    { id: 'WORKFLOW', label: 'Workflow', icon: Icons.workflow, key: '0' },
-  ]},
-  { label: 'Inteligence', items: [
-    { id: 'AGENT', label: 'Agent', icon: Icons.agent, key: '5' },
-    { id: 'MISSIONS', label: 'Mise', icon: Icons.mission, key: 'm' },
-    { id: 'VISION', label: 'Vision', icon: Icons.eye, key: 'v' },
-    { id: 'TIMELINE', label: 'Timeline', icon: Icons.timeline, key: '6' },
-    { id: 'MEMORY', label: 'Paměť', icon: Icons.memory, key: '7' },
-  ]},
-  { label: 'Monitor', items: [
-    { id: 'DASHBOARD', label: 'Dashboard', icon: Icons.dash, key: '8' },
-    { id: 'SETTINGS', label: 'Nastavení', icon: Icons.settings, key: '9' },
-  ]},
+const PRIMARY_NAV: NavItem[] = [
+  { id: 'CHAT', label: 'Chat', icon: Icons.chat, key: '1' },
 ]
+
+const ADVANCED_NAV: NavItem[] = [
+  { id: 'SYSTEM', label: 'Systém', icon: Icons.system, key: '2' },
+  { id: 'PLUGINS', label: 'Pluginy', icon: Icons.plugins, key: '3' },
+  { id: 'SKILL', label: 'Skill Gen', icon: Icons.skill, key: '4' },
+  { id: 'WORKFLOW', label: 'Workflow', icon: Icons.workflow, key: '0' },
+  { id: 'AGENT', label: 'Agent', icon: Icons.agent, key: '5' },
+  { id: 'MISSIONS', label: 'Mise', icon: Icons.mission, key: 'm' },
+  { id: 'VISION', label: 'Vision', icon: Icons.eye, key: 'v' },
+  { id: 'TIMELINE', label: 'Timeline', icon: Icons.timeline, key: '6' },
+  { id: 'MEMORY', label: 'Paměť', icon: Icons.memory, key: '7' },
+  { id: 'DASHBOARD', label: 'Dashboard', icon: Icons.dash, key: '8' },
+  { id: 'SETTINGS', label: 'Nastavení', icon: Icons.settings, key: '9' },
+]
+
+function NavButton({ item, tab, setTab }: { item: NavItem; tab: Tab; setTab: (t: Tab) => void }) {
+  return (
+    <button
+      onClick={() => setTab(item.id)}
+      title={`Alt+${item.key}`}
+      className={`nav-item ${tab === item.id ? 'active' : ''}`}
+    >
+      <span className="w-4 h-4 shrink-0 flex items-center justify-center opacity-80">
+        {item.icon}
+      </span>
+      <span className="flex-1 truncate">{item.label}</span>
+    </button>
+  )
+}
 
 const CONN_COLOR: Record<string, string> = {
   connected: 'var(--green)', connecting: 'var(--amber)',
@@ -54,6 +63,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen, clearMessages, theme, toggleTheme }: SidebarProps) {
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const connStatus = useJarvis(s => s.connStatus)
   const retry      = useJarvis(s => s.retry)
   const orbState   = useJarvis(s => s.orbState)
@@ -62,6 +72,7 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
 
   const connColor = CONN_COLOR[connStatus] ?? 'var(--muted)'
   const orb = ORB_CFG[orbState] ?? ORB_CFG.idle
+  const hasAdvancedActive = tab !== 'CHAT'
 
   return (
     <aside
@@ -84,7 +95,7 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
             JARVIS
           </div>
           <div className="text-[11px] font-mono" style={{ color: 'var(--muted)' }}>
-            v5.5 · AI OS
+            v5.6 · AI OS
           </div>
         </div>
       </div>
@@ -143,28 +154,37 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2.5 py-2 flex flex-col gap-0.5">
-        {NAV_GROUPS.map((group, gi) => (
-          <div key={gi} className="mb-1">
-            {group.label && (
-              <div className="text-[10px] font-medium uppercase tracking-wider px-3 pt-3 pb-1.5" style={{ color: 'var(--muted)' }}>
-                {group.label}
-              </div>
-            )}
-            {group.items.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setTab(item.id)}
-                title={`Alt+${item.key}`}
-                className={`nav-item ${tab === item.id ? 'active' : ''}`}
-              >
-                <span className="w-4 h-4 shrink-0 flex items-center justify-center opacity-80">
-                  {item.icon}
-                </span>
-                <span className="flex-1 truncate">{item.label}</span>
-              </button>
-            ))}
-          </div>
+        {PRIMARY_NAV.map(item => (
+          <NavButton key={item.id} item={item} tab={tab} setTab={setTab} />
         ))}
+
+        <div className="mt-1">
+          <button
+            onClick={() => setAdvancedOpen(o => !o)}
+            className="nav-item w-full"
+            style={hasAdvancedActive && !advancedOpen ? { color: 'var(--accent-light)' } : undefined}
+          >
+            <span
+              className="w-4 h-4 shrink-0 flex items-center justify-center opacity-80 transition-transform duration-150"
+              style={{ transform: advancedOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </span>
+            <span className="flex-1 truncate text-left">Pokročilé</span>
+            {hasAdvancedActive && !advancedOpen && (
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--accent)' }} />
+            )}
+          </button>
+          {advancedOpen && (
+            <div className="flex flex-col gap-0.5 mt-0.5">
+              {ADVANCED_NAV.map(item => (
+                <NavButton key={item.id} item={item} tab={tab} setTab={setTab} />
+              ))}
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* Footer */}

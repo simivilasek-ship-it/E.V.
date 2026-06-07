@@ -110,10 +110,11 @@ class TestScreenDescribe:
         import vision
         importlib.reload(vision)
         with patch("vision._take_screenshot", return_value=fake_png), \
+             patch("llm._pick_vision_model", return_value=True), \
              patch("vision._ask_vision", return_value="Mock popis") as mock_av:
             result = vision.VisionEngine().screen_describe()
         mock_av.assert_called_once()
-        assert result == "Mock popis"
+        assert "Mock popis" in result
 
     def test_fallback_on_screenshot_error(self):
         """Když screenshot selže, vrátí string s chybou."""

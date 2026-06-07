@@ -233,6 +233,33 @@ def register(app):
         except Exception:
             return []
 
+    @app.post("/api/install/cancel")
+    async def cancel_install(body: dict):
+        """Zruší probíhající instalaci aplikace."""
+        from commands.apps import cmd_cancel_install
+        app = (body.get("app") or body.get("name") or "").strip()
+        return {"response": cmd_cancel_install(app)}
+
+    @app.get("/api/onboarding")
+    async def onboarding_status():
+        """Kontrola prostředí pro první spuštění."""
+        import shutil
+
+        ollama_ok = False
+        try:
+            import requests as _r
+            from config import CONFIG
+            base = CONFIG.get("ollama_url", "http://localhost:11434/api/chat").replace("/api/chat", "")
+            ollama_ok = _r.get(f"{base}/api/tags", timeout=2).ok
+        except Exception:
+            pass
+        return {
+            "ollama": ollama_ok,
+            "snap": bool(shutil.which("snap")),
+            "flatpak": bool(shutil.which("flatpak")),
+            "platform": __import__("platform").system(),
+        }
+
     @app.get("/api/suggestions")
     async def proactive_suggestions(limit: int = 10):
         """Proaktivní návrhy (CPU/RAM) z context_suggestions workeru."""

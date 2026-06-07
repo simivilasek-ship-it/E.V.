@@ -34,19 +34,34 @@ function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString('cs', { hour: '2-digit', minute: '2-digit' })
 }
 
+/** Jednořádkové výstupy z backendu → markdown odstavce (ReactMarkdown ignoruje samotné \n). */
+function prepareMarkdown(text: string): string {
+  if (!text) return text
+  if (/^#{1,3}\s|^\*\*[^*]+\*\*/m.test(text)) return text
+  return text.split('\n').map(l => l.trimEnd()).join('\n\n')
+}
+
 function renderContent(text: string) {
   if (!text) return null
   return (
     <ReactMarkdown
       components={{
-        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-        ul: ({ children }) => <ul className="list-disc ml-5 mb-2 space-y-0.5">{children}</ul>,
-        ol: ({ children }) => <ol className="list-decimal ml-5 mb-2 space-y-0.5">{children}</ol>,
-        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+        p: ({ children }) => <p className="mb-2.5 last:mb-0 leading-relaxed">{children}</p>,
+        ul: ({ children }) => <ul className="list-none ml-0 mb-3 flex flex-col gap-1.5">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal ml-5 mb-3 space-y-1">{children}</ol>,
+        li: ({ children }) => (
+          <li className="leading-relaxed pl-3 border-l-2" style={{ borderColor: 'var(--border-accent)' }}>
+            {children}
+          </li>
+        ),
         h1: ({ children }) => <h1 className="text-base font-semibold mb-2 mt-3" style={{ color: 'var(--accent-light)' }}>{children}</h1>,
         h2: ({ children }) => <h2 className="text-sm font-semibold mb-1.5 mt-3" style={{ color: 'var(--accent-light)' }}>{children}</h2>,
-        h3: ({ children }) => <h3 className="text-sm font-medium mb-1 mt-2" style={{ color: 'var(--text-secondary)' }}>{children}</h3>,
-        strong: ({ children }) => <strong className="font-semibold" style={{ color: 'var(--text)' }}>{children}</strong>,
+        h3: ({ children }) => <h3 className="text-base font-semibold mb-3 mt-1 pb-2" style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>{children}</h3>,
+        strong: ({ children }) => (
+          <strong className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--accent-light)' }}>
+            {children}
+          </strong>
+        ),
         code: ({ children, className }) => {
           const isBlock = className?.startsWith('language-')
           if (isBlock) return <code className="prose-j block">{children}</code>
@@ -57,7 +72,7 @@ function renderContent(text: string) {
         blockquote: ({ children }) => <blockquote className="border-l-2 pl-3 my-2 italic" style={{ borderColor: 'var(--accent)', color: 'var(--muted)' }}>{children}</blockquote>,
       }}
     >
-      {text}
+      {prepareMarkdown(text)}
     </ReactMarkdown>
   )
 }
@@ -130,6 +145,35 @@ function MessageBubble({ msg }: { msg: Message }) {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function InstallProgressBar() {
+  const activeInstall = useJarvis(s => s.activeInstall)
+  const cancelInstall = useJarvis(s => s.cancelInstall)
+  if (!activeInstall) return null
+  const pct = Math.min(100, Math.max(0, activeInstall.progress))
+  return (
+    <div className="mx-5 mb-2 card p-3 flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">
+          Instaluji {activeInstall.app}
+          {activeInstall.method ? ` (${activeInstall.method})` : ''}
+        </span>
+        <button type="button" onClick={() => cancelInstall()} className="btn-ghost px-2 py-1 text-xs">
+          Zrušit
+        </button>
+      </div>
+      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,.08)' }}>
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent-light))' }}
+        />
+      </div>
+      <span className="text-xs font-mono" style={{ color: 'var(--muted)' }}>
+        {pct}% · {activeInstall.stage}
+      </span>
     </div>
   )
 }
@@ -220,6 +264,8 @@ export default function ChatPanel() {
           </div>
         )}
       </div>
+
+      <InstallProgressBar />
 
       {/* Input area */}
       <div className="shrink-0 px-5 pb-5 pt-2 max-w-3xl w-full mx-auto flex flex-col gap-2">

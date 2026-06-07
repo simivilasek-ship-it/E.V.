@@ -54,7 +54,7 @@ def test_disk_space_root():
 def test_hardware_info_has_cpu():
     result = cmd_hardware_info()
     assert isinstance(result, str)
-    assert "CPU" in result
+    assert "**Procesor**" in result or "jader" in result
 
 
 def test_list_directory_home():

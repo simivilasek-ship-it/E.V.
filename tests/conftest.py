@@ -170,6 +170,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "slow: slow tests")
     config.addinivalue_line("markers", "requires_ollama: requires running Ollama")
     config.addinivalue_line("markers", "requires_mic: requires microphone")
+    config.addinivalue_line("markers", "e2e: end-to-end tests with minimal mocks")
 
 
 # Autouse fixtures

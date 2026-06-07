@@ -4,13 +4,14 @@
 
 # JARVIS
 
-**Local AI Operating System for autonomous computer control.**
+**Local AI assistant for Linux — chat, system commands, and optional autonomous control.**
 
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.5-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.6-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
+[![Linux-first](https://img.shields.io/badge/Linux--first-22c55e?style=flat-square&logo=linux&logoColor=white)](#linux-out-of-the-box)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-531%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 
@@ -32,24 +33,54 @@ JARVIS: Opening Chrome...                      ✓  0.3s
         Done. Want me to read it aloud?
 ```
 
-![JARVIS demo — Copilot, Agent, PC overview](docs/demo.gif)
+![JARVIS demo — chat, agent graph, PC overview](docs/demo.gif)
 
 > 📹 YouTube demo — coming soon
 
 ---
 
+## Linux out of the box
+
+> **Linux-first:** JARVIS is developed and tested primarily on Linux (Ubuntu/Debian). macOS and Windows support exists but is less complete.
+
+After `./install.sh` and `python3 dashboard.py`, these work **without extra configuration**:
+
+| Feature | Notes |
+|---------|-------|
+| **Czech chat** | Regex router + fallback replies; cloud LLM optional |
+| **Local command router** | Open apps, weather, time, screenshots — &lt;1 ms, no LLM |
+| **Hardware info** | CPU, RAM, disk, GPU via `/proc` and system tools |
+| **Live PC context** | Active window, open apps, top processes — injected into chat |
+| **Weather & time** | Built-in commands, no API key |
+| **Snap app install** | `"install spotify"` etc. — requires `sudo` for `snap install` |
+
+**Needs setup before it works:**
+
+| Feature | Setup |
+|---------|-------|
+| **Local LLM chat (Ollama)** | Install [Ollama](https://ollama.com), pull a model (`ollama pull qwen2.5:3b`) |
+| **Voice input (Whisper)** | Whisper model download on first use; mic permissions |
+| **Background workers** | `.env` tokens for Slack, email (IMAP), GitHub, calendar |
+| **Screen / UI automation** | Opt-in: `computer_use_enabled=true` in `config.json` (AT-SPI on Linux) |
+| **LAN dashboard access** | `JARVIS_BIND_HOST=0.0.0.0` + `JARVIS_API_AUTH_REQUIRED=1` + token |
+
+API binds to **`127.0.0.1` by default** — not exposed on your network unless you change it.
+
+---
+
 ## 3 things that make it different
 
-### 1 · AI controls your PC
+### 1 · Optional PC automation (opt-in)
 
-JARVIS sees your screen, clicks buttons, fills forms, reads content — in any app.
+With **`computer_use_enabled`** and vision sandbox, JARVIS can preview and execute UI actions — OCR first, vision model fallback. This is **disabled by default**; enable only when you need it.
 
 ```python
-agent.run_task("Open Gmail, find invoice from last week, download attachment")
-# → opens browser → navigates → clicks → downloads. Watches it happen.
+# Requires computer_use_enabled + vision sandbox approval
+agent.run_task("Open Firefox and search for Python async libraries")
+# → navigates visible UI when AT-SPI / vision pipeline is configured
 ```
 
-It uses OCR first (50 ms), falls back to vision AI (400 ms). Works in Chrome, Excel, Photoshop, terminal — anything visible on screen.
+Works best on Linux with AT-SPI; quality varies by app and desktop environment. Not a guarantee of control in every application.
 
 ---
 
@@ -73,15 +104,14 @@ If a step fails, the agent backs up and tries a different path. Self-correcting.
 
 ### 3 · Plugin + MCP Ecosystem
 
-Every external tool is a plugin. Install in one command, sandboxed by default.
+External tools integrate via plugins and [Model Context Protocol](https://modelcontextprotocol.io/). Install from the marketplace when available; many require API keys in `.env`.
 
 ```bash
-"install plugin brave-search"
-"install plugin github-copilot"
-"install plugin slack-notifier"
+"install plugin brave-search"    # needs BRAVE_API_KEY
+"install plugin slack-notifier"  # needs SLACK_BOT_TOKEN
 ```
 
-Built on [Model Context Protocol](https://modelcontextprotocol.io/) — the same standard used by Claude, Cursor, and Zed. 10 MCP servers included out of the box.
+Several MCP servers ship with the repo (filesystem, git, fetch, …). Availability depends on your OS and configured tokens — not every plugin works on every platform.
 
 ---
 
@@ -92,14 +122,15 @@ One chat, three automatic modes:
 | Mode | When | Examples |
 |------|------|----------|
 | **Copilot** | Conversation, code, explanations | *"Explain asyncio"*, *"What am I working on?"* |
-| **Action** | OS commands (regex router, &lt;1 ms) | *"Open Chrome"*, *"Screenshot"*, *"Weather in Prague"* |
-| **Agent** | Multi-step tasks | *"Find X and save a note"*, *"Check repo and summarize"* |
+| **Action** | OS commands (regex router, &lt;1 ms) | *"Open Firefox"*, *"Screenshot"*, *"Weather in Prague"*, *"What time is it?"* |
+| **Agent** | Multi-step tasks (needs LLM) | *"Find X and save a note"*, *"Check repo and summarize"* |
 
-JARVIS always sees your **live PC context** — active window, open apps, CPU/RAM/disk, clipboard — injected into every Copilot reply (no hallucinated apps).
+JARVIS injects **live PC context** — active window, open apps, CPU/RAM/disk — into Copilot replies when available.
 
 ```bash
-"PC overview"          # full system snapshot + windows + top processes
-"What's on my screen?" # factual window list (Cursor, Firefox, …)
+"PC overview"          # system snapshot + windows + top processes
+"What's on my screen?" # factual window list
+"install vlc"          # snap install (sudo)
 ```
 
 ---
@@ -120,31 +151,36 @@ Add speed (optional — free API key at [console.groq.com](https://console.groq.
 echo "GROQ_API_KEY=gsk_..." >> .env
 ```
 
+Local LLM (recommended for offline chat):
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen2.5:3b
+```
+
 ---
 
 ## Performance
 
 | What | How fast |
 |------|----------|
-| OS command (`open Chrome`) | **< 1 ms** — regex, no LLM |
-| Chat response (local, warm) | **~120 ms** — Ollama cached |
+| OS command (`open Firefox`) | **< 1 ms** — regex, no LLM |
+| Chat response (Ollama, warm) | **~120 ms+** — depends on model/GPU |
 | Chat response (Groq cloud) | **~200 ms** — LLaMA 3.3 70B |
-| Voice transcription | **~200 ms** — Groq Whisper |
-| Screen click via OCR | **~50 ms** — pytesseract |
-| Voice → answer end-to-end | **~580 ms** total |
+| Voice transcription (Whisper) | **~200 ms+** — first run downloads model |
+| Screen click via OCR | **~50 ms** — when vision pipeline enabled |
 
-RAM: **34 MB** idle · **~650 MB** with Ollama · runs on any modern laptop.
+RAM: **~34 MB** idle backend · **~650 MB+** with Ollama loaded · runs on any modern laptop.
 
 ---
 
 ## What else it does
 
-- **Listens continuously** — WebRTC VAD + Whisper Live; **barge-in** in web duplex (`/ws/audio`) and desktop app
-- **Wake word** (“jarvis”) — desktop app only; web voice uses mic button or duplex stream
-- **Remembers across weeks** — GraphRAG knowledge graph, not just chat history
-- **Monitors in background** — email, git, Slack, GitHub, calendar — notifies you when something matters
-- **Long-horizon missions** — plan a multi-day task, JARVIS executes steps each day autonomously
-- **100% local option** — no API key needed, everything runs on-device via Ollama
+- **Voice in web UI** — mic button / duplex stream (`/ws/audio`); Whisper STT when configured
+- **Wake word** (“jarvis”) — desktop app only
+- **Long-term memory** — GraphRAG knowledge graph (SQLite MVP)
+- **Background workers** — email, git, Slack, GitHub, calendar — need `.env` tokens
+- **Long-horizon missions** — multi-step plans executed over time
+- **100% local option** — Ollama + on-device Whisper; no cloud API key required
 
 ---
 
@@ -172,6 +208,8 @@ Backend: **FastAPI** (`src/api/routers/`) · Frontend: **Next.js** · Desktop: *
 
 ## Security
 
+- API listens on **`127.0.0.1` by default** — override with `JARVIS_BIND_HOST` only if you need LAN access
+- When binding to `0.0.0.0`, set **`JARVIS_API_AUTH_REQUIRED=1`** and a strong `JARVIS_API_TOKEN`
 - Shell commands go through a **blacklist** (`rm -rf /`, `dd`, reverse shells, fork bombs — always blocked)
 - Agent actions require **permission levels** — destructive ops need user confirmation
 - **Web UI confirmation modal** — when the browser is connected, ELEVATED actions wait for approve/deny (`/ws/confirm`)

@@ -274,8 +274,8 @@ class _SQLiteMemoryStore:
         with self._lock, self._connect() as con:
             rows = con.execute("SELECT id, importance, created_at, access_score FROM memories").fetchall()
             for row in rows:
-                # Long-term memories (access_score >= 5.0) nepodléhají decay
-                if row["access_score"] >= 5.0:
+                # Long-term memories (access_score >= 2.0) nepodléhají decay
+                if row["access_score"] >= 2.0:
                     continue
                 age_days    = (now - row["created_at"]) / 86400
                 new_imp     = row["importance"] * _math.exp(-decay_rate * age_days)
@@ -565,17 +565,26 @@ def _extract_entities_simple(text: str) -> list[tuple[str, str, str]]:
 
     # Examples:
     # "Můj brácha Jirka začal programovat v Rustu"
-    m = re.search(r"\b(m[uů]j\s+br[áa]cha|bratr)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][\wÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž-]{1,30})\b", t)
+    m = re.search(
+        r"(?:m[uů]j\s+)?br[áa]cha\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][\wÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž-]{1,30})",
+        t, re.I,
+    )
     if m:
-        person = m.group(2)
+        person = m.group(1)
         triplets.append(("Ty", "MÁ_BRATRA", person))
 
     # "Jirka se učí Rust" / "Jirka programuje v Rustu"
-    m2 = re.search(r"\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][\wÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž-]{1,30})\s+(se\s+u[cč]i|u[cč]i\s+se|programuje\s+v|k[oó]duje\s+v)\s+([A-Za-z][A-Za-z0-9_\-\+\.#]{1,40})\b", t)
+    m2 = re.search(
+        r"([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][\wÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž-]{1,30})\s+"
+        r"(se\s+u[cč][íi]|u[cč][íi]\s+se|programuje\s+v|k[oó]duje\s+v)\s+"
+        r"([A-Za-z][A-Za-z0-9_\-\+\.#]{1,40})",
+        t, re.I,
+    )
     if m2:
         who = m2.group(1)
         what = m2.group(3)
-        pred = "UČÍ_SE" if "u" in m2.group(2) else "PROGRAMUJE_V"
+        verb = m2.group(2).lower()
+        pred = "UČÍ_SE" if "uč" in verb or "uc" in verb.split()[0] else "PROGRAMUJE_V"
         triplets.append((who, pred, what))
 
     # "Mám rád X" / "Preferuji X"
@@ -954,7 +963,20 @@ class JarvisMemory:
         from pathlib import Path as _Path
         if not self._store:
             return "Paměť není inicializována."
-        memories = self.recall("", top_k=1000, min_importance=0.0)
+        with self._store._lock, self._store._connect() as con:
+            rows = con.execute(
+                "SELECT content, importance, tags, metadata FROM memories "
+                "ORDER BY created_at DESC LIMIT 1000",
+            ).fetchall()
+        memories = [
+            {
+                "content": r["content"],
+                "importance": r["importance"],
+                "tags": _json.loads(r["tags"]),
+                "metadata": _json.loads(r["metadata"]),
+            }
+            for r in rows
+        ]
         _Path(path).write_text(_json.dumps(memories, ensure_ascii=False, indent=2), encoding="utf-8")
         return f"Exportováno {len(memories)} vzpomínek do {path}"
 

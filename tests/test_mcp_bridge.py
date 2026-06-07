@@ -8,6 +8,15 @@ import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 
 
+@pytest.fixture(autouse=True)
+def _mcp_installed(monkeypatch):
+    """Tests assume MCP SDK is available — mock when pip package missing."""
+    monkeypatch.setattr("mcp_bridge.HAS_MCP", True, raising=False)
+    monkeypatch.setattr("mcp_bridge.stdio_client", MagicMock(), raising=False)
+    monkeypatch.setattr("mcp_bridge.ClientSession", MagicMock(), raising=False)
+    monkeypatch.setattr("mcp_bridge.StdioServerParameters", MagicMock(), raising=False)
+
+
 # ── Pomocné ──────────────────────────────────────────────────────
 
 def _make_bridge(brave_key="TEST_KEY", brave_enabled=True):

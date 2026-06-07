@@ -32,11 +32,45 @@ def _install_method(spec: AppSpec) -> str:
     return "unknown"
 
 
+_PROGRESS: Dict[str, int] = {
+    "starting": 10,
+    "method": 25,
+    "running": 55,
+    "success": 100,
+    "cancelled": 0,
+    "error": 0,
+}
+
+_cancel_flags: Dict[str, threading.Event] = {}
+_active_installs: Dict[str, bool] = {}
+
+
 def _emit_install(event_type: str, spec: AppSpec, stage: str, **extra) -> None:
     data = {"app": spec.key, "stage": stage, **extra}
-    if "method" not in data and stage in ("starting", "method", "success"):
+    if "progress" not in data:
+        data["progress"] = _PROGRESS.get(stage, 50)
+    if "method" not in data and stage in ("starting", "method", "running", "success"):
         data.setdefault("method", _install_method(spec))
+    if stage == "error" and data.get("errors"):
+        data["error_code"] = "install_failed"
+        data["error_detail"] = data["errors"][0] if isinstance(data["errors"], list) else str(data["errors"])
     get_event_bus().emit(event_type, data, source="apps")
+
+
+def cmd_cancel_install(name: str = "") -> str:
+    """Zruší probíhající instalaci aplikace."""
+    spec = resolve_app(name)
+    key = spec.key if spec else (name or "").lower().strip()
+    if not key or not _active_installs.get(key):
+        return f"Žádná aktivní instalace: {key or name}"
+    flag = _cancel_flags.get(key)
+    if flag:
+        flag.set()
+    if spec:
+        _emit_install(EventType.INSTALL_ERROR, spec, "cancelled", errors=["Instalace zrušena uživatelem"])
+    _active_installs.pop(key, None)
+    return f"Instalace {key} zrušena."
+
 
 _IS_LINUX = platform.system() == "Linux"
 
@@ -259,74 +293,102 @@ def _install_spec_worker(spec: AppSpec, launch_after: bool) -> None:
     installed = False
     used_method: Optional[str] = None
     errors: List[str] = []
+    cancel = threading.Event()
+    _cancel_flags[spec.key] = cancel
+    _active_installs[spec.key] = True
 
-    _emit_install(EventType.INSTALL_PROGRESS, spec, "starting", launch_after=launch_after)
-    method = _install_method(spec)
-    _emit_install(EventType.INSTALL_PROGRESS, spec, "method", method=method)
+    def _cancelled() -> bool:
+        return cancel.is_set()
 
-    if not _IS_LINUX:
-        if launch_after and spec.web_url:
-            webbrowser.open(spec.web_url)
+    try:
+        _emit_install(EventType.INSTALL_PROGRESS, spec, "starting", launch_after=launch_after)
+        method = _install_method(spec)
+        _emit_install(EventType.INSTALL_PROGRESS, spec, "method", method=method)
+
+        if _cancelled():
+            _emit_install(EventType.INSTALL_ERROR, spec, "cancelled", errors=["Instalace zrušena uživatelem"])
+            return
+
+        if not _IS_LINUX:
+            if launch_after and spec.web_url:
+                webbrowser.open(spec.web_url)
+                _emit_install(
+                    EventType.INSTALL_PROGRESS, spec, "success",
+                    method="web", launched=True,
+                )
+            else:
+                _emit_install(
+                    EventType.INSTALL_ERROR, spec, "error",
+                    errors=["Instalace podporována pouze na Linuxu"],
+                )
+            return
+
+        if spec.snap and shutil.which("snap") and not _snap_installed(spec.snap):
+            _emit_install(EventType.INSTALL_PROGRESS, spec, "running", method="snap", progress=45)
+            if _cancelled():
+                _emit_install(EventType.INSTALL_ERROR, spec, "cancelled", errors=["Instalace zrušena uživatelem"])
+                return
+            r = safe_run(["snap", "install", spec.snap], timeout=600)
+            if r["rc"] != 0 and "access denied" in (r.get("stderr") or "").lower():
+                r = safe_run(["pkexec", "snap", "install", spec.snap], timeout=600)
+            if r["rc"] == 0:
+                installed = True
+                used_method = "snap"
+                logger.info(f"Snap nainstalován: {spec.snap}")
+            else:
+                errors.append(f"snap: {r.get('stderr', '')[:200]}")
+
+        if not installed and spec.flatpak and shutil.which("flatpak") and spec.flatpak:
+            if not _flatpak_installed(spec.flatpak):
+                _emit_install(EventType.INSTALL_PROGRESS, spec, "running", method="flatpak", progress=50)
+                if _cancelled():
+                    _emit_install(EventType.INSTALL_ERROR, spec, "cancelled", errors=["Instalace zrušena uživatelem"])
+                    return
+                r = safe_run(["flatpak", "install", "-y", "flathub", spec.flatpak], timeout=600)
+                if r["rc"] == 0:
+                    installed = True
+                    used_method = "flatpak"
+                else:
+                    errors.append(f"flatpak: {r.get('stderr', '')[:200]}")
+
+        if not installed and spec.apt and shutil.which("apt"):
+            if not _apt_installed(spec.apt):
+                _emit_install(EventType.INSTALL_PROGRESS, spec, "running", method="apt", progress=50)
+                if _cancelled():
+                    _emit_install(EventType.INSTALL_ERROR, spec, "cancelled", errors=["Instalace zrušena uživatelem"])
+                    return
+                safe_run(["pkexec", "apt", "install", "-y", spec.apt], timeout=600)
+                if _apt_installed(spec.apt):
+                    installed = True
+                    used_method = "apt"
+
+        launched = False
+        if launch_after and not _cancelled():
+            if installed or is_app_installed(spec):
+                launch_app_spec(spec)
+                launched = True
+            elif spec.web_url:
+                webbrowser.open(spec.web_url)
+                launched = True
+
+        if _cancelled():
+            _emit_install(EventType.INSTALL_ERROR, spec, "cancelled", errors=["Instalace zrušena uživatelem"])
+        elif installed:
             _emit_install(
                 EventType.INSTALL_PROGRESS, spec, "success",
-                method="web", launched=True,
+                method=used_method or method, launched=launched,
             )
+        elif errors:
+            _emit_install(EventType.INSTALL_ERROR, spec, "error", errors=errors)
+            logger.warning(f"Instalace {spec.key}: {'; '.join(errors)}")
         else:
             _emit_install(
                 EventType.INSTALL_ERROR, spec, "error",
-                errors=["Instalace podporována pouze na Linuxu"],
+                errors=["Instalace se nezdařila — žádný balíčkový manažer neuspěl"],
             )
-        return
-
-    if spec.snap and shutil.which("snap") and not _snap_installed(spec.snap):
-        r = safe_run(["snap", "install", spec.snap], timeout=600)
-        if r["rc"] != 0 and "access denied" in (r.get("stderr") or "").lower():
-            r = safe_run(["pkexec", "snap", "install", spec.snap], timeout=600)
-        if r["rc"] == 0:
-            installed = True
-            used_method = "snap"
-            logger.info(f"Snap nainstalován: {spec.snap}")
-        else:
-            errors.append(f"snap: {r.get('stderr', '')[:120]}")
-
-    if not installed and spec.flatpak and shutil.which("flatpak") and spec.flatpak:
-        if not _flatpak_installed(spec.flatpak):
-            r = safe_run(["flatpak", "install", "-y", "flathub", spec.flatpak], timeout=600)
-            if r["rc"] == 0:
-                installed = True
-                used_method = "flatpak"
-            else:
-                errors.append(f"flatpak: {r.get('stderr', '')[:120]}")
-
-    if not installed and spec.apt and shutil.which("apt"):
-        if not _apt_installed(spec.apt):
-            safe_run(["pkexec", "apt", "install", "-y", spec.apt], timeout=600)
-            if _apt_installed(spec.apt):
-                installed = True
-                used_method = "apt"
-
-    launched = False
-    if launch_after:
-        if installed or is_app_installed(spec):
-            launch_app_spec(spec)
-            launched = True
-        elif spec.web_url:
-            webbrowser.open(spec.web_url)
-            launched = True
-
-    if installed:
-        _emit_install(
-            EventType.INSTALL_PROGRESS, spec, "success",
-            method=used_method or method, launched=launched,
-        )
-    elif errors:
-        _emit_install(EventType.INSTALL_ERROR, spec, "error", errors=errors)
-        logger.warning(f"Instalace {spec.key}: {'; '.join(errors)}")
-    else:
-        _emit_install(
-            EventType.INSTALL_ERROR, spec, "error",
-            errors=["Instalace se nezdařila — žádný balíčkový manažer neuspěl"],
-        )
+    finally:
+        _active_installs.pop(spec.key, None)
+        _cancel_flags.pop(spec.key, None)
 
 
 def cmd_open_app(app: str, args: Optional[List[str]] = None) -> str:

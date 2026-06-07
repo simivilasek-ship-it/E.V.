@@ -140,8 +140,8 @@ def test_access_score_increases_on_recall(tmp_path):
     assert score_after > score_before, (
         f"access_score by mělo vzrůst po recall, bylo {score_before}, je {score_after}"
     )
-    assert abs(score_after - (score_before + 0.1)) < 1e-9, (
-        f"Očekáván nárůst o 0.1, ale dostali jsme {score_after}"
+    assert abs(score_after - (score_before + 0.25)) < 1e-9, (
+        f"Očekáván nárůst o 0.25, ale dostali jsme {score_after}"
     )
 
 

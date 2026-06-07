@@ -56,6 +56,13 @@ interface JarvisState {
   duplexVoice: boolean
   pendingConfirm: PendingConfirm | null
   quickActionHistory: string[]
+  activeInstall: {
+    app: string
+    progress: number
+    stage: string
+    method?: string
+    error?: string
+  } | null
 
   // Internal
   _ws:        WebSocket | null
@@ -94,6 +101,7 @@ interface JarvisState {
   fetchAgents:    () => Promise<void>
   fetchPlugins:   () => Promise<void>
   fetchDuplexFlag: () => Promise<void>
+  cancelInstall: () => Promise<void>
   _scheduleReconnect: () => void
 }
 
@@ -129,6 +137,7 @@ export const useJarvis = create<JarvisState>((set, get) => ({
   duplexVoice: false,
   pendingConfirm: null,
   quickActionHistory: [],
+  activeInstall: null,
   _ws: null, _attempt: 0, _retryId: null, _metricsWs: null, _chatWs: null, _confirmWs: null,
   _recognition: null, _audioDuplex: null,
 
@@ -186,9 +195,24 @@ export const useJarvis = create<JarvisState>((set, get) => ({
         const msg = JSON.parse(e.data)
         if (msg.type === 'install_progress' || msg.type === 'install_error') {
           const text = msg.message || `Instalace ${msg.app || '?'}: ${msg.stage || ''}`
-          get().addMessage(text, 'jarvis', { error: msg.type === 'install_error' })
-          get().addToast(text, msg.type === 'install_error' ? 'error' : 'info', 4000)
-          set(s => ({ logs: [...s.logs.slice(-300), { text, ts: Date.now() }] }))
+          const isError = msg.type === 'install_error'
+          const isDone = msg.stage === 'success' || isError || msg.stage === 'cancelled'
+          const structured = isError && msg.error_detail
+            ? `**Instalace ${msg.app} selhala**\n\n- **Důvod:** ${msg.error_detail}${msg.errors?.length ? `\n- **Detail:** ${msg.errors.join('; ')}` : ''}`
+            : text
+          get().addMessage(structured, 'jarvis', { error: isError })
+          if (isError) get().addToast(msg.error_detail || text, 'error', 6000)
+          else if (msg.stage === 'success') get().addToast(text, 'success', 4000)
+          set(s => ({
+            logs: [...s.logs.slice(-300), { text, ts: Date.now() }],
+            activeInstall: isDone ? null : {
+              app: msg.app || '?',
+              progress: typeof msg.progress === 'number' ? msg.progress : 50,
+              stage: msg.stage || '',
+              method: msg.method,
+              error: isError ? (msg.error_detail || text) : undefined,
+            },
+          }))
           return
         }
         if (msg.type === 'log' && msg.message) {
@@ -427,6 +451,22 @@ export const useJarvis = create<JarvisState>((set, get) => ({
       const d = await fetch(`${getApiBase()}/api/plugins`).then(r => r.json())
       get().setPlugins(d.plugins || [])
     } catch {}
+  },
+
+  async cancelInstall() {
+    const inst = get().activeInstall
+    if (!inst?.app) return
+    try {
+      await fetch(`${getApiBase()}/api/install/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ app: inst.app }),
+      })
+      get().addToast(`Ruším instalaci ${inst.app}…`, 'warning', 3000)
+      set({ activeInstall: null })
+    } catch {
+      get().addToast('Zrušení instalace selhalo', 'error', 3000)
+    }
   },
 
   async fetchDuplexFlag() {

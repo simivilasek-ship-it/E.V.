@@ -149,12 +149,67 @@ def cmd_volume(level: int = None, action: str = None) -> str:
     return "ok"
 
 
-def cmd_hardware_info() -> str:
-    """Zjistí hardwarové komponenty PC přes systémové příkazy."""
+def _filter_gpu_names(gpus: list[str]) -> list[str]:
+    """Vyfiltruje audio/duplicitní GPU — nechá hlavní grafiku."""
+    import re
+
+    skip = re.compile(r"audio controller|high definition audio|hdmi audio", re.I)
+    integrated = re.compile(r"raphael|integrated|basic render|uhd graphics|vega \d", re.I)
+    discrete = re.compile(r"radeon rx|geforce|rtx |gtx |arc a\d|quadro|nav[ií] \d", re.I)
+
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in gpus:
+        name = raw.strip()
+        if not name or skip.search(name):
+            continue
+        key = re.sub(r"\s+", " ", name.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(name)
+
+    if any(discrete.search(g) for g in cleaned):
+        cleaned = [g for g in cleaned if not integrated.search(g)]
+
+    return cleaned
+
+
+def _collect_gpus() -> list[str]:
+    """Sebere GPU z nvidia-smi a lspci."""
     import subprocess
     import re
 
-    lines = []
+    gpus: list[str] = []
+    try:
+        r = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode == 0:
+            for line in r.stdout.strip().splitlines():
+                if line.strip():
+                    gpus.append(line.strip())
+    except Exception:
+        pass
+
+    try:
+        r = subprocess.run(["lspci"], capture_output=True, text=True, timeout=5)
+        for line in r.stdout.splitlines():
+            if re.search(r"VGA|3D controller|Display controller", line, re.I):
+                gpus.append(re.sub(r"^.*:\s*", "", line).strip())
+    except Exception:
+        pass
+
+    return _filter_gpu_names(gpus)
+
+
+def cmd_hardware_info() -> str:
+    """Zjistí hardwarové komponenty PC — přehledný markdown výstup."""
+    import subprocess
+    import re
+
+    sections: list[str] = ["### 🖥️ Hardwarové komponenty", ""]
 
     # ── CPU ──────────────────────────────────────────
     cpu_name = ""
@@ -167,7 +222,6 @@ def cmd_hardware_info() -> str:
     except Exception:
         pass
     if not cpu_name:
-        # Fallback: /proc/cpuinfo
         try:
             with open("/proc/cpuinfo") as f:
                 for line in f:
@@ -178,79 +232,80 @@ def cmd_hardware_info() -> str:
             pass
     if not cpu_name:
         cpu_name = platform.processor() or "neznámý"
-    cores = psutil.cpu_count(logical=False)
-    threads = psutil.cpu_count(logical=True)
+
+    cores = psutil.cpu_count(logical=False) or 0
+    threads = psutil.cpu_count(logical=True) or 0
     freq = psutil.cpu_freq()
-    freq_str = f" @ {freq.max / 1000:.1f} GHz" if freq else ""
-    lines.append(f"CPU: {cpu_name} ({cores} jádra / {threads} vláken{freq_str})")
+    freq_str = f" · {freq.max / 1000:.1f} GHz" if freq and freq.max else ""
+
+    sections += [
+        "**Procesor**",
+        f"- {cpu_name}",
+        f"- {cores} jader / {threads} vláken{freq_str}",
+        "",
+    ]
 
     # ── RAM ──────────────────────────────────────────
     ram = psutil.virtual_memory()
     ram_total = ram.total / 1024 ** 3
-    lines.append(f"RAM: {ram_total:.0f} GB ({ram.percent:.0f}% obsazeno)")
+    ram_free = ram.available / 1024 ** 3
+    sections += [
+        "**Paměť RAM**",
+        f"- {ram_total:.0f} GB celkem",
+        f"- {ram.percent:.0f}% obsazeno · {ram_free:.1f} GB volné",
+        "",
+    ]
 
     # ── Disk ─────────────────────────────────────────
+    disk_lines: list[str] = []
     try:
-        disks = []
         for part in psutil.disk_partitions(all=False):
             if "loop" in part.device:
                 continue
             try:
                 usage = psutil.disk_usage(part.mountpoint)
-                disks.append(f"{part.device} {usage.total / 1024 ** 3:.0f} GB ({part.fstype})")
+                total_gb = usage.total / 1024 ** 3
+                free_gb = usage.free / 1024 ** 3
+                disk_lines.append(
+                    f"- `{part.device}` — **{total_gb:.0f} GB** {part.fstype} "
+                    f"({usage.percent:.0f}% obsazeno, volné {free_gb:.0f} GB)"
+                )
             except Exception:
                 pass
-        if disks:
-            lines.append("Disky: " + ", ".join(disks))
     except Exception:
         pass
+    if disk_lines:
+        sections += ["**Úložiště**", *disk_lines, ""]
 
     # ── GPU ──────────────────────────────────────────
-    gpu_found = False
-    # Zkus nvidia-smi
-    try:
-        r = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=5)
-        if r.returncode == 0:
-            for line in r.stdout.strip().splitlines():
-                if line.strip():
-                    lines.append(f"GPU (NVIDIA): {line.strip()}")
-                    gpu_found = True
-    except Exception:
-        pass
-    # Zkus lspci pro AMD/Intel
-    if not gpu_found:
-        try:
-            r = subprocess.run(["lspci"], capture_output=True, text=True, timeout=5)
-            for line in r.stdout.splitlines():
-                if re.search(r"VGA|3D|Display|Radeon|GeForce|Intel.*Graphics", line, re.I):
-                    gpu_name = re.sub(r"^.*:\s*", "", line).strip()
-                    lines.append(f"GPU: {gpu_name}")
-                    gpu_found = True
-        except Exception:
-            pass
-    if not gpu_found:
-        lines.append("GPU: nezjištěno (nainstaluj nvidia-smi nebo lspci)")
+    gpus = _collect_gpus()
+    if gpus:
+        sections += ["**Grafika**", *[f"- {g}" for g in gpus], ""]
+    else:
+        sections += ["**Grafika**", "- Nezjištěno (nvidia-smi / lspci)", ""]
 
-    # ── Základní deska (lshw) ─────────────────────────
+    # ── Základní deska ───────────────────────────────
     try:
         r = subprocess.run(
             ["lshw", "-class", "system", "-short"],
-            capture_output=True, text=True, timeout=8)
+            capture_output=True, text=True, timeout=8,
+        )
         for line in r.stdout.splitlines():
             if "system" in line.lower() and "/" not in line[:5]:
-                mb = line.strip().split(None, 2)[-1] if len(line.strip().split(None, 2)) >= 3 else ""
-                if mb:
-                    lines.append(f"Základní deska/Systém: {mb}")
+                parts = line.strip().split(None, 2)
+                if len(parts) >= 3 and parts[-1]:
+                    sections += ["**Systém / deska**", f"- {parts[-1]}", ""]
                     break
     except Exception:
         pass
 
     # ── OS ───────────────────────────────────────────
-    lines.append(f"OS: {platform.system()} {platform.release()} ({platform.machine()})")
+    sections += [
+        "**Operační systém**",
+        f"- {platform.system()} {platform.release()} ({platform.machine()})",
+    ]
 
-    return "\n".join(lines)
+    return "\n".join(sections)
 
 
 def cmd_disk_space(path: str = "/") -> str:
