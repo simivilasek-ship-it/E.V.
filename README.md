@@ -21,6 +21,10 @@
 
 ## Demo
 
+![JARVIS dashboard — chat, quick actions, live PC context](docs/dashboard.jpg)
+
+*Web UI: chat, rychlé akce, živý kontext PC (aktivní okno, CPU/RAM/disk).*
+
 ```
 You:    "Open Chrome, research the best Python async libraries,
          summarize findings, and save a note."
