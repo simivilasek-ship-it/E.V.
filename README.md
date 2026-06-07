@@ -9,7 +9,7 @@
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.4-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.5-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-531%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
@@ -139,7 +139,8 @@ RAM: **34 MB** idle · **~650 MB** with Ollama · runs on any modern laptop.
 
 ## What else it does
 
-- **Listens continuously** — WebRTC VAD + Whisper Live, barge-in supported
+- **Listens continuously** — WebRTC VAD + Whisper Live; **barge-in** in web duplex (`/ws/audio`) and desktop app
+- **Wake word** (“jarvis”) — desktop app only; web voice uses mic button or duplex stream
 - **Remembers across weeks** — GraphRAG knowledge graph, not just chat history
 - **Monitors in background** — email, git, Slack, GitHub, calendar — notifies you when something matters
 - **Long-horizon missions** — plan a multi-day task, JARVIS executes steps each day autonomously

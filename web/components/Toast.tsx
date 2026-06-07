@@ -1,11 +1,11 @@
 'use client'
 import { useJarvis } from '@/store/jarvis'
 
-const TYPE_STYLE: Record<string, { bg: string; border: string; color: string }> = {
-  success: { bg: 'rgba(34,211,165,.08)', border: 'rgba(34,211,165,.25)', color: '#22d3a5' },
-  warning: { bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.25)', color: '#f59e0b' },
-  error:   { bg: 'rgba(244,63,94,.08)',  border: 'rgba(244,63,94,.25)',  color: '#f43f5e' },
-  info:    { bg: 'rgba(0,200,255,.08)',  border: 'rgba(0,200,255,.25)',  color: '#00c8ff' },
+const TYPE_STYLE: Record<string, { accent: string; bg: string }> = {
+  success: { accent: 'var(--green)', bg: 'rgba(52,211,153,.1)' },
+  warning: { accent: 'var(--amber)', bg: 'rgba(251,191,36,.1)' },
+  error:   { accent: 'var(--red)',   bg: 'rgba(248,113,113,.1)' },
+  info:    { accent: 'var(--accent-light)', bg: 'rgba(99,102,241,.1)' },
 }
 
 export default function ToastContainer() {
@@ -18,16 +18,13 @@ export default function ToastContainer() {
         const style = TYPE_STYLE[t.type] ?? TYPE_STYLE.info
         return (
           <div key={t.id}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] font-mono text-[11px] pointer-events-auto anim-slide-up max-w-xs"
+            className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm pointer-events-auto anim-slide-up max-w-sm glass-panel cursor-pointer"
             style={{
-              background: `${style.bg} rgba(4,9,16,.8)`,
-              backdropFilter: 'blur(24px)',
-              border: `1px solid ${style.border}`,
-              color: style.color,
-              boxShadow: '0 8px 24px rgba(0,0,0,.4)',
+              borderLeft: `3px solid ${style.accent}`,
+              background: `${style.bg}`,
             }}
             onClick={() => removeToast(t.id)}>
-            <span className="flex-1">{t.message}</span>
+            <span className="flex-1" style={{ color: 'var(--text)' }}>{t.message}</span>
           </div>
         )
       })}

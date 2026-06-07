@@ -243,10 +243,10 @@ export default function SettingsPanel() {
   const testVoice = useCallback(async () => {
     setTestingVoice(true)
     try {
-      const r = await fetch(apiUrl('/api/command'), {
+      const r = await fetch(apiUrl('/api/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_time' }),
+        body: JSON.stringify({ text: 'kolik je hodin' }),
       })
       if (!r.ok) addToast('Test hlasu selhal', 'error')
     } catch {

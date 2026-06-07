@@ -46,6 +46,101 @@ class TestLocalRouterRoutes:
         assert action["action"] == "weather"
         assert action["params"]["city"] == "praze"
 
+    def test_stahni_instagram_is_install_not_video(self, router):
+        msg, action = router.route("stahni instagram")
+        assert action is not None
+        assert action["action"] == "install_app"
+        assert action["params"]["name"] == "instagram"
+        assert action["params"].get("launch") is True
+        assert "spouštím" in msg.lower() or "instaluji" in msg.lower()
+
+    def test_aplikaci_instagram_stahni_is_install(self, router):
+        _msg, action = router.route("aplikaci instagram stahni")
+        assert action is not None
+        assert action["action"] == "install_app"
+        assert action["params"]["name"] == "instagram"
+
+    def test_stahni_video_youtube_is_download(self, router):
+        _msg, action = router.route("stahni video minecraft tutorial")
+        assert action is not None
+        assert action["action"] == "youtube_download"
+
+
+class TestAppInstallSpec:
+    """Instagram a další aplikace — snap spec, ne apt."""
+
+    def test_resolve_instagram_snap(self):
+        from commands.apps import resolve_app
+
+        spec = resolve_app("instagram")
+        assert spec is not None
+        assert spec.snap == "instagram-electron"
+        assert spec.launch == ["snap", "run", "instagram-electron"]
+
+    def test_install_instagram_uses_snap_not_apt(self):
+        from commands.apps import cmd_install_app
+
+        with patch("commands.apps.is_app_installed", return_value=False), \
+             patch("commands.apps.threading.Thread") as mock_thread:
+            msg = cmd_install_app("instagram", launch=True)
+            assert "instagram" in msg.lower()
+            assert "snap" in msg.lower()
+            mock_thread.assert_called_once()
+
+
+class TestInstallEventEmission:
+    """_install_spec_worker emits progress/error events via EventBus."""
+
+    def test_emits_starting_method_and_success(self):
+        from commands.apps import APP_SPECS, _install_spec_worker
+        from event_bus import EventType
+
+        mock_bus = MagicMock()
+        spec = APP_SPECS["instagram"]
+
+        with patch("commands.apps.get_event_bus", return_value=mock_bus), \
+             patch("commands.apps._IS_LINUX", True), \
+             patch("commands.apps.shutil.which", return_value="/usr/bin/snap"), \
+             patch("commands.apps._snap_installed", return_value=False), \
+             patch("commands.apps.safe_run", return_value={"rc": 0, "stdout": "", "stderr": ""}), \
+             patch("commands.apps.is_app_installed", return_value=True), \
+             patch("commands.apps.launch_app_spec", return_value="ok"):
+            _install_spec_worker(spec, launch_after=True)
+
+        emitted = [(c.args[0], c.args[1]) for c in mock_bus.emit.call_args_list]
+        types = [t for t, _ in emitted]
+        assert EventType.INSTALL_PROGRESS in types
+        stages = [d.get("stage") for _, d in emitted]
+        assert "starting" in stages
+        assert "method" in stages
+        assert "success" in stages
+        success = next(d for t, d in emitted if d.get("stage") == "success")
+        assert success.get("method") == "snap"
+        assert success.get("launched") is True
+
+    def test_emits_error_on_install_failure(self):
+        from commands.apps import APP_SPECS, _install_spec_worker
+        from event_bus import EventType
+
+        mock_bus = MagicMock()
+        spec = APP_SPECS["instagram"]
+
+        with patch("commands.apps.get_event_bus", return_value=mock_bus), \
+             patch("commands.apps._IS_LINUX", True), \
+             patch("commands.apps.shutil.which", return_value="/usr/bin/snap"), \
+             patch("commands.apps._snap_installed", return_value=False), \
+             patch("commands.apps._flatpak_installed", return_value=False), \
+             patch("commands.apps._apt_installed", return_value=False), \
+             patch("commands.apps.safe_run", return_value={"rc": 1, "stdout": "", "stderr": "snap failed"}):
+            _install_spec_worker(spec, launch_after=False)
+
+        emitted = [(c.args[0], c.args[1]) for c in mock_bus.emit.call_args_list]
+        types = [t for t, _ in emitted]
+        assert EventType.INSTALL_ERROR in types
+        err = next(d for t, d in emitted if t == EventType.INSTALL_ERROR)
+        assert err.get("app") == "instagram"
+        assert err.get("errors")
+
 
 class TestPcOverview:
     """cmd_pc_overview returns real system info."""

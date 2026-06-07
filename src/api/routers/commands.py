@@ -6,6 +6,7 @@ import json
 import time
 
 import psutil
+from fastapi.responses import JSONResponse
 
 from src.api.deps import (
     HAS_LOGURU,
@@ -48,27 +49,42 @@ def register(app):
         )
         return {"ok": ok}
 
+    _DEPRECATION_HEADERS = {
+        "Deprecation": "true",
+        "Link": '</api/chat>; rel="successor-version"',
+    }
+
     @app.post("/api/command")
     async def run_command(body: dict):
-        """Spustí příkaz přes JARVIS a vrátí odpověď."""
+        """Spustí příkaz přes unified runtime (deprecated — použij /api/chat)."""
         cmd = body.get("command", "").strip()
         if not cmd:
-            return {"error": "Prázdný příkaz"}
+            return JSONResponse(
+                status_code=200,
+                content={"error": "Prázdný příkaz", "deprecated": True, "use": "/api/chat"},
+                headers=_DEPRECATION_HEADERS,
+            )
         try:
-            from llm import LLMEngine, LocalRouter
-            from config import CONFIG
-            router = LocalRouter()
-            msg, action = router.route(cmd)
-            if action:
-                from commands import CommandExecutor
-                cmds = CommandExecutor(CONFIG)
-                result = cmds.execute(action["action"], action.get("params", {}))
-                return {"response": result or msg, "action": action["action"]}
-            # Fallback — LLM
-            llm = LLMEngine(CONFIG)
-            resp, _ = llm.ask(cmd)
-            return {"response": resp}
+            from src.api.runtime import process_chat
+
+            response = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: process_chat(cmd),
+            )
+            return JSONResponse(
+                status_code=200,
+                content={"response": response, "deprecated": True, "use": "/api/chat"},
+                headers=_DEPRECATION_HEADERS,
+            )
         except Exception as e:
-            return {"response": f"Chyba: {e}", "error": str(e)}
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "response": f"Chyba: {e}",
+                    "error": str(e),
+                    "deprecated": True,
+                    "use": "/api/chat",
+                },
+                headers=_DEPRECATION_HEADERS,
+            )
 
 

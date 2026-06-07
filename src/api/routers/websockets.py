@@ -36,7 +36,12 @@ else:
         raise RuntimeError("security unavailable")
 
 
-async def _stream_tts(ws: WebSocket, text: str, voice: str) -> None:
+async def _stream_tts(
+    ws: WebSocket,
+    text: str,
+    voice: str,
+    cancel: asyncio.Event,
+) -> None:
     """Stream Edge-TTS audio jako binary frames do prohlížeče."""
     if not text or len(text) > 800:
         text = (text[:800] + "…") if len(text) > 800 else text
@@ -45,12 +50,29 @@ async def _stream_tts(ws: WebSocket, text: str, voice: str) -> None:
         communicate = edge_tts.Communicate(text, voice)
         await ws.send_text(json.dumps({"type": "tts_start"}))
         async for chunk in communicate.stream():
+            if cancel.is_set():
+                return
             if chunk["type"] == "audio":
                 await ws.send_bytes(chunk["data"])
-        await ws.send_text(json.dumps({"type": "tts_end"}))
+        if not cancel.is_set():
+            await ws.send_text(json.dumps({"type": "tts_end"}))
+    except asyncio.CancelledError:
+        raise
     except Exception as e:
         logger.debug(f"ws_audio TTS skip: {e}")
-        await ws.send_text(json.dumps({"type": "tts_end"}))
+        if not cancel.is_set():
+            await ws.send_text(json.dumps({"type": "tts_end"}))
+
+
+def _pcm_has_speech(pcm: bytes, vad) -> bool:
+    """Return True if any 30 ms frame in pcm contains speech."""
+    if not pcm or vad is None:
+        return False
+    frame_bytes = int(16000 * 0.03) * 2
+    for i in range(0, len(pcm) - frame_bytes + 1, frame_bytes):
+        if vad.is_speech(pcm[i:i + frame_bytes]):
+            return True
+    return False
 
 
 def register(app):
@@ -108,6 +130,55 @@ def register(app):
 
         loop = asyncio.get_event_loop()
         voice = CONFIG.get("tts_voice", "cs-CZ-AntoninNeural")
+        barge_in = bool(CONFIG.get("duplex_barge_in", True))
+
+        barge_vad = None
+        if barge_in:
+            try:
+                from src.audio.vad import get_vad
+                barge_vad = get_vad(CONFIG)
+            except Exception:
+                barge_vad = None
+
+        current_tts_task: asyncio.Task | None = None
+        tts_cancel = asyncio.Event()
+
+        async def _cancel_tts(*, notify: bool = True) -> None:
+            nonlocal current_tts_task
+            tts_cancel.set()
+            task = current_tts_task
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    pass
+            current_tts_task = None
+            if notify:
+                try:
+                    await ws.send_text(json.dumps({"type": "tts_cancel"}))
+                except Exception:
+                    pass
+
+        async def _run_tts(text: str) -> None:
+            nonlocal current_tts_task
+            try:
+                await _stream_tts(ws, text, voice, tts_cancel)
+            except asyncio.CancelledError:
+                pass
+            finally:
+                if current_tts_task is asyncio.current_task():
+                    current_tts_task = None
+
+        def _start_tts(text: str) -> None:
+            nonlocal current_tts_task
+            if current_tts_task and not current_tts_task.done():
+                tts_cancel.set()
+                current_tts_task.cancel()
+            tts_cancel.clear()
+            current_tts_task = asyncio.create_task(_run_tts(text))
 
         async def _handle_utterance(pcm: bytes) -> None:
             if not pcm or not transcriber:
@@ -131,7 +202,7 @@ def register(app):
                 if response:
                     await ws.send_text(json.dumps({"type": "response", "text": response}))
                     if CONFIG.get("audio_ws_tts", True):
-                        await _stream_tts(ws, response, voice)
+                        _start_tts(response)
             except Exception as e:
                 logger.warning(f"ws_audio utterance: {e}")
                 await ws.send_text(json.dumps({"type": "error", "data": str(e)}))
@@ -146,7 +217,11 @@ def register(app):
                 if "text" in raw and raw["text"]:
                     try:
                         msg = json.loads(raw["text"])
-                        if msg.get("type") == "stop":
+                        if msg.get("type") == "interrupt":
+                            if barge_in:
+                                await _cancel_tts()
+                        elif msg.get("type") == "stop":
+                            await _cancel_tts(notify=False)
                             if vad_filter:
                                 tail = vad_filter.flush()
                                 if tail:
@@ -159,6 +234,14 @@ def register(app):
                 frame = raw.get("bytes") or b""
                 if not frame:
                     continue
+
+                if (
+                    barge_in
+                    and current_tts_task
+                    and not current_tts_task.done()
+                    and _pcm_has_speech(frame, barge_vad)
+                ):
+                    await _cancel_tts()
 
                 if bus:
                     try:

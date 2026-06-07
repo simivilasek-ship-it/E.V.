@@ -15,6 +15,7 @@ if HAS_FASTAPI:
     from fastapi.middleware.cors import CORSMiddleware
 
     from src.api.lifespan import lifespan
+    from src.api.middleware.auth import ApiTokenAuthMiddleware
     from src.api.paths import ROOT
     from src.api.routers import register_all
     from src.api.ws import broadcast_graph_event
@@ -29,6 +30,7 @@ if HAS_FASTAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(ApiTokenAuthMiddleware)
 
     register_all(app)
 

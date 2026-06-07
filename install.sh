@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
-JARVIS_VERSION="4.3.0"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+JARVIS_VERSION=$(python3 -c "from config import __version__; print(__version__)" 2>/dev/null || echo "5.4.0")
 DEFAULT_MODEL="qwen2.5:3b"
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'

@@ -6,17 +6,13 @@ import { Icons } from './Icons'
 import HeroPanel from './HeroPanel'
 
 const PLACEHOLDERS = [
-  { text: 'Otevři Spotify…',           tag: 'ovládání PC' },
-  { text: 'Počasí Praha…',             tag: 'Open-Meteo' },
-  { text: 'Popiš obrazovku…',          tag: 'vision AI' },
-  { text: 'Zahraj Bohemian Rhapsody…', tag: 'YouTube' },
-  { text: 'Jaké máš komponenty?',      tag: 'hardware' },
-  { text: 'Fotbal výsledky dnes…',     tag: 'sport' },
-  { text: 'Přelož hello world…',       tag: 'AI překlad' },
-  { text: 'Vypočítej 15% z 2400…',     tag: 'kalkulačka' },
+  { text: 'Otevři Spotify…', tag: 'ovládání PC' },
+  { text: 'Počasí Praha…', tag: 'počasí' },
+  { text: 'Popiš obrazovku…', tag: 'vision' },
+  { text: 'Stáhni Instagram…', tag: 'instalace' },
+  { text: 'Přehled o PC…', tag: 'systém' },
+  { text: 'Fotbal výsledky…', tag: 'sport' },
 ]
-
-const SUGGESTIONS = ['kolik je hodin?', 'počasí Praha', 'info o systému', 'screenshot', 'hardware info', 'fotbal výsledky']
 
 const QUICK_ACTIONS = [
   { label: 'Přehled PC', cmd: 'Přehled PC' },
@@ -25,10 +21,10 @@ const QUICK_ACTIONS = [
   { label: 'Počasí', cmd: 'Počasí' },
 ] as const
 
-const MODE_BADGE: Record<MessageMode, { label: string; color: string; bg: string; border: string }> = {
-  copilot: { label: 'Copilot', color: 'var(--cyan)', bg: 'rgba(0,200,255,.08)', border: 'rgba(0,200,255,.2)' },
-  akce:    { label: 'Akce',    color: 'var(--amber)', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.25)' },
-  agent:   { label: 'Agent',   color: 'var(--purple)', bg: 'rgba(168,85,247,.08)', border: 'rgba(168,85,247,.25)' },
+const MODE_BADGE: Record<MessageMode, { label: string; color: string; bg: string }> = {
+  copilot: { label: 'Copilot', color: 'var(--accent-light)', bg: 'rgba(99,102,241,.12)' },
+  akce:    { label: 'Akce',    color: 'var(--amber)', bg: 'rgba(251,191,36,.12)' },
+  agent:   { label: 'Agent',   color: 'var(--purple)', bg: 'rgba(167,139,250,.12)' },
 }
 
 function formatTime(ts: number) {
@@ -47,20 +43,18 @@ function renderContent(text: string) {
         ul: ({ children }) => <ul className="list-disc ml-5 mb-2 space-y-0.5">{children}</ul>,
         ol: ({ children }) => <ol className="list-decimal ml-5 mb-2 space-y-0.5">{children}</ol>,
         li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-        h1: ({ children }) => <h1 className="text-base font-bold mb-2 mt-3" style={{ color: 'var(--cyan)' }}>{children}</h1>,
-        h2: ({ children }) => <h2 className="text-sm font-semibold mb-1.5 mt-3" style={{ color: 'var(--cyan)' }}>{children}</h2>,
-        h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 mt-2" style={{ color: 'rgba(0,200,255,.7)' }}>{children}</h3>,
-        strong: ({ children }) => <strong className="font-semibold" style={{ color: '#e2e8f0' }}>{children}</strong>,
-        em: ({ children }) => <em className="italic" style={{ color: 'rgba(219,234,254,.7)' }}>{children}</em>,
+        h1: ({ children }) => <h1 className="text-base font-semibold mb-2 mt-3" style={{ color: 'var(--accent-light)' }}>{children}</h1>,
+        h2: ({ children }) => <h2 className="text-sm font-semibold mb-1.5 mt-3" style={{ color: 'var(--accent-light)' }}>{children}</h2>,
+        h3: ({ children }) => <h3 className="text-sm font-medium mb-1 mt-2" style={{ color: 'var(--text-secondary)' }}>{children}</h3>,
+        strong: ({ children }) => <strong className="font-semibold" style={{ color: 'var(--text)' }}>{children}</strong>,
         code: ({ children, className }) => {
           const isBlock = className?.startsWith('language-')
           if (isBlock) return <code className="prose-j block">{children}</code>
           return <code className="prose-j">{children}</code>
         },
         pre: ({ children }) => <pre className="prose-j mb-2">{children}</pre>,
-        a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" className="underline" style={{ color: 'var(--cyan)' }}>{children}</a>,
-        blockquote: ({ children }) => <blockquote className="border-l-2 pl-3 my-2 italic" style={{ borderColor: 'var(--cyan)', color: 'var(--muted)' }}>{children}</blockquote>,
-        hr: () => <hr className="my-3" style={{ borderColor: 'rgba(255,255,255,.08)' }} />,
+        a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" className="underline" style={{ color: 'var(--accent-light)' }}>{children}</a>,
+        blockquote: ({ children }) => <blockquote className="border-l-2 pl-3 my-2 italic" style={{ borderColor: 'var(--accent)', color: 'var(--muted)' }}>{children}</blockquote>,
       }}
     >
       {text}
@@ -70,10 +64,10 @@ function renderContent(text: string) {
 
 function TypingDots() {
   return (
-    <div className="flex gap-1 py-1">
+    <div className="flex gap-1.5 py-1">
       {[0, 1, 2].map(i => (
-        <div key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce"
-          style={{ animationDelay: `${i * 0.15}s` }} />
+        <div key={i} className="w-1.5 h-1.5 rounded-full anim-pulse"
+          style={{ background: 'var(--accent-light)', animationDelay: `${i * 0.15}s` }} />
       ))}
     </div>
   )
@@ -87,68 +81,51 @@ function MessageBubble({ msg }: { msg: Message }) {
   }
 
   if (msg.sender === 'user') return (
-    <div className="flex justify-end gap-2.5 mb-5 items-end anim-msg-in">
-      <div className="max-w-[580px]">
-        <div className="px-4 py-2.5 rounded-2xl rounded-br-[3px] text-sm leading-7"
-          style={{
-            background: 'linear-gradient(135deg,rgba(59,130,246,.18),rgba(99,102,241,.14))',
-            border: '1px solid rgba(99,102,241,.25)',
-            color: 'var(--text)',
-          }}>
+    <div className="flex justify-end mb-5 anim-msg-in">
+      <div className="max-w-[min(580px,85%)]">
+        <div className="msg-user px-4 py-3 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
           {renderContent(msg.text)}
         </div>
-        <div className="text-right mt-1 font-mono text-[9px]" style={{ color: 'var(--muted)' }}>
+        <div className="text-right mt-1 font-mono text-[10px]" style={{ color: 'var(--muted)' }}>
           {formatTime(msg.ts)}
         </div>
-      </div>
-      <div className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center font-hud text-[10px] font-bold"
-        style={{ background: 'linear-gradient(135deg,rgba(59,130,246,.1),rgba(99,102,241,.08))', border: '1px solid rgba(99,102,241,.25)', color: '#93c5fd' }}>
-        U
       </div>
     </div>
   )
 
-  return (
-    <div className="flex gap-3 mb-6 items-start anim-msg-in">
-      <div className="w-8 h-8 rounded-lg shrink-0 mt-0.5 flex items-center justify-center font-hud text-[10px] font-bold"
-        style={{
-          background: 'linear-gradient(135deg,rgba(0,200,255,.12),rgba(99,102,241,.08))',
-          border: '1px solid rgba(0,200,255,.2)',
-          color: 'var(--cyan)', boxShadow: '0 0 12px rgba(0,200,255,.08)',
-        }}>J</div>
+  const badge = msg.mode ? MODE_BADGE[msg.mode] : null
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1.5 font-mono text-[10px]">
-          <span className="font-semibold tracking-wide" style={{ color: 'rgba(0,200,255,.7)' }}>JARVIS</span>
-          {msg.mode && (
-            <span className="px-1.5 py-px rounded-full text-[8px] font-semibold tracking-wide"
-              style={{
-                color: MODE_BADGE[msg.mode].color,
-                background: MODE_BADGE[msg.mode].bg,
-                border: `1px solid ${MODE_BADGE[msg.mode].border}`,
-              }}>
-              {MODE_BADGE[msg.mode].label}
+  return (
+    <div className="flex gap-3 mb-6 anim-msg-in">
+      <div
+        className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center font-display text-xs font-bold"
+        style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)', color: '#fff' }}
+      >
+        J
+      </div>
+      <div className="flex-1 min-w-0 max-w-[min(640px,90%)]">
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="font-medium text-xs" style={{ color: 'var(--text-secondary)' }}>JARVIS</span>
+          {badge && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+              style={{ color: badge.color, background: badge.bg }}>
+              {badge.label}
             </span>
           )}
-          <span style={{ color: 'var(--muted)' }}>·</span>
-          <span style={{ color: 'var(--muted)' }}>{formatTime(msg.ts)}</span>
+          <span className="font-mono text-[10px]" style={{ color: 'var(--muted)' }}>{formatTime(msg.ts)}</span>
         </div>
-        <div className="group relative text-sm leading-[1.75]" style={{ color: 'rgba(219,234,254,.9)' }}>
+        <div className="group relative msg-assistant px-4 py-3 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
           {renderContent(msg.text)}
           {msg.streaming && !msg.text && <TypingDots />}
           {msg.streaming && msg.text && (
-            <span className="inline-block w-2 h-3.5 rounded-sm ml-0.5 align-middle anim-blink"
-              style={{ background: 'var(--cyan)', boxShadow: '0 0 6px var(--cyan)' }}/>
+            <span className="inline-block w-1.5 h-4 rounded-sm ml-0.5 align-middle anim-blink"
+              style={{ background: 'var(--accent-light)' }} />
           )}
           {!msg.streaming && msg.text && (
             <button onClick={copy}
-              className="copy-btn absolute top-0 right-0 font-mono text-[10px] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{
-                background: copied ? 'rgba(34,211,165,.1)' : 'rgba(0,0,0,.45)',
-                border: `1px solid ${copied ? 'rgba(34,211,165,.3)' : 'rgba(255,255,255,.08)'}`,
-                color: copied ? 'var(--green)' : 'var(--muted)',
-              }}>
-              {copied ? '✓' : '⎘'}
+              className="absolute top-2 right-2 font-mono text-[10px] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity btn-ghost"
+              style={{ color: copied ? 'var(--green)' : 'var(--muted)' }}>
+              {copied ? '✓' : 'Kopírovat'}
             </button>
           )}
         </div>
@@ -158,7 +135,7 @@ function MessageBubble({ msg }: { msg: Message }) {
 }
 
 export default function ChatPanel() {
-  const [input, setInput]     = useState('')
+  const [input, setInput] = useState('')
   const messages  = useJarvis(s => s.messages)
   const sendCmd   = useJarvis(s => s.sendCommand)
   const clearMsgs = useJarvis(s => s.clearMessages)
@@ -183,22 +160,17 @@ export default function ChatPanel() {
     e.preventDefault()
     setDragOver(false)
     const file = e.dataTransfer.files[0]
-    if (file && file.type.startsWith('image/')) {
+    if (file?.type.startsWith('image/')) {
       const reader = new FileReader()
-      reader.onload = (ev) => {
-        const base64 = ev.target?.result as string
-        setPendingImage(base64)
-      }
+      reader.onload = (ev) => setPendingImage(ev.target?.result as string)
       reader.readAsDataURL(file)
     }
   }, [])
 
   const send = useCallback(() => {
     const t = input.trim()
-    if (!t && !pendingImage || orbState === 'thinking') return
-    const text = pendingImage
-      ? `[OBRAZ:${pendingImage.substring(0, 100)}...] ${t}`
-      : t
+    if ((!t && !pendingImage) || orbState === 'thinking') return
+    const text = pendingImage ? `[OBRAZ:${pendingImage.substring(0, 100)}...] ${t}` : t
     setHist(h => [text, ...h.slice(0, 49)]); setHidx(-1); setInput('')
     if (taRef.current) taRef.current.style.height = 'auto'
     setPendingImage(null)
@@ -224,140 +196,80 @@ export default function ChatPanel() {
       onDragOver={e => { e.preventDefault(); setDragOver(true) }}
       onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false) }}
       onDrop={handleDrop}
-      style={dragOver ? { outline: '2px solid rgba(0,200,255,.6)', outlineOffset: -2, borderRadius: 12 } : undefined}
+      style={dragOver ? { outline: '2px solid var(--accent)', outlineOffset: -2 } : undefined}
     >
-
-      {/* Toolbar */}
-      <div className="flex items-center justify-between shrink-0 px-4 py-2.5"
-        style={{ borderBottom: '1px solid var(--border2)' }}>
-        <span className="font-hud text-[8px] tracking-[.2em]" style={{ color: 'var(--muted)' }}>KOMUNIKACE</span>
-        <button onClick={clearMsgs}
-          className="font-mono text-[9px] tracking-wider px-2 py-1 rounded transition-colors"
-          style={{ color: 'var(--muted)', background: 'none', border: 'none' }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}>
-          CLEAR
+      {/* Header */}
+      <div className="flex items-center justify-between shrink-0 px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div>
+          <h2 className="font-display text-sm font-semibold" style={{ color: 'var(--text)' }}>Chat</h2>
+          <p className="text-[11px]" style={{ color: 'var(--muted)' }}>Copilot · Agent · Akce</p>
+        </div>
+        <button onClick={clearMsgs} className="btn-ghost px-3 py-1.5 text-xs font-mono">
+          Vymazat
         </button>
       </div>
 
-      {/* Messages or Hero Panel */}
-      <div className="flex-1 overflow-y-auto flex flex-col items-center">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
-          <HeroPanel onSend={(cmd) => { sendCmd(cmd) }} />
+          <HeroPanel onSend={sendCmd} />
         ) : (
-          <div className="w-full max-w-[760px] flex flex-col justify-end min-h-full px-5 pt-6 pb-2">
+          <div className="max-w-3xl mx-auto px-5 pt-6 pb-4">
             {messages.map(m => <MessageBubble key={m.id} msg={m} />)}
             <div ref={bottomRef} />
           </div>
         )}
       </div>
 
-      {/* Suggestions — jen při prázdném chatu (pod hero) */}
-      {messages.length === 0 && false && (
-        <div className="flex flex-wrap gap-1.5 px-4 pb-2 justify-center">
-          {SUGGESTIONS.map(s => (
-            <button key={s} onClick={() => sendCmd(s)}
-              className="font-mono text-[10px] px-3 py-1 rounded-full transition-all"
-              style={{
-                background: 'rgba(0,200,255,.05)', border: '1px solid rgba(0,200,255,.15)',
-                color: 'rgba(0,200,255,.7)',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,200,255,.1)'; (e.currentTarget as HTMLElement).style.color = 'var(--cyan)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,200,255,.05)'; (e.currentTarget as HTMLElement).style.color = 'rgba(0,200,255,.7)' }}>
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Input */}
-      <div className="shrink-0 px-4 pb-4 flex flex-col gap-1.5 max-w-[760px] w-full mx-auto">
-        {/* Quick actions */}
-        <div className="flex flex-wrap gap-1.5 justify-center">
+      {/* Input area */}
+      <div className="shrink-0 px-5 pb-5 pt-2 max-w-3xl w-full mx-auto flex flex-col gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {QUICK_ACTIONS.map(({ label, cmd }) => (
             <button
               key={label}
               type="button"
               onClick={() => sendCmd(cmd)}
               disabled={busy}
-              className="font-mono text-[10px] px-3 py-1 rounded-full transition-all"
-              style={{
-                background: 'rgba(78,205,196,.05)',
-                border: '1px solid rgba(78,205,196,.18)',
-                color: 'rgba(78,205,196,.85)',
-                cursor: busy ? 'not-allowed' : 'pointer',
-                opacity: busy ? 0.5 : 1,
-              }}
-              onMouseEnter={e => {
-                if (busy) return
-                const el = e.currentTarget as HTMLElement
-                el.style.background = 'rgba(78,205,196,.12)'
-                el.style.borderColor = 'rgba(78,205,196,.35)'
-                el.style.color = 'var(--teal)'
-              }}
-              onMouseLeave={e => {
-                const el = e.currentTarget as HTMLElement
-                el.style.background = 'rgba(78,205,196,.05)'
-                el.style.borderColor = 'rgba(78,205,196,.18)'
-                el.style.color = 'rgba(78,205,196,.85)'
-              }}>
+              className="status-pill hover:opacity-90 transition-opacity disabled:opacity-40"
+              style={{ cursor: busy ? 'not-allowed' : 'pointer', color: 'var(--text-secondary)' }}
+            >
               {label}
             </button>
           ))}
         </div>
 
-        {/* Pending image thumbnail */}
         {pendingImage && (
-          <div className="flex items-center gap-2 px-1">
-            <div className="relative inline-block">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={pendingImage} alt="pending" className="h-14 w-14 rounded-lg object-cover"
-                style={{ border: '1px solid rgba(0,200,255,.3)' }} />
-              <button
-                onClick={() => setPendingImage(null)}
-                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
-                style={{ background: 'rgba(239,68,68,.85)', color: '#fff', border: '1px solid rgba(0,0,0,.3)' }}>
-                ✕
-              </button>
-            </div>
-            <span className="font-mono text-[10px]" style={{ color: 'var(--muted)' }}>Obrázek připraven k odeslání</span>
+          <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={pendingImage} alt="pending" className="h-12 w-12 rounded-lg object-cover" style={{ border: '1px solid var(--border-accent)' }} />
+            <button onClick={() => setPendingImage(null)} className="text-xs" style={{ color: 'var(--red)' }}>Odebrat</button>
           </div>
         )}
 
-        {/* Drag over overlay hint */}
         {dragOver && (
-          <div className="text-center font-mono text-[11px] py-1" style={{ color: 'var(--cyan)' }}>
-            📂 Pusť obrázek pro přiložení
-          </div>
+          <p className="text-center text-xs font-mono" style={{ color: 'var(--accent-light)' }}>Pusť obrázek pro přiložení</p>
         )}
 
-        {/* Feature tag */}
         {!input && (
-          <div className="flex items-center gap-2 pl-0.5">
-            <span className="font-mono text-[9px]" style={{ color: 'var(--muted)' }}>JARVIS umí:</span>
-            <span className="font-mono text-[9px] px-2 py-0.5 rounded-full"
-              style={{ background: 'rgba(78,205,196,.08)', border: '1px solid rgba(78,205,196,.2)', color: '#4ecdc4' }}>
-              {pl.tag}
-            </span>
+          <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+            <span>Zkuste:</span>
+            <span className="status-pill" style={{ color: 'var(--accent-light)' }}>{pl.tag}</span>
           </div>
         )}
 
-        {/* Textarea box */}
-        <div className="flex gap-2 items-end rounded-[14px] px-4 py-2 transition-all"
-          style={{ background: 'rgba(6,12,26,.85)', border: '1px solid rgba(0,200,255,.16)', boxShadow: '0 4px 24px rgba(0,0,0,.35)' }}>
+        <div className="input-shell flex gap-2 items-end px-3 py-2">
           <button
             type="button"
             onClick={toggleMic}
             disabled={busy}
-            title={isMicActive ? 'Zastavit mikrofon' : 'Mluvit (Web Speech API)'}
-            className="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center transition-all"
+            title={isMicActive ? 'Zastavit mikrofon' : 'Mluvit'}
+            className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center btn-ghost"
             style={{
-              background: isMicActive ? 'rgba(244,63,94,.15)' : 'rgba(255,255,255,.04)',
-              border: isMicActive ? '1px solid rgba(244,63,94,.35)' : '1px solid rgba(255,255,255,.08)',
               color: isMicActive ? 'var(--red)' : 'var(--muted)',
-              cursor: busy ? 'not-allowed' : 'pointer',
-              boxShadow: isMicActive ? '0 0 14px rgba(244,63,94,.25)' : 'none',
-            }}>
+              borderColor: isMicActive ? 'rgba(248,113,113,.3)' : undefined,
+              background: isMicActive ? 'rgba(248,113,113,.1)' : undefined,
+            }}
+          >
             {Icons.mic}
           </button>
           <textarea
@@ -366,34 +278,31 @@ export default function ChatPanel() {
             onChange={e => {
               setInput(e.target.value)
               e.target.style.height = 'auto'
-              e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
+              e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'
             }}
             onKeyDown={onKey}
             placeholder={pl.text}
             rows={1}
             disabled={busy}
-            className="flex-1 bg-transparent border-none resize-none outline-none text-sm leading-[1.55] py-1.5"
-            style={{ color: 'var(--text)', fontFamily: "'Inter',system-ui", minHeight: 36, maxHeight: 160 }}
+            className="flex-1 bg-transparent border-none resize-none outline-none text-sm py-2"
+            style={{ color: 'var(--text)', minHeight: 36, maxHeight: 140 }}
           />
-          <button onClick={send} disabled={busy || (!input.trim() && !pendingImage)}
-            className="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center transition-all"
-            style={{
-              background: (input.trim() || pendingImage) && !busy ? 'linear-gradient(135deg,#4ecdc4,#3b82f6)' : 'rgba(255,255,255,.04)',
-              border: 'none',
-              color: (input.trim() || pendingImage) && !busy ? '#000' : 'var(--muted)',
-              cursor: (input.trim() || pendingImage) && !busy ? 'pointer' : 'not-allowed',
-              boxShadow: (input.trim() || pendingImage) && !busy ? '0 0 18px rgba(78,205,196,.35)' : 'none',
-            }}>
+          <button
+            onClick={send}
+            disabled={busy || (!input.trim() && !pendingImage)}
+            className="btn-primary w-9 h-9 shrink-0 flex items-center justify-center"
+            style={{ padding: 0 }}
+          >
             {busy
-              ? <div className="w-4 h-4 rounded-full anim-spin" style={{ border: '2px solid var(--muted)', borderTopColor: 'transparent' }}/>
+              ? <div className="w-4 h-4 rounded-full anim-spin" style={{ border: '2px solid rgba(255,255,255,.3)', borderTopColor: '#fff' }} />
               : Icons.send
             }
           </button>
         </div>
 
-        <div className="text-center font-mono text-[9px]" style={{ color: 'var(--muted)' }}>
-          ↵ odeslat · 🎤 hlas (Chrome) · ⇧↵ nový řádek · ↑↓ historie
-        </div>
+        <p className="text-center font-mono text-[10px]" style={{ color: 'var(--muted)' }}>
+          Enter odeslat · Shift+Enter nový řádek · ↑↓ historie
+        </p>
       </div>
     </div>
   )

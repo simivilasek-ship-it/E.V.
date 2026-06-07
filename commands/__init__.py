@@ -189,7 +189,7 @@ class CommandExecutor:
     # ── apps ─────────────────────────────────────────
     def _cmd_open_app(self, app="", args=None, **_): return cmd_open_app(app, args)
     def _cmd_kill_process(self, name="", **_):       return cmd_kill_process(name)
-    def _cmd_install_app(self, name="", **_):        return cmd_install_app(name)
+    def _cmd_install_app(self, name="", launch=True, **_): return cmd_install_app(name, launch=launch)
     def _cmd_uninstall_app(self, name="", **_):      return cmd_uninstall_app(name)
     def _cmd_run_script(self, path="", **_):         return cmd_run_script(path)
     def _cmd_vscode_open(self, path="", **_):        return cmd_vscode_open(path)

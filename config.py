@@ -3,7 +3,7 @@ JARVIS — Konfigurace
 Načítání a validace z .env, config.json s fallbackem na defaults
 """
 
-__version__ = "5.4.0"
+__version__ = "5.5.0"
 
 import os
 import json
@@ -68,6 +68,8 @@ DEFAULT_CONFIG = {
     # Security
     "audit_log_file": "audit.log",
     "audit_enabled": True,
+    "api_token": "",
+    "api_auth_required": False,
     # Memory
     "memory_dir": "memory_data",
     # MCP defaults
@@ -212,6 +214,11 @@ def _load_env() -> Dict[str, Any]:
         "RATE_LIMIT_MAX": ("rate_limit_max", int),
         "AUDIT_LOG_FILE": "audit_log_file",
         "AUDIT_ENABLED": ("audit_enabled", lambda x: x.lower() == "true"),
+        "JARVIS_API_TOKEN": "api_token",
+        "JARVIS_API_AUTH_REQUIRED": (
+            "api_auth_required",
+            lambda x: x.lower() in ("1", "true", "yes"),
+        ),
         "MEMORY_DIR": "memory_dir",
         "BRAVE_API_KEY": "brave_api_key",
         "GROQ_API_KEY": "groq_api_key",

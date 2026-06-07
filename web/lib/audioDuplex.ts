@@ -3,6 +3,8 @@
  */
 
 const SAMPLE_RATE = 16000
+/** RMS energy threshold for local barge-in during TTS playback */
+const BARGE_IN_RMS = 0.02
 
 function downsampleTo16k(input: Float32Array, inputRate: number): Int16Array {
   if (inputRate === SAMPLE_RATE) {
@@ -24,6 +26,14 @@ function downsampleTo16k(input: Float32Array, inputRate: number): Int16Array {
   return out
 }
 
+function pcmRms(input: Float32Array): number {
+  let sum = 0
+  for (let i = 0; i < input.length; i++) {
+    sum += input[i] * input[i]
+  }
+  return Math.sqrt(sum / Math.max(input.length, 1))
+}
+
 export type DuplexCallbacks = {
   onListening?: () => void
   onTranscript?: (text: string) => void
@@ -42,6 +52,10 @@ export class AudioDuplex {
   private active = false
   private ttsQueue: ArrayBuffer[] = []
   private playingTts = false
+  private ttsAbort = false
+  private bargeInSent = false
+  private currentSource: AudioBufferSourceNode | null = null
+  private playbackCtx: AudioContext | null = null
 
   constructor(
     private wsUrl: string,
@@ -92,9 +106,17 @@ export class AudioDuplex {
               this.cb.onTranscript?.(msg.text)
             } else if (msg.type === 'response' && msg.text) {
               this.cb.onResponse?.(msg.text)
+            } else if (msg.type === 'tts_start') {
+              this.ttsAbort = false
+              this.bargeInSent = false
+              this.ttsQueue = []
             } else if (msg.type === 'tts_end') {
-              await this._playTtsQueue()
-              this.cb.onIdle?.()
+              if (!this.ttsAbort) {
+                await this._playTtsQueue()
+                this.cb.onIdle?.()
+              }
+            } else if (msg.type === 'tts_cancel') {
+              this.abortTts()
             } else if (msg.type === 'error') {
               fail(msg.data || 'Audio WS chyba')
             } else if (msg.type === 'vad' && msg.speech) {
@@ -102,8 +124,10 @@ export class AudioDuplex {
             }
           } catch { /* ignore */ }
         } else if (ev.data instanceof ArrayBuffer) {
-          this.ttsQueue.push(ev.data)
-          this.cb.onSpeaking?.()
+          if (!this.ttsAbort) {
+            this.ttsQueue.push(ev.data)
+            this.cb.onSpeaking?.()
+          }
         }
       }
 
@@ -123,6 +147,7 @@ export class AudioDuplex {
 
   stop() {
     this.active = false
+    this.abortTts(false)
     this.processor?.disconnect()
     this.source?.disconnect()
     this.processor = null
@@ -138,9 +163,22 @@ export class AudioDuplex {
       this.ws.close()
     }
     this.ws = null
-    this.ttsQueue = []
-    this.playingTts = false
     this.cb.onIdle?.()
+  }
+
+  /** Stop TTS playback immediately and clear queued audio. */
+  abortTts(notify = true) {
+    this.ttsAbort = true
+    this.ttsQueue = []
+    this.bargeInSent = false
+    try { this.currentSource?.stop() } catch { /* already stopped */ }
+    this.currentSource = null
+    if (this.playbackCtx?.state !== 'closed') {
+      this.playbackCtx?.close().catch(() => {})
+    }
+    this.playbackCtx = null
+    this.playingTts = false
+    if (notify) this.cb.onListening?.()
   }
 
   private _startCapture() {
@@ -152,6 +190,16 @@ export class AudioDuplex {
     this.processor.onaudioprocess = (e) => {
       if (!this.active || this.ws?.readyState !== WebSocket.OPEN) return
       const input = e.inputBuffer.getChannelData(0)
+
+      if (this.playingTts && !this.bargeInSent) {
+        const energy = pcmRms(input)
+        if (energy >= BARGE_IN_RMS) {
+          this.bargeInSent = true
+          try { this.ws!.send(JSON.stringify({ type: 'interrupt' })) } catch { /* */ }
+          this.abortTts()
+        }
+      }
+
       const pcm = downsampleTo16k(input, this.ctx!.sampleRate)
       this.ws!.send(pcm.buffer)
     }
@@ -160,17 +208,25 @@ export class AudioDuplex {
   }
 
   private async _playTtsQueue() {
-    if (this.playingTts || !this.ttsQueue.length) return
+    if (this.playingTts || !this.ttsQueue.length || this.ttsAbort) return
     this.playingTts = true
+    this.bargeInSent = false
     const ctx = new AudioContext()
+    this.playbackCtx = ctx
     try {
       for (const buf of this.ttsQueue) {
+        if (this.ttsAbort) break
         const audioBuf = await ctx.decodeAudioData(buf.slice(0))
+        if (this.ttsAbort) break
         await new Promise<void>((resolve) => {
           const src = ctx.createBufferSource()
           src.buffer = audioBuf
           src.connect(ctx.destination)
-          src.onended = () => resolve()
+          this.currentSource = src
+          src.onended = () => {
+            if (this.currentSource === src) this.currentSource = null
+            resolve()
+          }
           src.start()
         })
       }
@@ -179,6 +235,8 @@ export class AudioDuplex {
     } finally {
       this.ttsQueue = []
       this.playingTts = false
+      this.currentSource = null
+      this.playbackCtx = null
       ctx.close().catch(() => {})
     }
   }

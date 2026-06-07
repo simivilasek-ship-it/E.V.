@@ -1,4 +1,4 @@
-# Canonical: use root llm.py / local_router.py
+# DEPRECATED: canonical module is root local_router.py — do not edit this copy.
 """
 JARVIS — Lokální router (regex/fuzzy bez LLM)
 Zpracovává 95% příkazů lokálně.
@@ -136,6 +136,57 @@ def _extract_app_name(text: str) -> str:
         "", _norm(text), flags=re.IGNORECASE
     ).strip(" ,.-")
     return t
+
+
+_INSTALL_APP_NAMES = {
+    "instagram", "whatsapp", "telegram", "discord", "spotify", "vlc",
+    "chrome", "chromium", "firefox", "vscode", "code", "steam", "gimp",
+    "blender", "inkscape", "libreoffice", "zoom", "slack", "teams",
+    "signal", "element", "thunderbird", "obs", "audacity", "krita",
+    *_APPS.keys(),
+}
+
+
+def _extract_install_name(text: str, t: str) -> str:
+    patterns = [
+        r"\b(?:nainstaluj|instaluj|nainstalovat|install|apt\s+install)\s+(.+)",
+        r"\bstahni\s+(?:aplikaci|appku|app|program)\s+(.+)",
+        r"\baplikaci\s+(\S+)\s+stahni",
+        r"\bstahni\s+(\S+)\s+aplikaci",
+    ]
+    for pat in patterns:
+        m = re.search(pat, t, re.I)
+        if m:
+            return m.group(1).strip(" ?.,!")
+    m = re.search(r"\bstahni\s+(\S+)", t, re.I)
+    if m:
+        name = m.group(1).strip(" ?.,!")
+        if name.lower() in _INSTALL_APP_NAMES:
+            return name
+    return ""
+
+
+def _is_video_download_intent(t: str, text: str) -> bool:
+    if re.search(r"\b(youtube\.com|youtu\.be)\b", text, re.I):
+        return True
+    if re.search(
+        r"\b(stahni\s+(?:video|youtube|hudbu|mp3|zvuk|skladbu|pisnicku|song)"
+        r"|stahni\s+.+\s+(?:z\s+)?youtube"
+        r"|uloz\s+video|uloz\s+audio"
+        r"|download\s+(?:video|from\s+youtube|mp3))\b",
+        t, re.I,
+    ):
+        return True
+    m = re.search(r"\bstahni\s+(.+)", t, re.I)
+    if m:
+        rest = m.group(1).strip()
+        first = rest.split()[0].lower() if rest else ""
+        if first in _INSTALL_APP_NAMES:
+            return False
+        if re.search(r"\b(aplikaci|appku|app|program)\b", t):
+            return False
+        return len(rest.split()) >= 1 and first not in _INSTALL_APP_NAMES
+    return False
 
 
 def _parse_args(command: str, args: str) -> dict:
@@ -520,12 +571,32 @@ class LocalRouter:
         if re.search(r"\b(predchozi\s+skladb|zpet\s+skladb)\b", t):
             return "Předchozí.", {"action": "media", "params": {"action": "prev"}}
 
-        # ── YT-DLP: STÁHNOUT ──────────────────────────
-        if re.search(r"\b(stahni|download|stahnout|uloz\s+video|uloz\s+audio)\b", t):
-            audio = bool(re.search(r"\b(audio|mp3|hudbu|zvuk)\b", t))
+        # ── INSTALACE APLIKACE (před yt-dlp) ─────────
+        install_name = _extract_install_name(text, t)
+        if install_name and not _is_video_download_intent(t, text):
+            from commands.apps import find_app, resolve_app
+            pkg = find_app(install_name)
+            spec = resolve_app(pkg)
+            label = spec.key if spec else pkg
+            return f"Stahuji, instaluji a spouštím {label}…", {
+                "action": "install_app", "params": {"name": pkg, "launch": True}}
+
+        if re.search(r"\b(odinstaluj|odstran\s+aplikaci|uninstall)\b", t):
+            m = re.search(
+                r"\b(?:odinstaluj|uninstall|odstran\s+aplikaci)\s+(.+)", t, re.I)
+            if m:
+                from commands.apps import find_app
+                pkg = find_app(m.group(1).strip(" ?.,!"))
+                return f"Odinstalovávám: {pkg}.", {
+                    "action": "uninstall_app", "params": {"name": pkg}}
+
+        # ── YT-DLP: STÁHNOUT (jen video/hudba) ───────
+        if _is_video_download_intent(t, text):
+            audio = bool(re.search(r"\b(audio|mp3|hudbu|zvuk|skladbu|pisnicku)\b", t))
             quality = "720p" if "720" in t else "1080p" if "1080" in t else "480p" if "480" in t else "best"
-            query = re.sub(r"\b(stahni|download|stahnout|uloz|video|audio|mp3|hudbu|zvuk|z\s+youtube)\b",
-                           "", text, flags=re.IGNORECASE).strip(" ,.-")
+            query = re.sub(
+                r"\b(stahni|download|stahnout|uloz|video|audio|mp3|hudbu|zvuk|z\s+youtube|youtube)\b",
+                "", text, flags=re.IGNORECASE).strip(" ,.-")
             if query:
                 mode = "audio MP3" if audio else f"video {quality}"
                 return f"Stahuji {mode}: {query}", {

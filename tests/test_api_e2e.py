@@ -56,23 +56,47 @@ class TestSystemEndpoint:
         assert "net" in d
 
 
+class TestChatEndpoint:
+    def test_chat_get_time(self):
+        r = client.post("/api/chat", json={"text": "kolik je hodin"})
+        assert r.status_code == 200
+        d = r.json()
+        assert "response" in d
+        assert len(d["response"]) > 0
+        assert "deprecated" not in d
+
+    def test_chat_empty_returns_message(self):
+        r = client.post("/api/chat", json={"text": ""})
+        assert r.status_code == 200
+        d = r.json()
+        assert "response" in d
+
+
 class TestCommandEndpoint:
+    """Legacy /api/command — unified runtime + deprecation metadata."""
+
     def test_command_get_time(self):
         r = client.post("/api/command", json={"command": "kolik je hodin"})
         assert r.status_code == 200
         d = r.json()
         assert "response" in d
         assert len(d["response"]) > 0
+        assert d.get("deprecated") is True
+        assert d.get("use") == "/api/chat"
+        assert r.headers.get("deprecation") == "true"
 
     def test_command_empty_returns_error(self):
         r = client.post("/api/command", json={"command": ""})
         assert r.status_code == 200  # FastAPI vrátí 200 i pro prázdný příkaz
         d = r.json()
         assert "response" in d or "error" in d
+        assert d.get("deprecated") is True
+        assert d.get("use") == "/api/chat"
 
     def test_command_hardware_info(self):
         r = client.post("/api/command", json={"command": "info o systemu"})
         assert r.status_code == 200
+        assert r.json().get("deprecated") is True
 
 
 class TestPluginsEndpoint:

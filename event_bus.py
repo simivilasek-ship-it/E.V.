@@ -38,6 +38,10 @@ class EventType:
     CMD_DONE          = "cmd.done"           # příkaz dokončen
     CMD_ERROR         = "cmd.error"          # chyba příkazu
 
+    # Install
+    INSTALL_PROGRESS  = "install.progress"   # průběh instalace aplikace
+    INSTALL_ERROR     = "install.error"      # chyba instalace aplikace
+
     # Agents (background)
     AGENT_ALERT       = "agent.alert"        # agent detekoval problém
     AGENT_INFO        = "agent.info"         # agent info zpráva

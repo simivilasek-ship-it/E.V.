@@ -38,45 +38,20 @@ export function JarvisStatusBar() {
   ]
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 20,
-      padding: '8px 18px',
-      background: 'rgba(0,200,255,.04)',
-      border: '1px solid rgba(0,200,255,.1)',
-      borderRadius: 10,
-      flexWrap: 'wrap',
-    }}>
-      {/* Online indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: online ? '#22d3a5' : '#f43f5e',
-          boxShadow: online ? '0 0 8px #22d3a5' : 'none',
-          animation: online ? 'pulse 2s ease-in-out infinite' : 'none',
-          display: 'inline-block',
-          flexShrink: 0,
+    <div className="glass-panel flex items-center gap-4 flex-wrap px-4 py-2.5 rounded-xl"
+      style={{ border: '1px solid var(--border)' }}>
+      <span className="status-pill" style={{ color: online ? 'var(--green)' : 'var(--red)' }}>
+        <span className="w-2 h-2 rounded-full" style={{
+          background: online ? 'var(--green)' : 'var(--red)',
+          boxShadow: online ? '0 0 8px var(--green)' : 'none',
+          animation: online ? 'pulseDot 2s infinite' : 'none',
         }} />
-        <span style={{
-          fontFamily: 'var(--font-hud)', fontSize: 11,
-          color: online ? '#22d3a5' : '#f43f5e',
-          letterSpacing: '.15em', fontWeight: 700,
-          whiteSpace: 'nowrap',
-        }}>
-          JARVIS {online ? 'ONLINE' : 'OFFLINE'}
-        </span>
-      </div>
-
-      <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,.08)', flexShrink: 0 }} />
-
-      {/* Status items */}
+        {online ? 'Online' : 'Offline'}
+      </span>
       {items.map(item => (
-        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-            {item.label}:
-          </span>
-          <span style={{ fontSize: 11, color: item.color || 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-            {item.value}
-          </span>
+        <div key={item.label} className="flex items-center gap-1.5 font-mono text-[11px]">
+          <span style={{ color: 'var(--muted)' }}>{item.label}</span>
+          <span className="font-medium" style={{ color: item.color || 'var(--text)' }}>{item.value}</span>
         </div>
       ))}
     </div>
@@ -99,11 +74,8 @@ function LiveClock() {
   }, [])
   return (
     <div className="text-center">
-      <div className="font-mono text-5xl font-bold tracking-tight"
-        style={{ color: 'var(--cyan)', textShadow: '0 0 30px rgba(0,200,255,.35)' }}>
-        {t}
-      </div>
-      <div className="font-mono text-sm mt-1 capitalize" style={{ color: 'var(--muted)' }}>{d}</div>
+      <div className="font-display text-5xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>{t}</div>
+      <div className="text-sm mt-1 capitalize" style={{ color: 'var(--muted)' }}>{d}</div>
     </div>
   )
 }
@@ -115,9 +87,8 @@ function MetricPill({ label, value, color, unit = '%' }: {
   const numVal = typeof value === 'number' ? value : null
   const warn = numVal !== null && numVal > 85 ? 'var(--red)' : numVal !== null && numVal > 70 ? 'var(--amber)' : color
   return (
-    <div className="flex flex-col items-center gap-1 px-4 py-3 rounded-xl"
-      style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)' }}>
-      <div className="font-hud text-[8px] tracking-widest" style={{ color: 'var(--muted)' }}>{label}</div>
+    <div className="card flex flex-col items-center gap-1 px-4 py-3">
+      <div className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--muted)' }}>{label}</div>
       <div className="font-mono text-xl font-bold" style={{ color: warn }}>
         {value}{typeof value === 'number' ? unit : ''}
       </div>
@@ -141,12 +112,10 @@ function ActionBtn({ icon, label, cmd, onSend }: {
       onClick={() => onSend(cmd)}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left"
+      className="card flex items-center gap-2.5 px-4 py-3 text-sm font-medium transition-all text-left"
       style={{
-        background: hover ? 'rgba(78,205,196,.1)' : 'rgba(255,255,255,.03)',
-        border: `1px solid ${hover ? 'rgba(78,205,196,.3)' : 'rgba(255,255,255,.08)'}`,
-        color: hover ? '#4ecdc4' : 'var(--text)',
-        boxShadow: hover ? '0 0 16px rgba(78,205,196,.1)' : 'none',
+        borderColor: hover ? 'var(--border-accent)' : undefined,
+        background: hover ? 'rgba(99,102,241,.08)' : undefined,
         transform: hover ? 'translateY(-1px)' : 'none',
       }}>
       <span className="text-xl">{icon}</span>
@@ -235,8 +204,8 @@ export default function HeroPanel({ onSend }: { onSend: (cmd: string) => void })
 
       {/* Quick actions */}
       <div className="w-full">
-        <div className="font-hud text-[9px] tracking-widest mb-3" style={{ color: 'var(--muted)' }}>
-          RYCHLÉ AKCE
+        <div className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>
+          Rychlé akce
         </div>
         <div className="grid grid-cols-4 gap-2.5">
           {QUICK_ACTIONS.map(a => (

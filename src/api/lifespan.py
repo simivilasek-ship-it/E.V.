@@ -44,6 +44,23 @@ async def lifespan(application):
     except Exception as e:
         logger.warning(f"Dashboard: confirmation bridge init failed: {e}")
 
+    try:
+        from commands.install_notify import register as register_install_notify
+        from commands.install_notify import set_broadcast as set_install_broadcast
+
+        def _emit_install(payload: str):
+            if ws_mod.main_loop:
+                asyncio.run_coroutine_threadsafe(
+                    ws_mod.ws_mgr.broadcast(payload),
+                    ws_mod.main_loop,
+                )
+
+        set_install_broadcast(_emit_install)
+        register_install_notify()
+        logger.info("Dashboard: install progress → /ws/logs")
+    except Exception as e:
+        logger.warning(f"Dashboard: install notify init failed: {e}")
+
     # Plný JARVIS runtime — Copilot + Agent pipeline
     try:
         from src.api.runtime import init_runtime

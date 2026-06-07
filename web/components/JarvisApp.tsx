@@ -102,14 +102,11 @@ export default function JarvisApp() {
 
           {/* Error banner */}
           {connError && (
-            <div className="flex items-center gap-3 px-5 py-2 shrink-0 font-mono text-[11px]"
-              style={{ background: 'rgba(244,63,94,.05)', borderBottom: '1px solid rgba(244,63,94,.15)' }}>
-              <span style={{ color: 'var(--red)', fontSize: 13 }}>⚠</span>
-              <span className="flex-1" style={{ color: 'rgba(244,63,94,.85)' }}>{connError}</span>
-              <button onClick={retry}
-                className="px-3 py-1 rounded font-hud text-[9px] tracking-widest cursor-pointer"
-                style={{ background: 'rgba(244,63,94,.1)', color: 'var(--red)', border: '1px solid rgba(244,63,94,.25)' }}>
-                RETRY
+            <div className="flex items-center gap-3 px-5 py-2.5 shrink-0 text-sm mx-4 mt-2 rounded-xl"
+              style={{ background: 'rgba(248,113,113,.08)', border: '1px solid rgba(248,113,113,.2)' }}>
+              <span className="flex-1" style={{ color: 'var(--red)' }}>{connError}</span>
+              <button onClick={retry} className="btn-ghost px-3 py-1 text-xs" style={{ color: 'var(--red)' }}>
+                Zkusit znovu
               </button>
             </div>
           )}
@@ -184,32 +181,24 @@ export default function JarvisApp() {
         onCommand={() => { setTab('CHAT'); setSpotlightOpen(false) }}
       />
         {paletteOpen && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center pt-28"
-            style={{ background: 'rgba(2,6,14,.75)', backdropFilter: 'blur(8px)' }}
+          <div className="fixed inset-0 z-50 flex items-start justify-center pt-24"
+            style={{ background: 'rgba(10,11,16,.8)', backdropFilter: 'blur(12px)' }}
             onClick={() => setPaletteOpen(false)}>
-            <div className="w-[540px] rounded-[14px] overflow-hidden anim-slide-up"
-              style={{
-                background: 'rgba(6,12,26,.96)',
-                border: '1px solid rgba(0,200,255,.2)',
-                boxShadow: '0 24px 64px rgba(0,0,0,.6)',
-              }}
+            <div className="w-[480px] rounded-2xl overflow-hidden anim-slide-up glass-panel"
+              style={{ boxShadow: '0 24px 64px rgba(0,0,0,.5)' }}
               onClick={e => e.stopPropagation()}>
-              <div className="px-5 py-3 font-hud text-[9px] tracking-widest"
-                style={{ color: 'var(--muted)', borderBottom: '1px solid var(--border2)' }}>
-                COMMAND PALETTE — Alt+1..8 pro navigaci
+              <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+                <div className="font-display text-sm font-semibold">Paleta příkazů</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Alt+1–9 pro rychlou navigaci</div>
               </div>
               <div className="p-2">
                 {Object.entries(NAV_KEYS).map(([key, id]) => (
                   <button key={id}
                     onClick={() => { setTab(id); setPaletteOpen(false) }}
-                    className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm transition-all text-left"
-                    style={{ color: 'var(--text)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,200,255,.07)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
-                    <span className="font-mono text-[9px] px-1.5 py-px rounded"
-                      style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)', color: 'var(--muted)' }}>
+                    className="nav-item">
+                    <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,.05)', border: '1px solid var(--border)' }}>
                       Alt+{key}
-                    </span>
+                    </kbd>
                     {id}
                   </button>
                 ))}

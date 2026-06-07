@@ -6,7 +6,7 @@ import signal
 import sys
 from typing import Optional, Tuple
 
-from config import CONFIG, save_config
+from config import CONFIG, save_config, __version__
 from stt import STTEngine
 from tts import TTSEngine
 from llm import LLMEngine
@@ -105,7 +105,7 @@ class JarvisApp:
 
     def __init__(self):
         setup_logging()
-        logger.info("Spouštím JARVIS v4.6...")
+        logger.info(f"Spouštím JARVIS v{__version__}...")
 
         # Inicializace nových systémů (async, error handling, plugins)
         self._init_new_systems()

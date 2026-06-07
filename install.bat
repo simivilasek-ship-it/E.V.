@@ -1,7 +1,9 @@
 @echo off
 chcp 65001 >nul
+for /f "delims=" %%i in ('python -c "from config import __version__; print(__version__)" 2^>nul') do set JARVIS_VERSION=%%i
+if not defined JARVIS_VERSION set JARVIS_VERSION=5.4.0
 echo ============================================
-echo   JARVIS v2.0 — Instalace (Windows)
+echo   JARVIS v%JARVIS_VERSION% — Instalace (Windows)
 echo ============================================
 echo.
 

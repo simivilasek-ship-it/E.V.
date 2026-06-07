@@ -114,4 +114,4 @@ Viz [Architektura](architecture.md).
 
 ## Verze
 
-Aktuální: **v5.3.0** — viz [CHANGELOG](../CHANGELOG.md).
+Aktuální: **v5.4.0** — viz [CHANGELOG](../CHANGELOG.md).

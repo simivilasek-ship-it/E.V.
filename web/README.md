@@ -71,7 +71,10 @@ Status zprávy: `💬 Copilot…` · `⚡ Provádím akci…` · `🤖 Agent pra
 
 **Duplex** (když `audio_ws_enabled: true` v config):
 - Mikrofon → `/ws/audio` → VAD → Whisper STT → unified chat → Edge-TTS v prohlížeči
+- **Barge-in:** mluv během odpovědi — server i klient přeruší TTS (`interrupt` / `tts_cancel`)
 - Implementace: `web/lib/audioDuplex.ts`
+
+**Wake word** je pouze v desktopové aplikaci (pywebview), ne v prohlížeči.
 
 **Fallback:** Web Speech API (Chrome) pokud duplex není dostupný.
 

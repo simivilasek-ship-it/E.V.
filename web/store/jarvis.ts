@@ -182,6 +182,20 @@ export const useJarvis = create<JarvisState>((set, get) => ({
     ws.onerror = () => { clearTimeout(timeout); set({ connStatus: 'error' }) }
     ws.onmessage = (e) => {
       if (e.data === '{"type":"ping"}') return
+      try {
+        const msg = JSON.parse(e.data)
+        if (msg.type === 'install_progress' || msg.type === 'install_error') {
+          const text = msg.message || `Instalace ${msg.app || '?'}: ${msg.stage || ''}`
+          get().addMessage(text, 'jarvis', { error: msg.type === 'install_error' })
+          get().addToast(text, msg.type === 'install_error' ? 'error' : 'info', 4000)
+          set(s => ({ logs: [...s.logs.slice(-300), { text, ts: Date.now() }] }))
+          return
+        }
+        if (msg.type === 'log' && msg.message) {
+          set(s => ({ logs: [...s.logs.slice(-300), { text: msg.message, ts: Date.now() }] }))
+          return
+        }
+      } catch {}
       set(s => ({ logs: [...s.logs.slice(-300), { text: e.data, ts: Date.now() }] }))
     }
     set({ _ws: ws })
