@@ -9,7 +9,7 @@
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.3-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.4-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-531%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
@@ -32,7 +32,9 @@ JARVIS: Opening Chrome...                      ✓  0.3s
         Done. Want me to read it aloud?
 ```
 
-> 📹 **[YouTube demo — coming soon]** · **[GIF — coming soon]**
+![JARVIS demo — Copilot, Agent, PC overview](docs/demo.gif)
+
+> 📹 YouTube demo — coming soon
 
 ---
 

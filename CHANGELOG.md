@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [5.4.0] - 2026-06-06
+
+### Added
+- **Web duplex voice** — `/ws/audio`: mic PCM16 → VAD → Whisper STT → unified chat → Edge-TTS playback v prohlížeči
+- **Copilot tool-calling** — Ollama tools pro `open_app`, `weather`, `pc_overview`, …
+- **UI**: ContextSidebar, mode badges, quick actions, proactive `GET /api/suggestions`
+- **PC commands**: `top_processes`, `network_status`, `pc_overview`
+- **Demo GIF** v README (`docs/demo.gif`, `scripts/generate_demo_gif.py`)
+- Integrační testy `tests/test_unified_runtime.py` (11 testů)
+
+### Changed
+- Verze **5.4.0**, merge do `main`
+- Agent plan preview v chatu, PID file pro `--restart`
+- User memory: město, preferuji, oblíbené aplikace
+
+---
+
 ## [5.3.0] - 2026-06-06
 
 ### Added

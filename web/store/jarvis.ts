@@ -1,8 +1,10 @@
 'use client'
 import { create } from 'zustand'
+import { AudioDuplex } from '@/lib/audioDuplex'
 
 export type ConnStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'failed'
 export type OrbState   = 'idle' | 'listening' | 'thinking' | 'speaking'
+export type MessageMode = 'copilot' | 'akce' | 'agent'
 
 export interface Message {
   id: string
@@ -11,6 +13,15 @@ export interface Message {
   ts: number
   streaming?: boolean
   error?: boolean
+  mode?: MessageMode
+}
+
+export function parseStatusToMode(status: string): MessageMode | null {
+  if (!status) return null
+  if (status.includes('🤖') || /agent/i.test(status)) return 'agent'
+  if (status.includes('⚡') || /provádím/i.test(status)) return 'akce'
+  if (status.includes('💬') || /copilot/i.test(status)) return 'copilot'
+  return null
 }
 
 export interface SystemMetrics {
@@ -42,6 +53,7 @@ interface JarvisState {
   connStatus:  ConnStatus
   connError:   string | null
   isMicActive: boolean
+  duplexVoice: boolean
   pendingConfirm: PendingConfirm | null
   quickActionHistory: string[]
 
@@ -53,6 +65,7 @@ interface JarvisState {
   _chatWs:    WebSocket | null
   _confirmWs: WebSocket | null
   _recognition: SpeechRecognition | null
+  _audioDuplex: AudioDuplex | null
 
   // Actions
   connect:        () => Promise<void>
@@ -80,6 +93,7 @@ interface JarvisState {
   fetchSystem:    () => Promise<void>
   fetchAgents:    () => Promise<void>
   fetchPlugins:   () => Promise<void>
+  fetchDuplexFlag: () => Promise<void>
   _scheduleReconnect: () => void
 }
 
@@ -112,10 +126,11 @@ export const useJarvis = create<JarvisState>((set, get) => ({
   system: { cpu: 0, ram: 0, disk: 0, cpu_temp: null, net: null, gpu: null },
   agents: {}, plugins: [], currentModel: '',
   isConnected: false, connStatus: 'disconnected', connError: null, isMicActive: false,
+  duplexVoice: false,
   pendingConfirm: null,
   quickActionHistory: [],
   _ws: null, _attempt: 0, _retryId: null, _metricsWs: null, _chatWs: null, _confirmWs: null,
-  _recognition: null,
+  _recognition: null, _audioDuplex: null,
 
   async checkBackend() {
     try {
@@ -157,6 +172,7 @@ export const useJarvis = create<JarvisState>((set, get) => ({
       set({ isConnected: true, connStatus: 'connected', _ws: ws, _attempt: 0, connError: null })
       get().addToast('WebSocket připojen', 'success', 2000)
       get().connectMetrics()
+      get().fetchDuplexFlag()
     }
     ws.onclose = (ev) => {
       clearTimeout(timeout)
@@ -288,6 +304,19 @@ export const useJarvis = create<JarvisState>((set, get) => ({
           })
         } else if (msg.type === 'status') {
           get().setOrbState('thinking')
+          const mode = parseStatusToMode(msg.data || msg.text || '')
+          if (mode) {
+            set(s => {
+              const msgs = [...s.messages]
+              for (let i = msgs.length - 1; i >= 0; i--) {
+                if (msgs[i].sender === 'jarvis') {
+                  msgs[i] = { ...msgs[i], mode }
+                  break
+                }
+              }
+              return { messages: msgs }
+            })
+          }
         } else if (msg.type === 'done') {
           set(s => {
             const msgs = [...s.messages]
@@ -386,12 +415,50 @@ export const useJarvis = create<JarvisState>((set, get) => ({
     } catch {}
   },
 
-  toggleMic() {
-    const { isMicActive, _recognition } = get()
-    if (isMicActive && _recognition) {
-      _recognition.stop()
-      set({ isMicActive: false, _recognition: null, orbState: 'idle' })
+  async fetchDuplexFlag() {
+    try {
+      const d = await fetch(`${getApiBase()}/api/status`).then(r => r.json())
+      const enabled = Boolean(d?.features?.audio_duplex?.live_duplex_stt_tts)
+      set({ duplexVoice: enabled })
+    } catch {
+      set({ duplexVoice: false })
+    }
+  },
+
+  async toggleMic() {
+    const { isMicActive, _recognition, _audioDuplex, duplexVoice } = get()
+
+    if (isMicActive) {
+      _recognition?.stop()
+      _audioDuplex?.stop()
+      set({ isMicActive: false, _recognition: null, _audioDuplex: null, orbState: 'idle' })
       return
+    }
+
+    // Duplex: /ws/audio + STT + TTS (backend Whisper/Edge-TTS)
+    if (duplexVoice) {
+      const duplex = new AudioDuplex(`${getWsBase()}/ws/audio`, {
+        onListening: () => set({ isMicActive: true, orbState: 'listening' }),
+        onTranscript: (text) => get().addMessage(text, 'user'),
+        onResponse: (text) => {
+          get().addMessage(text, 'jarvis')
+          get().setOrbState('idle')
+        },
+        onSpeaking: () => get().setOrbState('speaking'),
+        onIdle: () => set({ isMicActive: false, _audioDuplex: null, orbState: 'idle' }),
+        onError: (msg) => {
+          get().addToast(msg, 'error')
+          set({ isMicActive: false, _audioDuplex: null, orbState: 'idle' })
+        },
+      })
+      set({ _audioDuplex: duplex })
+      const ok = await duplex.start()
+      if (!ok) {
+        set({ _audioDuplex: null })
+        get().addToast('Duplex hlas selhal — zkouším Web Speech API', 'info')
+      } else {
+        return
+      }
     }
 
     const SR = typeof window !== 'undefined'

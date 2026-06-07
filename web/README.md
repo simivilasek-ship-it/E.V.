@@ -69,8 +69,11 @@ Status zprávy: `💬 Copilot…` · `⚡ Provádím akci…` · `🤖 Agent pra
 
 ## Voice v prohlížeči
 
-Tlačítko mikrofonu v chatu používá **Web Speech API** (nejlepší v Chrome).
-Pro plný duplex STT/TTS použij desktop mód (`whisper_live.py`).
+**Duplex** (když `audio_ws_enabled: true` v config):
+- Mikrofon → `/ws/audio` → VAD → Whisper STT → unified chat → Edge-TTS v prohlížeči
+- Implementace: `web/lib/audioDuplex.ts`
+
+**Fallback:** Web Speech API (Chrome) pokud duplex není dostupný.
 
 ## Skripty
 

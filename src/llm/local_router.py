@@ -1,3 +1,4 @@
+# Canonical: use root llm.py / local_router.py
 """
 JARVIS — Lokální router (regex/fuzzy bez LLM)
 Zpracovává 95% příkazů lokálně.

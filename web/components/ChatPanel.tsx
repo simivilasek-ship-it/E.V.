@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { useJarvis, type Message } from '@/store/jarvis'
+import { useJarvis, type Message, type MessageMode } from '@/store/jarvis'
 import { Icons } from './Icons'
 import HeroPanel from './HeroPanel'
 
@@ -17,6 +17,19 @@ const PLACEHOLDERS = [
 ]
 
 const SUGGESTIONS = ['kolik je hodin?', 'počasí Praha', 'info o systému', 'screenshot', 'hardware info', 'fotbal výsledky']
+
+const QUICK_ACTIONS = [
+  { label: 'Přehled PC', cmd: 'Přehled PC' },
+  { label: 'Obrazovka', cmd: 'Obrazovka' },
+  { label: 'Čas', cmd: 'Čas' },
+  { label: 'Počasí', cmd: 'Počasí' },
+] as const
+
+const MODE_BADGE: Record<MessageMode, { label: string; color: string; bg: string; border: string }> = {
+  copilot: { label: 'Copilot', color: 'var(--cyan)', bg: 'rgba(0,200,255,.08)', border: 'rgba(0,200,255,.2)' },
+  akce:    { label: 'Akce',    color: 'var(--amber)', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.25)' },
+  agent:   { label: 'Agent',   color: 'var(--purple)', bg: 'rgba(168,85,247,.08)', border: 'rgba(168,85,247,.25)' },
+}
 
 function formatTime(ts: number) {
   const diff = (Date.now() - ts) / 1000
@@ -107,6 +120,16 @@ function MessageBubble({ msg }: { msg: Message }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1.5 font-mono text-[10px]">
           <span className="font-semibold tracking-wide" style={{ color: 'rgba(0,200,255,.7)' }}>JARVIS</span>
+          {msg.mode && (
+            <span className="px-1.5 py-px rounded-full text-[8px] font-semibold tracking-wide"
+              style={{
+                color: MODE_BADGE[msg.mode].color,
+                background: MODE_BADGE[msg.mode].bg,
+                border: `1px solid ${MODE_BADGE[msg.mode].border}`,
+              }}>
+              {MODE_BADGE[msg.mode].label}
+            </span>
+          )}
           <span style={{ color: 'var(--muted)' }}>·</span>
           <span style={{ color: 'var(--muted)' }}>{formatTime(msg.ts)}</span>
         </div>
@@ -249,6 +272,40 @@ export default function ChatPanel() {
 
       {/* Input */}
       <div className="shrink-0 px-4 pb-4 flex flex-col gap-1.5 max-w-[760px] w-full mx-auto">
+        {/* Quick actions */}
+        <div className="flex flex-wrap gap-1.5 justify-center">
+          {QUICK_ACTIONS.map(({ label, cmd }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => sendCmd(cmd)}
+              disabled={busy}
+              className="font-mono text-[10px] px-3 py-1 rounded-full transition-all"
+              style={{
+                background: 'rgba(78,205,196,.05)',
+                border: '1px solid rgba(78,205,196,.18)',
+                color: 'rgba(78,205,196,.85)',
+                cursor: busy ? 'not-allowed' : 'pointer',
+                opacity: busy ? 0.5 : 1,
+              }}
+              onMouseEnter={e => {
+                if (busy) return
+                const el = e.currentTarget as HTMLElement
+                el.style.background = 'rgba(78,205,196,.12)'
+                el.style.borderColor = 'rgba(78,205,196,.35)'
+                el.style.color = 'var(--teal)'
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget as HTMLElement
+                el.style.background = 'rgba(78,205,196,.05)'
+                el.style.borderColor = 'rgba(78,205,196,.18)'
+                el.style.color = 'rgba(78,205,196,.85)'
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
         {/* Pending image thumbnail */}
         {pendingImage && (
           <div className="flex items-center gap-2 px-1">

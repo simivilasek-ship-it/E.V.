@@ -15,7 +15,7 @@ from collections import deque
 from collections import deque as _deque
 from pathlib import Path as _Path
 from threading import Lock as _Lock
-from typing import Dict, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 from memory import JarvisMemory
 
@@ -325,13 +325,61 @@ class LLMEngine:
         logger.info(f"LLM: {self.model} @ {self.url} + Neural Memory + GraphRAG + LLMRouter + Cache + {_cloud_tag}")
 
     def _extract_user_facts(self, text: str) -> None:
-        """Zkusí extrahovat fakta o uživateli z jeho zprávy do UserProfile."""
+        """Zkusí extrahovat fakta o uživateli z jeho zprávy do UserProfile a paměti."""
         try:
             from user_profile import get_user_profile
-            found = get_user_profile().extract_from_text(text)
+            from commands.utils import normalize_text as _norm
+
+            profile = get_user_profile()
+            found = profile.extract_from_text(text)
+            t = _norm(text)
+
+            # Město z dotazů na počasí: "jake je pocasi v praze"
+            if re.search(r"\b(pocasi|weather)\b", t):
+                m = re.search(r"\b(?:v|ve)\s+([a-z]+(?:\s+[a-z]+)?)", t)
+                if m:
+                    city = m.group(1).strip().title()
+                    if city.lower() not in (
+                        "pocasi", "weather", "dnes", "zitra", "bude", "jake", "je",
+                    ):
+                        profile.set("město", city, confidence=0.7, source="inferred")
+                        self.memory.store(
+                            f"Preferované město pro počasí: {city}", importance=0.65,
+                        )
+                        found.append("město")
+
+            # Explicitní preference: "preferuji X"
+            m = re.search(r"\bpreferuji\s+(.{2,40}?)(?:\.|,|$)", t)
+            if m:
+                pref = m.group(1).strip()
+                if len(pref) >= 2:
+                    existing = profile.get("preference") or []
+                    if not isinstance(existing, list):
+                        existing = [existing] if existing else []
+                    if pref not in existing:
+                        existing.append(pref)
+                    profile.set("preference", existing, confidence=0.7, source="extracted")
+                    self.memory.store(f"Uživatel preferuje: {pref}", importance=0.6)
+                    found.append("preference")
+
+            # Oblíbené aplikace z open_app příkazů
+            m = re.search(r"\b(otevri|spust|open|start)\s+(\w+)", t)
+            if m:
+                app = m.group(2).strip()
+                if app not in ("to", "mi", "prosim", "aplikaci", "program") and len(app) >= 2:
+                    favs = profile.get("oblíbené_aplikace") or []
+                    if not isinstance(favs, list):
+                        favs = [favs] if favs else []
+                    if app not in favs:
+                        favs.append(app)
+                        profile.set(
+                            "oblíbené_aplikace", favs, confidence=0.5, source="inferred",
+                        )
+                        self.memory.store(f"Často otevírá aplikaci: {app}", importance=0.4)
+                        found.append("oblíbené_aplikace")
+
             if found:
-                # Aktualizuj inject po extrakci
-                self.inject_profile(get_user_profile().summary())
+                self.inject_profile(profile.summary())
         except Exception:
             pass
 
@@ -491,6 +539,116 @@ class LLMEngine:
         except Exception as e:
             self.history.pop()
             return f"Chyba: {e}", {"action": "answer", "params": {}}
+
+    # ── COPILOT TOOL-CALLING ─────────────────────────
+
+    _COPILOT_TOOLS_HINT = (
+        "\n\nMáš k dispozici nástroje pro akce na PC (otevření app, screenshot, počasí…). "
+        "Použij je, když uživatel chce provést akci. Jinak odpověz konverzačně."
+    )
+
+    def try_copilot_tools(
+        self,
+        user_text: str,
+        tools_schema: list,
+        on_tool_call: Callable[[str, dict], str],
+        *,
+        max_rounds: int = 2,
+    ) -> Optional[str]:
+        """Ollama nativní tool-calling pro Copilot.
+
+        Vrátí finální text pokud model odpověděl nebo nástroj proběhl.
+        Vrátí None pokud tool-calling selhal — volající použije stream_ask().
+        """
+        if not tools_schema or not getattr(self, "_ollama_available", True):
+            return None
+
+        _rate_limiter.wait_if_needed()
+        messages, routed_model, temperature, max_tokens = self._build_messages(user_text)
+        if messages and messages[0]["role"] == "system":
+            messages[0] = {
+                **messages[0],
+                "content": messages[0]["content"] + self._COPILOT_TOOLS_HINT,
+            }
+
+        last_observation = ""
+
+        for _round in range(max_rounds):
+            payload = {
+                "model":    routed_model,
+                "messages": messages,
+                "tools":    tools_schema,
+                "stream":   False,
+                "options":  {"temperature": temperature, "num_predict": max_tokens},
+            }
+            try:
+                resp = requests.post(self.url, json=payload, timeout=60)
+                resp.raise_for_status()
+                msg = resp.json().get("message", {})
+            except Exception as e:
+                logger.warning(f"Copilot tool-calling chyba ({e}) — fallback na stream")
+                return None
+
+            tool_calls = msg.get("tool_calls", [])
+            content    = (msg.get("content") or "").strip()
+
+            if not tool_calls:
+                if content:
+                    self._finalize_copilot_turn(user_text, content)
+                    return content
+                if last_observation:
+                    self._finalize_copilot_turn(user_text, last_observation)
+                    return last_observation
+                return None
+
+            messages.append({
+                "role": "assistant",
+                "content": content or None,
+                "tool_calls": tool_calls,
+            })
+
+            for tc in tool_calls:
+                fn   = tc.get("function", {})
+                name = fn.get("name", "")
+                args = fn.get("arguments", {})
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except Exception:
+                        args = {}
+
+                try:
+                    observation = on_tool_call(name, args)
+                except Exception as e:
+                    observation = f"Chyba nástroje {name}: {e}"
+
+                if len(observation) > 1200:
+                    observation = observation[:1200] + "…[zkráceno]"
+                last_observation = observation
+
+                messages.append({"role": "tool", "content": observation})
+
+        if last_observation:
+            self._finalize_copilot_turn(user_text, last_observation)
+            return last_observation
+        return None
+
+    def stream_ask_with_tools(
+        self,
+        user_text: str,
+        tools_schema: list,
+        on_tool_call: Callable[[str, dict], str],
+    ) -> Optional[str]:
+        """Alias pro try_copilot_tools — Copilot tool loop bez streamingu."""
+        return self.try_copilot_tools(user_text, tools_schema, on_tool_call)
+
+    def _finalize_copilot_turn(self, user_text: str, response: str) -> None:
+        self.history.append({"role": "user", "content": user_text})
+        self.history.append({"role": "assistant", "content": response})
+        try:
+            self.memory.store_conversation(user_text, response, importance=0.6)
+        except Exception as _me:
+            logger.warning(f"Memory store chyba (ignorováno): {_me}")
 
     # ── STREAM ASK ───────────────────────────────────
 

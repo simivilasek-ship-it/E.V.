@@ -407,6 +407,102 @@ def cmd_file_info(path: str = "") -> str:
         return f"Chyba: {e}"
 
 
+def cmd_top_processes(limit: int = 10, sort_by: str = "cpu") -> str:
+    """Top procesy podle CPU nebo RAM (výchozí top 10)."""
+    limit = max(1, min(int(limit or 10), 50))
+    sort_key = (sort_by or "cpu").strip().lower()
+    by_ram = sort_key in ("ram", "memory", "mem")
+
+    if not by_ram:
+        psutil.cpu_percent(interval=0.3)
+
+    rows: list[tuple[float, int, str]] = []
+    for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent"]):
+        try:
+            info = p.info
+            pid = int(info.get("pid") or 0)
+            name = info.get("name") or "?"
+            val = (
+                float(info.get("memory_percent") or 0.0)
+                if by_ram
+                else float(info.get("cpu_percent") or 0.0)
+            )
+            rows.append((val, pid, name))
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+
+    rows.sort(key=lambda x: x[0], reverse=True)
+    top = rows[:limit]
+    if not top:
+        return "Žádné procesy k zobrazení."
+
+    label = "RAM" if by_ram else "CPU"
+    lines = [f"Top {len(top)} procesů ({label}):"]
+    for i, (val, pid, name) in enumerate(top, 1):
+        lines.append(f"  {i}. {name} (PID {pid}) — {val:.1f}%")
+    return "\n".join(lines)
+
+
+def cmd_network_status() -> str:
+    """Stav WiFi/sítě — nmcli na Linuxu, ip fallback."""
+    import subprocess
+
+    lines: list[str] = []
+
+    if _IS_LINUX:
+        nmcli = safe_run(["which", "nmcli"], timeout=3)
+        if nmcli.get("rc") == 0:
+            dev = safe_run(["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device"], timeout=5)
+            if dev.get("stdout"):
+                lines.append("📡 Zařízení (nmcli):")
+                for raw in dev["stdout"].strip().splitlines():
+                    parts = raw.split(":")
+                    if len(parts) >= 3:
+                        device, typ, state = parts[0], parts[1], parts[2]
+                        conn = parts[3] if len(parts) > 3 else ""
+                        extra = f" → {conn}" if conn and conn != "--" else ""
+                        lines.append(f"  • {device} ({typ}): {state}{extra}")
+            active = safe_run(
+                ["nmcli", "-t", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active"],
+                timeout=5,
+            )
+            if active.get("stdout"):
+                lines.append("🔗 Aktivní připojení:")
+                for raw in active["stdout"].strip().splitlines():
+                    parts = raw.split(":")
+                    if len(parts) >= 2:
+                        lines.append(f"  • {parts[0]} ({parts[1]})" + (f" na {parts[2]}" if len(parts) > 2 else ""))
+            wifi = safe_run(["nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL,SECURITY", "dev", "wifi"], timeout=5)
+            if wifi.get("stdout"):
+                for raw in wifi["stdout"].strip().splitlines():
+                    parts = raw.split(":")
+                    if len(parts) >= 4 and parts[0] == "yes":
+                        lines.append(f"📶 WiFi: {parts[1]} ({parts[2]}%, {parts[3]})")
+                        break
+
+    if not lines:
+        link = safe_run(["ip", "-br", "link"], timeout=5)
+        if link.get("stdout"):
+            lines.append("🌐 Rozhraní (ip):")
+            for raw in link["stdout"].strip().splitlines():
+                lines.append(f"  • {raw}")
+        route = safe_run(["ip", "route", "show", "default"], timeout=5)
+        if route.get("stdout"):
+            lines.append(f"🛣️ Výchozí brána: {route['stdout'].strip()}")
+
+    if not lines:
+        return "Nelze zjistit stav sítě (nmcli/ip nedostupné)."
+
+    try:
+        import socket
+        host = socket.gethostname()
+        lines.insert(0, f"🖥️ {host}")
+    except Exception:
+        pass
+
+    return "\n".join(lines)
+
+
 def cmd_set_brightness(level: int = 50) -> str:
     level = max(1, min(100, int(level)))
     if _IS_LINUX:

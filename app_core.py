@@ -241,6 +241,15 @@ class JarvisApp:
             self.proactive = None
             logger.debug(f"ProactiveEngine init selhal: {e}")
 
+        # ── Context suggestions (CPU/RAM → GET /api/suggestions)
+        try:
+            from src.workers.context_suggestions import start_context_suggestions
+            self._context_suggestions = start_context_suggestions(bus=self.bus)
+            logger.info("ContextSuggestions aktivní")
+        except Exception as e:
+            self._context_suggestions = None
+            logger.debug(f"ContextSuggestions init selhal: {e}")
+
         # ── Autonomous Workers (email, git, calendar, slack, github)
         try:
             from autonomous_workers import get_worker_manager

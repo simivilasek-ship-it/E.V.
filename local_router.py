@@ -94,6 +94,12 @@ _FUZZY_COMMANDS = [
     ("info o systemu",   "system_info",     lambda: {}),
     ("prehled o pc",     "pc_overview",     lambda: {}),
     ("stav pocitace",    "pc_overview",     lambda: {}),
+    ("top procesy",      "top_processes",   lambda: {"limit": 10, "sort_by": "cpu"}),
+    ("nejvice cpu",      "top_processes",   lambda: {"limit": 10, "sort_by": "cpu"}),
+    ("nejvice ram",      "top_processes",   lambda: {"limit": 10, "sort_by": "ram"}),
+    ("stav site",        "network_status",  lambda: {}),
+    ("wifi stav",        "network_status",  lambda: {}),
+    ("sitove pripojeni", "network_status",  lambda: {}),
     ("rekni komponenty", "hardware_info",   lambda: {}),
     ("jaky mas hardware","hardware_info",   lambda: {}),
     ("moje pc komponenty","hardware_info",  lambda: {}),
@@ -472,6 +478,23 @@ class LocalRouter:
             path_m = re.search(r"(/\S+|~/\S+)", text)
             path = path_m.group(1) if path_m else ""
             return "Zjišťuji info o souboru...", {"action": "file_info", "params": {"path": path}}
+
+        # ── TOP PROCESY ───────────────────────────────
+        if re.search(
+            r"\b(top\s+proces|nejvice\s+(cpu|ram|pameti)|co\s+zere\s+(cpu|ram|pamet)"
+            r"|procesy\s+podle\s+(cpu|ram)|spotreba\s+proces)\b",
+            t, re.I,
+        ):
+            sort_by = "ram" if re.search(r"\b(ram|pamet|paměti|memory)\b", t, re.I) else "cpu"
+            return "Top procesy:", {"action": "top_processes", "params": {"limit": 10, "sort_by": sort_by}}
+
+        # ── SÍŤ / WIFI ────────────────────────────────
+        if re.search(
+            r"\b(stav\s+(site|siti|wifi|wi-?fi|sitoveho\s+pripojeni)"
+            r"|sitove\s+pripojeni|wifi\s+stav|jsem\s+online|mam\s+internet)\b",
+            t, re.I,
+        ):
+            return "Stav sítě:", {"action": "network_status", "params": {}}
 
         # ── PC PŘEHLED (Copilot-style awareness) ─────
         if re.search(

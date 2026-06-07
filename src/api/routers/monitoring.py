@@ -233,6 +233,17 @@ def register(app):
         except Exception:
             return []
 
+    @app.get("/api/suggestions")
+    async def proactive_suggestions(limit: int = 10):
+        """Proaktivní návrhy (CPU/RAM) z context_suggestions workeru."""
+        try:
+            from src.workers.context_suggestions import get_suggestions
+
+            items = get_suggestions(limit=limit)
+        except Exception:
+            items = []
+        return {"suggestions": items, "count": len(items)}
+
     @app.get("/api/audit")
     async def audit_log(limit: int = 50):
         if not logger_module_available:

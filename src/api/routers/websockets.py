@@ -36,6 +36,23 @@ else:
         raise RuntimeError("security unavailable")
 
 
+async def _stream_tts(ws: WebSocket, text: str, voice: str) -> None:
+    """Stream Edge-TTS audio jako binary frames do prohlížeče."""
+    if not text or len(text) > 800:
+        text = (text[:800] + "…") if len(text) > 800 else text
+    try:
+        import edge_tts
+        communicate = edge_tts.Communicate(text, voice)
+        await ws.send_text(json.dumps({"type": "tts_start"}))
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                await ws.send_bytes(chunk["data"])
+        await ws.send_text(json.dumps({"type": "tts_end"}))
+    except Exception as e:
+        logger.debug(f"ws_audio TTS skip: {e}")
+        await ws.send_text(json.dumps({"type": "tts_end"}))
+
+
 def register(app):
 
     @app.websocket("/ws/logs")
@@ -59,13 +76,7 @@ def register(app):
 
     @app.websocket("/ws/audio")
     async def ws_audio(ws: WebSocket):
-        """Duplex audio websocket (MVP).
-
-        Client sends raw PCM16 mono frames (default 16kHz). Server runs VAD and emits
-        EventType.AUDIO_SPEECH on detected speech (for barge-in interruption).
-
-        This endpoint is intentionally minimal: it does not perform STT yet.
-        """
+        """Duplex audio — PCM16 mono 16kHz → VAD → STT → chat → TTS stream."""
         await ws.accept()
 
         try:
@@ -75,18 +86,19 @@ def register(app):
                 await ws.close()
                 return
         except Exception:
-            pass
+            CONFIG = {}
 
-        vad = None
+        vad_filter = None
+        transcriber = None
         try:
-            from vad import get_vad
-            from config import CONFIG
-            if bool(CONFIG.get("vad_enabled", True)):
-                vad = get_vad(CONFIG)
-        except Exception:
-            vad = None
+            from whisper_live import VADFilter, WhisperTranscriber, pcm_to_wav
+            vad_filter = VADFilter()
+            transcriber = WhisperTranscriber(CONFIG)
+            if not transcriber.available:
+                transcriber = None
+        except Exception as e:
+            logger.debug(f"ws_audio STT init: {e}")
 
-        # lazy bus import
         bus = None
         try:
             from event_bus import get_event_bus, EventType
@@ -94,37 +106,73 @@ def register(app):
         except Exception:
             bus = None
 
+        loop = asyncio.get_event_loop()
+        voice = CONFIG.get("tts_voice", "cs-CZ-AntoninNeural")
+
+        async def _handle_utterance(pcm: bytes) -> None:
+            if not pcm or not transcriber:
+                return
+            try:
+                from whisper_live import pcm_to_wav
+                wav = pcm_to_wav(pcm)
+                text = await loop.run_in_executor(None, lambda: transcriber.transcribe(wav))
+                if not text or len(text.strip()) < 2:
+                    return
+                await ws.send_text(json.dumps({"type": "transcript", "text": text.strip()}))
+
+                try:
+                    from src.api.runtime import process_chat
+                    response = await loop.run_in_executor(
+                        None, lambda: process_chat(text.strip()),
+                    )
+                except Exception as ex:
+                    response = f"Chyba: {ex}"
+
+                if response:
+                    await ws.send_text(json.dumps({"type": "response", "text": response}))
+                    if CONFIG.get("audio_ws_tts", True):
+                        await _stream_tts(ws, response, voice)
+            except Exception as e:
+                logger.warning(f"ws_audio utterance: {e}")
+                await ws.send_text(json.dumps({"type": "error", "data": str(e)}))
+
         try:
+            await ws.send_text(json.dumps({"type": "ready"}))
             while True:
-                frame = await ws.receive_bytes()
+                raw = await ws.receive()
+                if raw.get("type") == "websocket.disconnect":
+                    break
+
+                if "text" in raw and raw["text"]:
+                    try:
+                        msg = json.loads(raw["text"])
+                        if msg.get("type") == "stop":
+                            if vad_filter:
+                                tail = vad_filter.flush()
+                                if tail:
+                                    await _handle_utterance(tail)
+                            break
+                    except json.JSONDecodeError:
+                        pass
+                    continue
+
+                frame = raw.get("bytes") or b""
                 if not frame:
                     continue
-                # Debug: optionally broadcast audio frames (off by default)
-                try:
-                    if bus and False:
-                        bus.emit(EventType.AUDIO_FRAME, {"n": len(frame)}, source="ws_audio")
-                except Exception:
-                    pass
 
-                speech = False
-                try:
-                    if vad is not None:
-                        speech = vad.is_speech(frame)
-                except Exception:
-                    speech = False
-
-                if speech:
-                    # emit event for barge-in
+                if bus:
                     try:
-                        if bus:
-                            bus.emit(EventType.AUDIO_SPEECH, {"ts": time.time()}, source="ws_audio")
+                        bus.emit(EventType.AUDIO_SPEECH, {"ts": time.time(), "n": len(frame)},
+                                 source="ws_audio")
                     except Exception:
                         pass
-                    # send ack to client
-                    try:
-                        await ws.send_text(json.dumps({"type": "vad", "speech": True}))
-                    except Exception:
-                        pass
+
+                if vad_filter is not None:
+                    utterance = vad_filter.feed(frame)
+                    if utterance:
+                        await _handle_utterance(utterance)
+                else:
+                    await ws.send_text(json.dumps({"type": "vad", "speech": True}))
 
         except WebSocketDisconnect:
             pass
@@ -185,5 +233,4 @@ def register(app):
             return {"ok": False, "error": "Chybí id"}
         ok = confirm_respond(req_id, bool(body.get("approved")))
         return {"ok": ok}
-
 

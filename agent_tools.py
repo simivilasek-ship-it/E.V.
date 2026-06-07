@@ -99,6 +99,86 @@ class ToolRegistry:
         return tools
 
 
+COPILOT_TOOL_NAMES = (
+    "open_app", "screenshot", "pc_overview", "get_time",
+    "weather", "search_web", "system_info",
+)
+
+
+def build_copilot_registry(executor, mcp_bridge=None) -> ToolRegistry:
+    """Malá sada nástrojů pro Copilot LLM path (Ollama tool-calling)."""
+    reg = ToolRegistry()
+    ex = executor
+
+    reg.register(Tool(
+        name="open_app",
+        description="Spustí aplikaci (chromium, spotify, vscode…)",
+        params=[ToolParam("app", "Název aplikace")],
+        fn=lambda app: ex.execute("open_app", {"app": app}),
+        examples=['open_app(app="chromium")'],
+    ))
+
+    reg.register(Tool(
+        name="screenshot",
+        description="Pořídí screenshot a uloží na plochu",
+        params=[],
+        fn=lambda: ex.execute("screenshot", {}),
+        examples=["screenshot()"],
+    ))
+
+    reg.register(Tool(
+        name="pc_overview",
+        description="Kompletní přehled PC — CPU, RAM, disk, okna, procesy",
+        params=[],
+        fn=lambda: ex.execute("pc_overview", {}),
+        examples=["pc_overview()"],
+    ))
+
+    reg.register(Tool(
+        name="get_time",
+        description="Vrátí aktuální čas",
+        params=[],
+        fn=lambda: ex.execute("get_time", {}),
+        examples=["get_time()"],
+    ))
+
+    reg.register(Tool(
+        name="weather",
+        description="Vrátí aktuální počasí pro město",
+        params=[ToolParam("city", "Název města", required=False)],
+        fn=lambda city="": ex.execute("weather", {"city": city}),
+        examples=['weather(city="Praha")'],
+    ))
+
+    if mcp_bridge and mcp_bridge.is_available("brave-search"):
+        reg.register(Tool(
+            name="search_web",
+            description="Vyhledá na webu a vrátí výsledky",
+            params=[ToolParam("query", "Co hledat")],
+            fn=lambda query: mcp_bridge.call_tool(
+                "brave-search", "brave_web_search", {"query": query, "count": 5}),
+            examples=['search_web(query="cena RTX 4090")'],
+        ))
+    else:
+        reg.register(Tool(
+            name="search_web",
+            description="Otevře Google vyhledávání v prohlížeči",
+            params=[ToolParam("query", "Co hledat")],
+            fn=lambda query: ex.execute("search_web", {"query": query}),
+            examples=['search_web(query="cena RTX 4090")'],
+        ))
+
+    reg.register(Tool(
+        name="system_info",
+        description="Základní systémové informace — OS, hostname, CPU, RAM",
+        params=[],
+        fn=lambda: ex.execute("system_info", {}),
+        examples=["system_info()"],
+    ))
+
+    return reg
+
+
 def build_registry(executor, mcp_bridge=None) -> ToolRegistry:
     """
     Sestaví ToolRegistry z existujícího CommandExecutoru a MCPBridge.

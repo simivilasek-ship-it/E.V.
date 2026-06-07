@@ -1,3 +1,4 @@
+# Canonical: use root llm.py / local_router.py
 """
 JARVIS v4.6 — LLM Engine (Ollama HTTP klient)
 Lokální router je v local_router.py.

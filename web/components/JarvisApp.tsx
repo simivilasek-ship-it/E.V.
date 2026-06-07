@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useJarvis } from '@/store/jarvis'
 import Sidebar, { type Tab } from './Sidebar'
 import ChatPanel from './ChatPanel'
+import ContextSidebar from './ContextSidebar'
 import ToastContainer from './Toast'
 import ErrorBoundary from './ErrorBoundary'
 import Spotlight from './Spotlight'
@@ -116,7 +117,10 @@ export default function JarvisApp() {
           {/* Pages */}
           <div className="flex-1 overflow-hidden flex">
             {tab === 'CHAT' && (
-              <ErrorBoundary><ChatPanel /></ErrorBoundary>
+              <>
+                <ErrorBoundary><ChatPanel /></ErrorBoundary>
+                <ErrorBoundary><ContextSidebar /></ErrorBoundary>
+              </>
             )}
             {tab === 'SYSTEM' && (
               <div className="flex flex-col overflow-hidden p-3 gap-3 w-full max-w-md">

@@ -44,6 +44,15 @@ _MODE_STATUS = {
 }
 
 
+def _agent_plan_preview(text: str) -> str:
+    """Jednořádkový náhled plánu pro web UI před spuštěním agenta."""
+    first = (text or "").strip().split("\n", 1)[0].strip()
+    if 12 <= len(first) <= 140:
+        snippet = first if len(first) <= 100 else first[:97] + "…"
+        return f"Plán: 1) {snippet}"
+    return "Plán: Zpracovávám vícekrokový úkol…"
+
+
 class CommandRouter:
     """Zapouzdřuje routing logiku — nezávislá na GUI lifecycle."""
 
@@ -138,6 +147,25 @@ class CommandRouter:
             if on_status:
                 on_status(_MODE_STATUS["copilot"])
 
+            from agent_tools import build_copilot_registry
+
+            copilot_reg = build_copilot_registry(
+                app.cmds, getattr(app, "mcp", None))
+            tools_schema = copilot_reg.ollama_tools_schema()
+
+            def _on_tool_call(name: str, args: dict) -> str:
+                tool = copilot_reg.get(name)
+                if tool is None:
+                    return f"Nástroj '{name}' neexistuje"
+                return tool.call(**args)
+
+            tool_result = app.llm.try_copilot_tools(
+                text, tools_schema, _on_tool_call)
+            if tool_result is not None:
+                if on_chunk:
+                    on_chunk(tool_result)
+                return tool_result
+
             full = ""
             for chunk in app.llm.stream_ask(text):
                 if not isinstance(chunk, str) or not chunk:
@@ -199,6 +227,8 @@ class CommandRouter:
         from agent_hierarchical import should_handle as _hierarchical_should
         if getattr(app, "hierarchical_agent", None) and _hierarchical_should(text):
             import time as _t, uuid as _uuid
+            if on_agent_step:
+                on_agent_step(_agent_plan_preview(text))
             app.gui.set_status("Supervisor plánuje…")
             steps: list = []
             t0 = _t.time()
@@ -217,6 +247,8 @@ class CommandRouter:
         from agent_graph import should_handle as _graph_should
         if getattr(app, "graph_agent", None) and _graph_should(text):
             import time as _t, uuid as _uuid
+            if on_agent_step:
+                on_agent_step(_agent_plan_preview(text))
             app.gui.set_status("Agent plánuje…")
             steps: list = []
             t0 = _t.time()
@@ -235,6 +267,8 @@ class CommandRouter:
         from agent_react import should_handle as _react_should
         if getattr(app, "react_agent", None) and _react_should(text):
             import time as _t, uuid as _uuid
+            if on_agent_step:
+                on_agent_step(_agent_plan_preview(text))
             app.gui.set_status("Agent pracuje…")
             steps: list = []
             t0 = _t.time()
