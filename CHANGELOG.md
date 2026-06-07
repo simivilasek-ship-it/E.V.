@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## [5.6.0] - 2026-06-07
+
+### Added
+- **Onboarding wizard** — first-run checks: Ollama, snap, microphone (`OnboardingWizard.tsx`, `GET /api/onboarding`)
+- **Install UX** — progress bar in chat (0→100 %), cancel button, structured snap/pkexec errors
+- **E2E tests** — `tests/test_e2e_real.py` (WS chat, audio, install, context)
+- **README gallery** — dashboard screenshot + demo GIF; WHY sentence; Who is it for; short quickstart
+
+### Changed
+- **Canonical module tree** — root modules are source of truth; duplicate `src/*` implementations removed (`docs/CANONICAL.md`)
+- **Secure defaults** — `api_bind_host: 127.0.0.1`; Docker Compose enables `JARVIS_API_AUTH_REQUIRED=1`
+- Verze **5.6.0** across `config.py`, `pyproject.toml`, Docker, requirements
+- **563 tests** passing in CI
+
+### Fixed
+- Full test suite green: MCP bridge mocks, memory isolation, Chrome dual-launch, VAD `audioop` fallback (Python 3.13+)
+
+---
+
+## [5.5.0] - 2026-06-06
+
+### Added
+- **UI redesign** — DM Sans, glass panels, collapsible Advanced sidebar, hardware markdown
+- **LAN API auth** — `JARVIS_API_AUTH_REQUIRED`, `JARVIS_API_TOKEN`, middleware in `src/api/middleware/auth.py`
+- **Unified API pipeline** — `/api/chat`, `/ws/chat` via `process_chat()`; `/api/command` deprecated
+- **Install events** — WebSocket progress via `event_bus` + `install_notify.py`
+
+### Changed
+- Verze **5.5.0**, README Linux-out-of-the-box section
+
+---
+
 ## [5.4.0] - 2026-06-06
 
 ### Added

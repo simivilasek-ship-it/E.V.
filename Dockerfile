@@ -1,4 +1,4 @@
-# JARVIS v4.4 — Headless Docker image
+# JARVIS v5.6.0 — Headless Docker image
 # Spustí FastAPI backend (port 8002) + React web UI (/app)
 # Bez Tkinter GUI, bez zvuku — vhodné pro server/NAS/cloud
 
@@ -39,4 +39,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
     CMD curl -f http://localhost:8002/health || exit 1
 
 # Headless mód: jen backend + web UI
-CMD ["python", "-c", "import uvicorn; from dashboard import app; uvicorn.run(app, host='0.0.0.0', port=8002, log_level='info')"]
+CMD ["python", "dashboard.py"]

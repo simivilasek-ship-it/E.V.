@@ -6,6 +6,8 @@
 
 **Local AI assistant for Linux — chat, system commands, and optional autonomous control.**
 
+> **Why JARVIS exists:** Your desktop already knows which window is active, what's eating RAM, and which apps are open — but cloud assistants don't. JARVIS runs on your machine, turns that live context into answers and actions, and keeps everyday commands on a sub-millisecond local router so you are not sending your screen to someone else's API.
+
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
@@ -13,17 +15,84 @@
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![Linux-first](https://img.shields.io/badge/Linux--first-22c55e?style=flat-square&logo=linux&logoColor=white)](#linux-out-of-the-box)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-531%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Tests](https://img.shields.io/badge/tests-563%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 
 </div>
 
 ---
 
-## Demo
+## Quickstart
 
-![JARVIS dashboard — chat, quick actions, live PC context](docs/dashboard.jpg)
+```bash
+git clone https://github.com/simivilasek-ship-it/Jarvis.git && cd Jarvis && ./install.sh && python3 dashboard.py
+```
 
-*Web UI: chat, rychlé akce, živý kontext PC (aktivní okno, CPU/RAM/disk).*
+Open **http://localhost:8002/app** — chat, live PC context, and quick actions work immediately.
+
+<details>
+<summary><strong>Full setup (Ollama, API keys, Docker, restart)</strong></summary>
+
+```bash
+git clone https://github.com/simivilasek-ship-it/Jarvis.git
+cd Jarvis && ./install.sh
+python3 dashboard.py              # backend + UI → http://localhost:8002/app
+python3 dashboard.py --restart    # kill old process on :8002, reload code
+```
+
+Alternativa s nativním oknem: `bash scripts/start.sh` · Makefile: `just start`
+
+**Cloud speed (optional)** — free key at [console.groq.com](https://console.groq.com):
+```bash
+echo "GROQ_API_KEY=gsk_..." >> .env
+```
+
+**Local LLM (offline chat):**
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen2.5:3b
+```
+
+**Docker:**
+```bash
+docker compose up -d    # http://localhost:8002/app — set JARVIS_API_TOKEN in .env
+```
+
+</details>
+
+---
+
+## Who is it for
+
+| You are… | JARVIS gives you… |
+|----------|-------------------|
+| **Linux daily driver** | Czech/English chat, open apps, weather, hardware info — no ChatGPT tab, no copy-paste |
+| **Developer on local-first** | Ollama + optional Groq, agent graph for multi-step tasks, MCP/plugins when you need them |
+| **Power user tired of cloud context** | Live PC context (active window, CPU/RAM, open apps) injected into every reply |
+| **Cautious about automation** | Computer use and UI clicks are **opt-in**; vision sandbox previews before execute |
+| **Tinkerer** | Workflows, missions, GraphRAG memory, background workers — all on your disk |
+
+Not for you if you want a hosted SaaS with zero setup, or if you need polished Windows/macOS parity (Linux is primary).
+
+---
+
+## See it in action
+
+<table>
+  <tr>
+    <td width="50%">
+      <a href="docs/dashboard.jpg">
+        <img src="docs/dashboard.jpg" alt="JARVIS dashboard — chat, quick actions, live PC context" width="100%"/>
+      </a>
+      <br/><sub><b>Dashboard</b> — chat, rychlé akce, živý kontext PC</sub>
+    </td>
+    <td width="50%">
+      <a href="docs/demo.gif">
+        <img src="docs/demo.gif" alt="JARVIS demo — agent graph and PC overview" width="100%"/>
+      </a>
+      <br/><sub><b>Agent flow</b> — multi-step task v reálném čase</sub>
+    </td>
+  </tr>
+</table>
 
 ```
 You:    "Open Chrome, research the best Python async libraries,
@@ -37,9 +106,20 @@ JARVIS: Opening Chrome...                      ✓  0.3s
         Done. Want me to read it aloud?
 ```
 
-![JARVIS demo — chat, agent graph, PC overview](docs/demo.gif)
-
 > 📹 YouTube demo — coming soon
+
+---
+
+## What else it does
+
+- **Voice in web UI** — mic button / duplex stream (`/ws/audio`); Whisper STT when configured
+- **Wake word** (“jarvis”) — desktop app only
+- **Long-term memory** — GraphRAG knowledge graph (SQLite MVP)
+- **Background workers** — email, git, Slack, GitHub, calendar — need `.env` tokens
+- **Long-horizon missions** — multi-step plans executed over time
+- **Install UX** — snap/flatpak progress in chat, cancel, structured errors
+- **Onboarding wizard** — first run checks Ollama, snap, microphone
+- **100% local option** — Ollama + on-device Whisper; no cloud API key required
 
 ---
 
@@ -139,30 +219,6 @@ JARVIS injects **live PC context** — active window, open apps, CPU/RAM/disk �
 
 ---
 
-## Quickstart
-
-```bash
-git clone https://github.com/simivilasek-ship-it/Jarvis.git
-cd Jarvis && ./install.sh
-python3 dashboard.py          # backend + UI → http://localhost:8002/app
-python3 dashboard.py --restart   # kill old process on :8002, reload code
-```
-
-Alternativa s nativním oknem: `bash scripts/start.sh` · Makefile: `just start`
-
-Add speed (optional — free API key at [console.groq.com](https://console.groq.com)):
-```bash
-echo "GROQ_API_KEY=gsk_..." >> .env
-```
-
-Local LLM (recommended for offline chat):
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull qwen2.5:3b
-```
-
----
-
 ## Performance
 
 | What | How fast |
@@ -177,36 +233,26 @@ RAM: **~34 MB** idle backend · **~650 MB+** with Ollama loaded · runs on any m
 
 ---
 
-## What else it does
-
-- **Voice in web UI** — mic button / duplex stream (`/ws/audio`); Whisper STT when configured
-- **Wake word** (“jarvis”) — desktop app only
-- **Long-term memory** — GraphRAG knowledge graph (SQLite MVP)
-- **Background workers** — email, git, Slack, GitHub, calendar — need `.env` tokens
-- **Long-horizon missions** — multi-step plans executed over time
-- **100% local option** — Ollama + on-device Whisper; no cloud API key required
-
----
-
 ## Architecture
 
 ```
 src/
-├── agents/    ReactAgent · GraphAgent · MissionManager
-├── llm/       Engine · CloudRouter (Groq + OpenRouter) · LocalRouter
+├── api/       FastAPI routers · WebSocket runtime · LAN auth
+├── agents/    ReactAgent · GraphAgent · MissionManager  (root canonical)
+├── llm/       Engine · CloudRouter · LocalRouter
 ├── memory/    SQLite + embeddings · GraphRAG knowledge graph
 ├── vision/    OCR pipeline · VisionAgent · Screen monitor
 ├── workers/   Email · Git · Slack · Calendar · GitHub watchers
-├── plugins/   Marketplace · Sandbox · MCP bridge (10 servers)
+├── plugins/   Marketplace · Sandbox · MCP bridge
 ├── security/  Shell blacklist · Audit log · Permission levels
 └── audio/     Whisper Live · Duplex · VAD · Edge-TTS
 ```
 
-Backend: **FastAPI** (`src/api/routers/`) · Frontend: **Next.js** · Desktop: **pywebview**
+Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · Desktop: **pywebview**
 
-**Web dashboard (v5):** Unified runtime (`src/api/runtime.py`) — web chat uses the same pipeline as desktop (LocalRouter → Agents → Copilot LLM). Agent Graph V2 (Alt+5), Plugin Marketplace (Alt+3), Workflow Editor (Alt+0), Vision Sandbox (Alt+V), Missions (Alt+M), live PC context API (`GET /api/context`), voice in chat, security confirmation modal.
+**Web dashboard (v5.6):** Unified runtime (`src/api/runtime.py`), onboarding wizard, install progress/cancel, Agent Graph V2 (Alt+5), Plugin Marketplace (Alt+3), Workflow Editor (Alt+0), Vision Sandbox (Alt+V), Missions (Alt+M), live PC context (`GET /api/context`), voice in chat, security confirmation modal.
 
-→ Full docs: **[docs/index.md](docs/index.md)** · Web UI: **[web/README.md](web/README.md)** · API: **[docs/api-reference.md](docs/api-reference.md)**
+→ Full docs: **[docs/index.md](docs/index.md)** · Web UI: **[web/README.md](web/README.md)** · Layout: **[docs/CANONICAL.md](docs/CANONICAL.md)** · API: **[docs/api-reference.md](docs/api-reference.md)**
 
 ---
 
@@ -219,13 +265,14 @@ Backend: **FastAPI** (`src/api/routers/`) · Frontend: **Next.js** · Desktop: *
 - **Web UI confirmation modal** — when the browser is connected, ELEVATED actions wait for approve/deny (`/ws/confirm`)
 - Every action is **audit-logged** to `~/.jarvis_audit.jsonl`
 - Headless/CI without web client blocks `ELEVATED` by default (opt-in: `JARVIS_HEADLESS_APPROVE_ELEVATED=1`)
+- **Docker:** `docker-compose.yml` enables API auth by default — set `JARVIS_API_TOKEN` in `.env`
 
 ---
 
 ## Tests · Docs · Contributing
 
 ```bash
-pytest tests/ test_jarvis.py -v   # 531 tests
+pytest tests/ test_jarvis.py -v   # 563 tests
 ```
 
 [API Reference](docs/api-reference.md) · [Configuration](docs/configuration.md) · [Plugin Dev](docs/plugin-development.md) · [Benchmarks](docs/benchmarks.md) · [CHANGELOG](CHANGELOG.md)

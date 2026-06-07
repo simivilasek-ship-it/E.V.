@@ -1,6 +1,7 @@
-# JARVIS v5.4.0 — Docker Compose
+# JARVIS v5.6.0 — Docker Compose
 # Spuštění: docker compose up -d
 # Web UI: http://localhost:8002/app
+# Vyžaduje JARVIS_API_TOKEN v .env (auth zapnuto ve výchozím stavu)
 
 services:
   ollama:
@@ -26,6 +27,8 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
       - JARVIS_HEADLESS=1
+      - JARVIS_BIND_HOST=0.0.0.0
+      - JARVIS_API_AUTH_REQUIRED=1
     env_file:
       - .env          # BRAVE_API_KEY atd.
     volumes:
