@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import shutil
 import time
 
 import psutil
@@ -36,6 +38,103 @@ else:
 
 
 def register(app):
+    def _collect_mcp_status(config: dict) -> tuple[list[dict], dict]:
+        _MCP_SERVERS = [
+            ("filesystem", "npx", "mcp_filesystem_enabled", None),
+            ("git", "uvx", "mcp_git_enabled", None),
+            ("mcp-memory", "npx", "mcp_memory_enabled", None),
+            ("fetch", "uvx", "mcp_fetch_enabled", None),
+            ("brave-search", "npx", "mcp_brave_enabled", "BRAVE_API_KEY"),
+            ("playwright", "npx", "mcp_playwright_enabled", None),
+            ("github", "npx", "mcp_github_enabled", "GITHUB_TOKEN"),
+            ("youtube-transcript", "npx", "mcp_youtube_transcript_enabled", None),
+            ("google-maps", "npx", "mcp_google_maps_enabled", "GOOGLE_MAPS_API_KEY"),
+            ("slack", "npx", "mcp_slack_enabled", "SLACK_BOT_TOKEN"),
+            ("sequential-thinking", "npx", "mcp_sequential_thinking_enabled", None),
+            ("puppeteer", "npx", "mcp_puppeteer_enabled", None),
+            ("computer-control", "uvx", "mcp_computer_control_enabled", None),
+            ("time", "uvx", "mcp_time_enabled", None),
+        ]
+
+        servers: list[dict] = []
+        enabled_total = 0
+        ready_total = 0
+        for srv_name, cmd, cfg_key, env_key in _MCP_SERVERS:
+            enabled = bool(config.get(cfg_key, True))
+            command_found = shutil.which(cmd) is not None
+            key_present = True if not env_key else bool(os.environ.get(env_key))
+            is_ready = enabled and command_found and key_present
+            if enabled:
+                enabled_total += 1
+                if is_ready:
+                    ready_total += 1
+
+            servers.append(
+                {
+                    "name": srv_name,
+                    "enabled": enabled,
+                    "command": cmd,
+                    "command_found": command_found,
+                    "config_key": cfg_key,
+                    "requires_env": env_key,
+                    "env_present": key_present,
+                    "ready": is_ready,
+                }
+            )
+
+        score = int(round((ready_total / enabled_total) * 100)) if enabled_total else 100
+        summary = {
+            "enabled_total": enabled_total,
+            "ready_total": ready_total,
+            "score": score,
+        }
+        return servers, summary
+
+    def _health_snapshot(config: dict) -> dict:
+        try:
+            import requests as _r
+
+            base = config.get("ollama_url", "http://localhost:11434/api/chat")
+            ollama_ok = _r.get(base.replace("/api/chat", "/api/tags"), timeout=2).ok
+        except Exception:
+            ollama_ok = False
+
+        mcp_pkg = True
+        try:
+            import mcp  # noqa: F401
+        except Exception:
+            mcp_pkg = False
+
+        servers, mcp_summary = _collect_mcp_status(config)
+        checks = {
+            "ollama": {"ok": ollama_ok, "hint": "Spusť `ollama serve` nebo zkontroluj ollama_url."},
+            "mcp_python_sdk": {"ok": mcp_pkg, "hint": "Nainstaluj `pip install mcp`."},
+            "npx": {"ok": shutil.which("npx") is not None, "hint": "Nainstaluj Node.js 18+ (npx)."},
+            "uvx": {"ok": shutil.which("uvx") is not None, "hint": "Nainstaluj uv/uvx (`pip install uv`)."},
+            "notify_send": {"ok": shutil.which("notify-send") is not None, "hint": "Ubuntu/Debian: `sudo apt install libnotify-bin`."},
+            "systemd_user": {"ok": os.path.isdir(os.path.expanduser("~/.config/systemd/user")), "hint": "Vytvoř `~/.config/systemd/user` a aktivuj `jarvis.service`."},
+            "snap": {"ok": shutil.which("snap") is not None, "hint": "Volitelné pro `install app` příkazy."},
+        }
+
+        checks_total = len(checks)
+        checks_ok = sum(1 for item in checks.values() if item["ok"])
+        score = int(round((checks_ok / checks_total) * 100)) if checks_total else 100
+
+        fixes = [
+            {"key": key, "hint": item["hint"]}
+            for key, item in checks.items()
+            if not item["ok"]
+        ]
+
+        return {
+            "score": score,
+            "checks_ok": checks_ok,
+            "checks_total": checks_total,
+            "checks": checks,
+            "fixes": fixes,
+            "mcp": {"servers": servers, **mcp_summary},
+        }
+
 
     @app.get("/api/models")
     async def list_models():
@@ -54,7 +153,6 @@ def register(app):
     @app.get("/api/settings")
     async def get_settings():
         """Vrátí aktuální nastavení + metadata (min/max/options) pro Settings UI."""
-        import shutil as _shutil
         try:
             from config import CONFIG
         except ImportError:
@@ -72,28 +170,17 @@ def register(app):
             pass
 
         # MCP servery — statická tabulka (command + config key)
-        _MCP_SERVERS = [
-            ("filesystem",           "npx",  "mcp_filesystem_enabled"),
-            ("git",                  "uvx",  "mcp_git_enabled"),
-            ("mcp-memory",           "npx",  "mcp_memory_enabled"),
-            ("fetch",                "uvx",  "mcp_fetch_enabled"),
-            ("brave-search",         "npx",  "mcp_brave_enabled"),
-            ("playwright",           "npx",  "mcp_playwright_enabled"),
-            ("github",               "npx",  "mcp_github_enabled"),
-            ("youtube-transcript",   "npx",  "mcp_youtube_transcript_enabled"),
-            ("google-maps",          "npx",  "mcp_google_maps_enabled"),
-            ("slack",                "npx",  "mcp_slack_enabled"),
-            ("sequential-thinking",  "npx",  "mcp_sequential_thinking_enabled"),
-            ("puppeteer",            "npx",  "mcp_puppeteer_enabled"),
-            ("computer-control",     "uvx",  "mcp_computer_control_enabled"),
-            ("time",                 "uvx",  "mcp_time_enabled"),
-        ]
-        mcp_status_map = {}
-        for srv_name, cmd, cfg_key in _MCP_SERVERS:
-            mcp_status_map[srv_name] = {
-                "enabled": bool(CONFIG.get(cfg_key, True)),
-                "command_found": _shutil.which(cmd) is not None,
+        mcp_servers, mcp_summary = _collect_mcp_status(CONFIG)
+        mcp_status_map = {
+            item["name"]: {
+                "enabled": item["enabled"],
+                "command_found": item["command_found"],
+                "ready": item["ready"],
+                "requires_env": item["requires_env"],
+                "env_present": item["env_present"],
             }
+            for item in mcp_servers
+        }
 
         return {
             "llm": {
@@ -122,6 +209,7 @@ def register(app):
                 "timeout":   CONFIG.get("agent_timeout", 60),
             },
             "mcp": mcp_status_map,
+            "mcp_summary": mcp_summary,
         }
 
     @app.get("/api/tts/voices")
@@ -170,37 +258,21 @@ def register(app):
     @app.get("/api/mcp/status")
     async def mcp_status():
         """Status všech MCP serverů: name, enabled, command_found."""
-        import shutil as _shutil
         try:
             from config import CONFIG
         except ImportError:
             return {"servers": [], "error": "config modul není dostupný"}
+        servers, summary = _collect_mcp_status(CONFIG)
+        return {"servers": servers, "summary": summary}
 
-        _MCP_SERVERS = [
-            ("filesystem",           "npx",  "mcp_filesystem_enabled"),
-            ("git",                  "uvx",  "mcp_git_enabled"),
-            ("mcp-memory",           "npx",  "mcp_memory_enabled"),
-            ("fetch",                "uvx",  "mcp_fetch_enabled"),
-            ("brave-search",         "npx",  "mcp_brave_enabled"),
-            ("playwright",           "npx",  "mcp_playwright_enabled"),
-            ("github",               "npx",  "mcp_github_enabled"),
-            ("youtube-transcript",   "npx",  "mcp_youtube_transcript_enabled"),
-            ("google-maps",          "npx",  "mcp_google_maps_enabled"),
-            ("slack",                "npx",  "mcp_slack_enabled"),
-            ("sequential-thinking",  "npx",  "mcp_sequential_thinking_enabled"),
-            ("puppeteer",            "npx",  "mcp_puppeteer_enabled"),
-            ("computer-control",     "uvx",  "mcp_computer_control_enabled"),
-            ("time",                 "uvx",  "mcp_time_enabled"),
-        ]
-        servers = []
-        for srv_name, cmd, cfg_key in _MCP_SERVERS:
-            servers.append({
-                "name":          srv_name,
-                "enabled":       bool(CONFIG.get(cfg_key, True)),
-                "command_found": _shutil.which(cmd) is not None,
-                "config_key":    cfg_key,
-            })
-        return {"servers": servers}
+    @app.get("/api/health/check")
+    async def health_check():
+        """Lightweight first-run diagnostics for Linux setup."""
+        try:
+            from config import CONFIG
+        except ImportError:
+            return {"score": 0, "error": "config modul není dostupný"}
+        return _health_snapshot(CONFIG)
 
     @app.post("/api/mcp/toggle")
     async def mcp_toggle(body: dict):

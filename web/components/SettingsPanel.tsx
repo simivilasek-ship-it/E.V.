@@ -25,8 +25,25 @@ interface Settings {
 interface McpServer {
   name: string
   enabled: boolean
-  on_path: boolean
+  command_found: boolean
+  ready?: boolean
+  requires_env?: string | null
+  env_present?: boolean
+  config_key?: string
   command?: string
+}
+
+interface HealthCheck {
+  score: number
+  checks_ok: number
+  checks_total: number
+  checks: Record<string, { ok: boolean; hint: string }>
+  fixes: Array<{ key: string; hint: string }>
+  mcp: {
+    score: number
+    enabled_total: number
+    ready_total: number
+  }
 }
 
 interface SliderRowProps {
@@ -164,6 +181,7 @@ export default function SettingsPanel() {
   const [models, setModels] = useState<string[]>([])
   const [voices, setVoices] = useState<string[]>([])
   const [mcpServers, setMcpServers] = useState<McpServer[]>([])
+  const [health, setHealth] = useState<HealthCheck | null>(null)
   const [savingSection, setSavingSection] = useState<string | null>(null)
   const [testingVoice, setTestingVoice] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -176,11 +194,12 @@ export default function SettingsPanel() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [sRes, mRes, vRes, mcpRes] = await Promise.allSettled([
+        const [sRes, mRes, vRes, mcpRes, hRes] = await Promise.allSettled([
           fetch(apiUrl('/api/settings')),
           fetch(apiUrl('/api/models')),
           fetch(apiUrl('/api/tts/voices')),
           fetch(apiUrl('/api/mcp/status')),
+          fetch(apiUrl('/api/health/check')),
         ])
 
         if (sRes.status === 'fulfilled' && sRes.value.ok) {
@@ -207,6 +226,10 @@ export default function SettingsPanel() {
           const d = await mcpRes.value.json()
           const servers: McpServer[] = Array.isArray(d) ? d : d.servers ?? []
           setMcpServers(servers)
+        }
+        if (hRes.status === 'fulfilled' && hRes.value.ok) {
+          const d = await hRes.value.json()
+          setHealth(d)
         }
       } catch (err) {
         console.error('Settings load error:', err)
@@ -540,16 +563,18 @@ export default function SettingsPanel() {
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span
-                    title={server.on_path ? 'Příkaz nalezen v PATH' : 'Příkaz není v PATH'}
+                    title={server.ready ? 'Server je připraven' : server.command_found ? 'Chybí env / disabled' : 'Příkaz není v PATH'}
                     style={{
                       width: 7,
                       height: 7,
                       borderRadius: '50%',
                       flexShrink: 0,
-                      background: server.on_path ? 'var(--green)' : 'var(--red)',
-                      boxShadow: server.on_path
+                      background: server.ready ? 'var(--green)' : server.command_found ? 'var(--yellow)' : 'var(--red)',
+                      boxShadow: server.ready
                         ? '0 0 6px rgba(34,211,165,.6)'
-                        : '0 0 6px rgba(244,63,94,.5)',
+                        : server.command_found
+                          ? '0 0 6px rgba(234,179,8,.5)'
+                          : '0 0 6px rgba(244,63,94,.5)',
                     }}
                   />
                   <div className="flex flex-col min-w-0">
@@ -565,6 +590,7 @@ export default function SettingsPanel() {
                         style={{ color: 'var(--muted)' }}
                       >
                         {server.command}
+                        {server.requires_env ? ` · ${server.requires_env}` : ''}
                       </span>
                     )}
                   </div>
@@ -593,6 +619,43 @@ export default function SettingsPanel() {
               </div>
             ))}
           </div>
+        )}
+      </Section>
+
+      <Section title="Health Check (Linux)">
+        {health ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: 'var(--text)' }}>
+                Ready Score
+              </span>
+              <span className="font-mono text-xs px-2 py-0.5 rounded"
+                style={{ color: 'var(--cyan)', background: 'rgba(0,200,255,.08)', border: '1px solid var(--border)' }}>
+                {health.score}%
+              </span>
+            </div>
+            <div className="text-[11px]" style={{ color: 'var(--muted)' }}>
+              Checks: {health.checks_ok}/{health.checks_total} · MCP: {health.mcp.ready_total}/{health.mcp.enabled_total} ready
+            </div>
+            <div className="flex flex-col gap-2">
+              {Object.entries(health.checks).map(([key, value]) => (
+                <div key={key} className="flex items-start gap-2 text-[11px]">
+                  <span style={{ color: value.ok ? 'var(--green)' : 'var(--red)' }}>{value.ok ? '✓' : '✗'}</span>
+                  <span style={{ color: 'var(--text)' }}>{key}</span>
+                </div>
+              ))}
+            </div>
+            {health.fixes.length > 0 && (
+              <div className="text-[11px] rounded-lg p-2" style={{ background: 'rgba(255,255,255,.03)', border: '1px solid var(--border2)' }}>
+                <div className="font-mono mb-1" style={{ color: 'var(--text)' }}>Fix hints</div>
+                {health.fixes.map((f, i) => (
+                  <div key={`${f.key}-${i}`} style={{ color: 'var(--muted)' }}>- {f.hint}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className="text-xs" style={{ color: 'var(--muted)' }}>Health check nedostupný</span>
         )}
       </Section>
 

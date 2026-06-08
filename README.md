@@ -132,6 +132,7 @@ JARVIS: Opening Chrome...                      ✓  0.3s
 - **Daily summary** — Alt+D nebo `jarvis log --today` / `GET /api/activity/report?format=md`
 - **Systemd autostart** — `desktop/jarvis.service` (instaluje `install.sh`)
 - **Desktop notifications** — proaktivní alerty přes `notify-send` (Linux)
+- **Health Check panel** — Settings zobrazuje Ready Score + MCP readiness + fix hints
 - **Install UX** — snap/flatpak progress in chat, cancel, structured errors
 - **Onboarding wizard** — first run checks Ollama, snap, microphone
 - **MCP guide** — [docs/mcp-servers.md](docs/mcp-servers.md) — které servery reálně fungují
