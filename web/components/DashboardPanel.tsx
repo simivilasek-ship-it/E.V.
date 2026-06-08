@@ -76,6 +76,7 @@ export default function DashboardPanel() {
   const [scheduler, setScheduler] = useState<SchedulerEntry[]>([])
   const [ollama,    setOllama]    = useState({ ok: false, model: '—' })
   const [uptime,    setUptime]    = useState('—')
+  const [summaryLoading, setSummaryLoading] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -132,18 +133,24 @@ export default function DashboardPanel() {
           <div style={S.title}>DNES — WORK TIMELINE</div>
           <button
             type="button"
+            disabled={summaryLoading}
             onClick={async () => {
+              setSummaryLoading(true)
               try {
-                const d = await fetch(apiUrl('/api/activity/report?format=md')).then(r => r.json())
+                const res = await fetch(apiUrl('/api/activity/report?format=md'))
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                const d = await res.json()
                 useJarvis.getState().addMessage(d.markdown || d.summary_text || 'Žádná aktivita.', 'jarvis')
                 useJarvis.getState().addToast('Denní shrnutí vloženo do chatu', 'success', 3000)
               } catch {
-                useJarvis.getState().addToast('Shrnutí dne selhalo', 'error', 3000)
+                useJarvis.getState().addToast('Shrnutí dne selhalo — backend offline', 'error', 3000)
+              } finally {
+                setSummaryLoading(false)
               }
             }}
-            style={{ fontSize: 10, padding: '4px 10px', borderRadius: 4, border: '1px solid #1a3050', background: '#0f1a2e', color: '#7dd3fc', cursor: 'pointer' }}
+            style={{ fontSize: 10, padding: '4px 10px', borderRadius: 4, border: '1px solid #1a3050', background: '#0f1a2e', color: summaryLoading ? '#475569' : '#7dd3fc', cursor: summaryLoading ? 'not-allowed' : 'pointer', opacity: summaryLoading ? 0.6 : 1 }}
           >
-            Shrnutí dne (Alt+D)
+            {summaryLoading ? 'Načítám…' : 'Shrnutí dne (Alt+D)'}
           </button>
         </div>
         {workSummary?.summary && workSummary.summary.length > 0 ? (

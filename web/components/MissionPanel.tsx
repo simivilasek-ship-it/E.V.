@@ -37,15 +37,23 @@ export default function MissionPanel() {
   const [deadline, setDeadline] = useState('')
   const [agentMode, setAgentMode] = useState<AgentMode>('multi')
   const [loading, setLoading] = useState(false)
+  const [listLoading, setListLoading] = useState(true)
+  const [listError, setListError] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
 
   const load = useCallback(async () => {
     try {
+      setListLoading(true)
       const r = await fetch(apiUrl('/api/missions'))
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const d = await r.json()
       setMissions(Array.isArray(d.missions) ? d.missions : [])
-    } catch {
+      setListError(null)
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : 'Backend offline')
       setMissions([])
+    } finally {
+      setListLoading(false)
     }
   }, [])
 
@@ -88,8 +96,13 @@ export default function MissionPanel() {
     const path = action === 'delete'
       ? `/api/missions/${id}`
       : `/api/missions/${id}/${action}`
-    await fetch(apiUrl(path), { method })
-    load()
+    try {
+      const r = await fetch(apiUrl(path), { method })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      load()
+    } catch (e) {
+      setMsg(e instanceof Error ? `Chyba: ${e.message}` : 'Akce selhala — backend offline')
+    }
   }
 
   return (
@@ -143,6 +156,22 @@ export default function MissionPanel() {
         </div>
         {msg && <p className="text-xs font-mono" style={{ color: 'var(--muted)' }}>{msg}</p>}
       </div>
+
+      {listLoading && (
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full" />
+        </div>
+      )}
+
+      {listError && !listLoading && (
+        <div className="p-4 text-amber-400 text-sm">⚠ {listError} — backend může být offline</div>
+      )}
+
+      {!listLoading && missions.length === 0 && !listError && (
+        <div className="card p-4 text-sm" style={{ color: 'var(--muted)' }}>
+          Žádné aktivní mise. Vytvoř první misi výše.
+        </div>
+      )}
 
       {missions.map(m => {
         const done = m.steps.filter(s => s.status === 'done').length

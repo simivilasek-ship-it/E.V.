@@ -274,6 +274,15 @@ def register(app):
             return {"score": 0, "error": "config modul není dostupný"}
         return _health_snapshot(CONFIG)
 
+    @app.post("/api/settings/generate-token")
+    async def generate_api_token():
+        """Generate a cryptographically secure API token."""
+        import secrets
+        import string
+        alphabet = string.ascii_letters + string.digits + "-_"
+        token = "".join(secrets.choice(alphabet) for _ in range(48))
+        return {"token": token, "hint": "Add JARVIS_API_TOKEN=" + token + " to your .env file"}
+
     @app.post("/api/mcp/toggle")
     async def mcp_toggle(body: dict):
         """Zapne/vypne MCP server: {server: "github", enabled: true}."""

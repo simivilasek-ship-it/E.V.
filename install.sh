@@ -126,6 +126,12 @@ else
     warn "desktop/jarvis.service nenalezen — přeskočeno"
 fi
 
+# ── .env bootstrap ────────────────────────────
+if [ -f ".env.example" ] && [ ! -f ".env" ]; then
+    cp .env.example .env
+    ok ".env criado a partir de .env.example — edite os valores"
+fi
+
 # ── Hotovo ────────────────────────────────────
 echo
 echo "============================================"

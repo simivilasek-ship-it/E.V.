@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useJarvis } from '@/store/jarvis'
+import { apiUrl } from '@/lib/api'
 
 // Ollama status widget
 function OllamaStatus() {
@@ -9,7 +10,7 @@ function OllamaStatus() {
   useEffect(() => {
     const check = async () => {
       try {
-        const r = await fetch('http://localhost:8002/api/status')
+        const r = await fetch(apiUrl('/api/status'))
         const d = await r.json()
         setStatus(d)
       } catch {}

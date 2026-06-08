@@ -5,6 +5,8 @@ __pycache__/
 
 # Secrets & local config
 .env
+.env.local
+!.env.example
 config.json
 audit.log
 *.log

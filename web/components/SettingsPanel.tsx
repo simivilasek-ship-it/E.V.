@@ -182,12 +182,29 @@ export default function SettingsPanel() {
   const [voices, setVoices] = useState<string[]>([])
   const [mcpServers, setMcpServers] = useState<McpServer[]>([])
   const [health, setHealth] = useState<HealthCheck | null>(null)
+  const [healthLoading, setHealthLoading] = useState(false)
   const [savingSection, setSavingSection] = useState<string | null>(null)
   const [testingVoice, setTestingVoice] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [generatingToken, setGeneratingToken] = useState(false)
 
   const patch = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }))
+  }, [])
+
+  const refreshHealth = useCallback(async () => {
+    setHealthLoading(true)
+    try {
+      const r = await fetch(apiUrl('/api/health/check'))
+      if (r.ok) {
+        const d = await r.json()
+        setHealth(d)
+      }
+    } catch {
+      // keep stale health data visible
+    } finally {
+      setHealthLoading(false)
+    }
   }, [])
 
   // Load initial data
@@ -238,7 +255,9 @@ export default function SettingsPanel() {
       }
     }
     load()
-  }, [])
+    const healthInterval = setInterval(refreshHealth, 60_000)
+    return () => clearInterval(healthInterval)
+  }, [refreshHealth])
 
   const saveSection = useCallback(async (section: string, keys: (keyof Settings)[]) => {
     setSavingSection(section)
@@ -623,6 +642,26 @@ export default function SettingsPanel() {
       </Section>
 
       <Section title="Health Check (Linux)">
+        <div className="flex items-center justify-between">
+          <span className="text-xs" style={{ color: 'var(--muted)' }}>
+            Automaticky obnovuje každých 60s
+          </span>
+          <button
+            onClick={refreshHealth}
+            disabled={healthLoading}
+            className="text-xs px-2 py-1 rounded hover:bg-white/5 transition-colors"
+            style={{ color: 'var(--cyan)', border: '1px solid var(--border)' }}
+          >
+            {healthLoading ? '⏳ kontroluji…' : '↻ refresh'}
+          </button>
+        </div>
+
+        {healthLoading && !health && (
+          <div className="flex items-center justify-center p-6">
+            <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full" />
+          </div>
+        )}
+
         {health ? (
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
@@ -637,11 +676,19 @@ export default function SettingsPanel() {
             <div className="text-[11px]" style={{ color: 'var(--muted)' }}>
               Checks: {health.checks_ok}/{health.checks_total} · MCP: {health.mcp.ready_total}/{health.mcp.enabled_total} ready
             </div>
+            {health.mcp.ready_total < health.mcp.enabled_total && (
+              <div className="text-[10px] px-2 py-1.5 rounded" style={{ background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', color: '#fbbf24' }}>
+                ⚠ {health.mcp.enabled_total - health.mcp.ready_total} MCP server(y) nejsou připraveny — zkontroluj chybějící balíčky v sekci MCP Servery
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               {Object.entries(health.checks).map(([key, value]) => (
                 <div key={key} className="flex items-start gap-2 text-[11px]">
                   <span style={{ color: value.ok ? 'var(--green)' : 'var(--red)' }}>{value.ok ? '✓' : '✗'}</span>
                   <span style={{ color: 'var(--text)' }}>{key}</span>
+                  {!value.ok && (
+                    <span className="text-[10px]" style={{ color: 'var(--muted)' }}>— {value.hint}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -655,8 +702,43 @@ export default function SettingsPanel() {
             )}
           </div>
         ) : (
-          <span className="text-xs" style={{ color: 'var(--muted)' }}>Health check nedostupný</span>
+          !healthLoading && <span className="text-xs" style={{ color: 'var(--muted)' }}>Health check nedostupný — backend offline</span>
         )}
+      </Section>
+
+      <Section title="API Token">
+        <div className="flex flex-col gap-2">
+          <span className="text-xs" style={{ color: 'var(--muted)' }}>
+            Vygeneruj bezpečný API token pro JARVIS_API_TOKEN v .env souboru
+          </span>
+          <button
+            onClick={async () => {
+              setGeneratingToken(true)
+              try {
+                const res = await fetch(apiUrl('/api/settings/generate-token'), { method: 'POST' })
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                const { token } = await res.json()
+                navigator.clipboard?.writeText(token)
+                addToast(`Token vygenerován a zkopírován: ${token.slice(0, 8)}…`, 'success', 4000)
+              } catch {
+                addToast('Backend offline — spusť: python scripts/generate_token.py --write', 'error', 5000)
+              } finally {
+                setGeneratingToken(false)
+              }
+            }}
+            disabled={generatingToken}
+            className="self-start px-3 py-1.5 text-sm rounded-lg font-mono transition-all duration-150"
+            style={{
+              background: generatingToken ? 'rgba(59,130,246,.06)' : 'rgba(59,130,246,.12)',
+              border: '1px solid #3b82f6',
+              color: '#3b82f6',
+              opacity: generatingToken ? 0.6 : 1,
+              cursor: generatingToken ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {generatingToken ? 'Generuji…' : 'Generovat token'}
+          </button>
+        </div>
       </Section>
 
       <AuditLogPanel />

@@ -82,7 +82,10 @@ Not for you if you want a hosted SaaS with zero setup, or if you need polished W
 
 ---
 
-## See it in action
+## Screenshots
+
+> **Dashboard** — Chat, Work Timeline, and system context in one view  
+> Run `./install.sh` to get started; the UI opens at `http://localhost:8002/app`
 
 <table>
   <tr>
@@ -100,6 +103,13 @@ Not for you if you want a hosted SaaS with zero setup, or if you need polished W
     </td>
   </tr>
 </table>
+
+| Panel | Description |
+|-------|-------------|
+| 💬 **Chat** | Natural language commands, file access, code execution |
+| 📅 **Work Timeline** | Automatic activity tracking — git commits, builds, app focus |
+| ⚙️ **Settings** | MCP status, health diagnostics, API token management |
+| 🚀 **Missions** | Task tracking with AI-generated checklists |
 
 ```
 You:    "Open Chrome, research the best Python async libraries,
@@ -253,6 +263,23 @@ RAM: **~34 MB** idle backend · **~650 MB+** with Ollama loaded · runs on any m
 ## Architecture
 
 ```
+┌─────────────────────────────────────────────────────┐
+│                    JARVIS v5.14                      │
+│                                                     │
+│  ┌──────────┐    ┌─────────────┐    ┌───────────┐  │
+│  │ Next.js  │◄──►│  FastAPI    │◄──►│  Ollama   │  │
+│  │  Web UI  │    │  Backend    │    │  (Local)  │  │
+│  └──────────┘    └──────┬──────┘    └───────────┘  │
+│                         │                           │
+│              ┌──────────▼──────────┐                │
+│              │    Core Modules     │                │
+│              │  memory · activity  │                │
+│              │  agents · MCP tools │                │
+│              └─────────────────────┘                │
+└─────────────────────────────────────────────────────┘
+```
+
+```
 activity_*.py  Work Timeline — collector, store, bridge
 src/api/       FastAPI · WebSocket · LAN auth · activity routes
 routing.py     Local router (<1 ms) + agent pipeline
@@ -263,7 +290,7 @@ web/           Next.js 16 — Chat, Dnes, Feed, Checklist (Alt+W/F/C/D)
 
 Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · CLI: **`jarvis log`**
 
-**Web dashboard (v5.13):** Work Timeline, Activity Feed, daily summary (Alt+D), proactive AI + desktop notify, unified runtime, onboarding, install UX, missions + checklist, live PC context, voice in chat.
+**Web dashboard (v5.14):** Work Timeline, Activity Feed, daily summary (Alt+D), proactive AI + desktop notify, unified runtime, onboarding, install UX, missions + checklist, live PC context, voice in chat.
 
 → **[docs/index.md](docs/index.md)** · **[docs/mcp-servers.md](docs/mcp-servers.md)** · **[docs/CANONICAL.md](docs/CANONICAL.md)** · **[docs/api-reference.md](docs/api-reference.md)** · **[web/README.md](web/README.md)**
 
@@ -281,6 +308,23 @@ Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · CLI: **`jarvis log
 - Every action is **audit-logged** to `~/.jarvis_audit.jsonl`
 - Headless/CI without web client blocks `ELEVATED` by default (opt-in: `JARVIS_HEADLESS_APPROVE_ELEVATED=1`)
 - **Docker:** `docker-compose.yml` enables API auth by default — set `JARVIS_API_TOKEN` in `.env`
+- **Docker hardening** — `cap_drop: ALL`, `no-new-privileges`, tmpfs for `/tmp`, memory + CPU limits
+- **Token generator** — `python scripts/generate_token.py --write` creates a cryptographically secure API token
+- **systemd isolation** — service loads secrets from `~/.config/jarvis/.env` (not the project root)
+
+---
+
+## Quick CLI reference
+
+```bash
+python jarvis.py                          # start backend + UI
+python jarvis.py log --today              # work summary for today
+python jarvis.py log --markdown           # markdown format
+python jarvis.py release --bump patch     # bump version, draft changelog
+python jarvis.py release --dry-run        # preview release changes
+python scripts/generate_token.py --write  # create API token in .env
+bash scripts/make_deb.sh                  # build .deb package
+```
 
 ---
 

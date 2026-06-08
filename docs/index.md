@@ -118,3 +118,9 @@ Viz [Architektura](architecture.md).
 ## Verze
 
 Aktuální: **v5.4.0** — viz [CHANGELOG](../CHANGELOG.md).
+
+---
+
+## Přispívání
+
+- [Contributing Guide](../CONTRIBUTING.md) — setup, tests, code style, PR process

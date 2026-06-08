@@ -8,7 +8,7 @@ import os
 import subprocess
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ _TOOL_HINTS = {
 }
 
 
-def detect_project(cwd: Optional[str] = None) -> dict:
+def detect_project(cwd: Optional[str] = None) -> dict[str, Any]:
     """Detect current project from cwd or active git repo."""
     path = Path(cwd) if cwd else Path.cwd()
 
@@ -133,11 +133,11 @@ def _git_remote(root: Path) -> str:
         return ""
 
 
-_cache: dict = {}
+_cache: dict[str, Any] = {}
 _cache_cwd: str = ""
 
 
-def get_project_profile(cwd: Optional[str] = None) -> dict:
+def get_project_profile(cwd: Optional[str] = None) -> dict[str, Any]:
     """Cached project profile (invalidated on cwd change)."""
     global _cache, _cache_cwd
     key = cwd or str(Path.cwd())

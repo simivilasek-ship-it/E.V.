@@ -32,12 +32,24 @@ export default function WorkTimeline() {
   const [summary, setSummary] = useState<DailySummary | null>(null)
   const [query, setQuery] = useState('')
   const [answer, setAnswer] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [querying, setQuerying] = useState(false)
 
-  const refresh = () => {
-    fetch(apiUrl('/api/activity/today'))
-      .then(r => r.json())
-      .then(d => { setEvents(d.events || []); setSummary(d.summary || null) })
-      .catch(() => {})
+  const refresh = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch(apiUrl('/api/activity/today'))
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const d = await res.json()
+      setEvents(d.events || [])
+      setSummary(d.summary || null)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Backend offline')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -46,21 +58,49 @@ export default function WorkTimeline() {
     return () => clearInterval(iv)
   }, [])
 
-  const ask = () => {
+  const ask = async () => {
     if (!query.trim()) return
-    fetch(apiUrl(`/api/activity/query?q=${encodeURIComponent(query)}`))
-      .then(r => r.json())
-      .then(d => setAnswer(d.answer || ''))
-      .catch(() => setAnswer('Chyba dotazu'))
+    setQuerying(true)
+    try {
+      const res = await fetch(apiUrl(`/api/activity/query?q=${encodeURIComponent(query)}`))
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const d = await res.json()
+      setAnswer(d.answer || '')
+    } catch {
+      setAnswer('⚠ Backend offline — nelze odpovědět')
+    } finally {
+      setQuerying(false)
+    }
   }
 
   return (
     <div className="w-full max-w-2xl font-mono text-[var(--text)]">
-      <div className="text-[9px] tracking-widest uppercase mb-3" style={{ color: 'var(--muted)' }}>
-        Work Timeline — co jsi dělal dnes
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[9px] tracking-widest uppercase" style={{ color: 'var(--muted)' }}>
+          Work Timeline — co jsi dělal dnes
+        </div>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="text-xs px-2 py-1 rounded hover:bg-white/5 transition-colors"
+          style={{ color: 'var(--muted)' }}
+          title="Obnovit"
+        >
+          {loading ? '⏳' : '↻ refresh'}
+        </button>
       </div>
 
-      {summary && (
+      {loading && (
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full" />
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="p-4 text-amber-400 text-sm">⚠ {error} — backend může být offline</div>
+      )}
+
+      {!loading && !error && summary && (
         <div className="card p-5 mb-4">
           <div className="text-[9px] tracking-widest uppercase mb-3" style={{ color: 'var(--muted)' }}>Dnes — přehled</div>
           {summary.summary?.length ? summary.summary.map((line, i) => (
@@ -75,44 +115,52 @@ export default function WorkTimeline() {
         </div>
       )}
 
-      <div className="card p-3 mb-4 flex gap-2">
-        <input
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && ask()}
-          placeholder="Co jsem dělal minulý týden? Na čem jsem skončil?"
-          className="flex-1 bg-transparent border rounded px-3 py-2 text-sm outline-none"
-          style={{ borderColor: 'var(--border)' }}
-        />
-        <button onClick={ask} className="btn-primary text-xs px-3">Zeptat</button>
-      </div>
+      {!loading && (
+        <div className="card p-3 mb-4 flex gap-2">
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && ask()}
+            placeholder="Co jsem dělal minulý týden? Na čem jsem skončil?"
+            className="flex-1 bg-transparent border rounded px-3 py-2 text-sm outline-none"
+            style={{ borderColor: 'var(--border)' }}
+          />
+          <button onClick={ask} disabled={querying} className="btn-primary text-xs px-3">
+            {querying ? '…' : 'Zeptat'}
+          </button>
+        </div>
+      )}
 
       {answer && (
         <div className="card p-4 mb-4 text-sm whitespace-pre-wrap leading-relaxed">{answer}</div>
       )}
 
-      <div className="card p-4 max-h-[420px] overflow-y-auto">
-        <div className="text-[9px] tracking-widest uppercase mb-3" style={{ color: 'var(--muted)' }}>
-          Události ({events.length})
-        </div>
-        {events.length === 0 ? (
-          <div className="text-sm" style={{ color: 'var(--muted)' }}>Čekám na aktivitu…</div>
-        ) : [...events].reverse().map(e => (
-          <div key={e.id} className="flex gap-3 py-2 border-b text-sm" style={{ borderColor: 'var(--border)' }}>
-            <span className="text-[11px] w-10 shrink-0" style={{ color: 'var(--muted)' }}>
-              {e.time || new Date(e.ts * 1000).toLocaleTimeString('cs', { hour: '2-digit', minute: '2-digit' })}
-            </span>
-            <div className="flex-1">
-              <div className="text-xs" style={{ color: TYPE_COLORS[e.type] || 'var(--cyan)' }}>
-                {e.type?.replace('.', ' · ')}
-                {e.project && <span className="ml-2" style={{ color: 'var(--muted)' }}>{e.project}</span>}
-              </div>
-              <div>{e.title}</div>
-              {e.detail && <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{e.detail.slice(0, 120)}</div>}
-            </div>
+      {!loading && (
+        <div className="card p-4 max-h-[420px] overflow-y-auto">
+          <div className="text-[9px] tracking-widest uppercase mb-3" style={{ color: 'var(--muted)' }}>
+            Události ({events.length})
           </div>
-        ))}
-      </div>
+          {events.length === 0 ? (
+            <div className="text-sm" style={{ color: 'var(--muted)' }}>
+              {error ? '⚠ Backend offline' : 'Čekám na aktivitu…'}
+            </div>
+          ) : [...events].reverse().map(e => (
+            <div key={e.id} className="flex gap-3 py-2 border-b text-sm" style={{ borderColor: 'var(--border)' }}>
+              <span className="text-[11px] w-10 shrink-0" style={{ color: 'var(--muted)' }}>
+                {e.time || new Date(e.ts * 1000).toLocaleTimeString('cs', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <div className="flex-1">
+                <div className="text-xs" style={{ color: TYPE_COLORS[e.type] || 'var(--cyan)' }}>
+                  {e.type?.replace('.', ' · ')}
+                  {e.project && <span className="ml-2" style={{ color: 'var(--muted)' }}>{e.project}</span>}
+                </div>
+                <div>{e.title}</div>
+                {e.detail && <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{e.detail.slice(0, 120)}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

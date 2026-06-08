@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [5.14.0] - 2026-06-08
+
+### Added
+- **Web panels hardened** — all panels have loading spinners, error states, backend-offline banners, auto-refresh
+- **WorkTimeline.tsx** — rebuilt with refresh button, commit/build stats, markdown preview
+- **MissionPanel.tsx** — error handling on list fetch and actions
+- **SettingsPanel.tsx** — health check auto-refresh (60s), MCP warning banner, "Generovat token" button
+- **DashboardPanel.tsx** — summary button shows loading state, catches errors
+- **`POST /api/settings/generate-token`** — backend token generation endpoint
+- **Docker hardening** — `cap_drop: ALL`, `no-new-privileges`, tmpfs, mem/CPU limits, Python healthcheck, jarvis_net network
+- **Type annotations** — `project_profiles.py`, `config.py` fully typed; `py.typed` PEP 561 marker
+- **`scripts/__init__.py`** — scripts importable as package
+- **.env.example** — template with all documented env vars
+- **README** — ASCII architecture diagram, screenshots panel table, Quick CLI reference
+- **CONTRIBUTING.md** — full English contributor guide
+
+
 ## [5.13.0] - 2026-06-08
 
 ### Added / Changed

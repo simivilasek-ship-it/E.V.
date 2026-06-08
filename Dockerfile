@@ -1,4 +1,4 @@
-# JARVIS v5.13.0 — Headless Docker image
+# JARVIS v5.14.0 — Headless Docker image
 # Spustí FastAPI backend (port 8002) + React web UI (/app)
 # Bez Tkinter GUI, bez zvuku — vhodné pro server/NAS/cloud
 
@@ -35,8 +35,8 @@ ENV JARVIS_HEADLESS=1
 USER jarvis
 EXPOSE 8002
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
-    CMD curl -f http://localhost:8002/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8002/api/health', timeout=3)" || exit 1
 
 # Headless mód: jen backend + web UI
 CMD ["python", "dashboard.py"]

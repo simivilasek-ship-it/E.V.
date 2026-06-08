@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "jarvis-assistant"
-version = "5.12.0"
+version = "5.14.0"
 description = "Lokální AI asistent — ovládej celý PC hlasem nebo textem, 100 % offline"
 readme = "README.md"
 license = { text = "MIT" }
@@ -110,6 +110,9 @@ Changelog    = "https://github.com/simivilasek-ship-it/Jarvis/blob/main/CHANGELO
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["commands*", "gui*", "src*"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
 
 [tool.ruff]
 line-length = 100
