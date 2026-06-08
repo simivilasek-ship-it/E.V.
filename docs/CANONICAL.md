@@ -21,7 +21,7 @@ At runtime, **root-level modules are canonical**. The app is started from the re
 | App lifecycle | `app_core.py` | — |
 | Web dashboard | `dashboard.py` → `src/api/runner.py` | `src/api/` (FastAPI app, routers, runtime) |
 | CLI | `jarvis.py`, `jarvis_cli.py` (`jarvis log`) | — |
-| Desktop (legacy) | `gui/` — **deprecated** | Produkční UI = Next.js `web/` |
+| Desktop (legacy) | `gui_legacy/ (deprecated — Tkinter, not maintained)` | Produkční UI = Next.js `web/` |
 
 ## Shims
 

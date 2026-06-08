@@ -1,4 +1,4 @@
-# Konfigurace JARVIS v5.11
+# Konfigurace JARVIS v5.12
 
 Konfigurace se načítá v pořadí: `DEFAULT_CONFIG` → `config.json` → `.env` (nejvyšší priorita).
 

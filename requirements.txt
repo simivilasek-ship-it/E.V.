@@ -1,4 +1,4 @@
-# JARVIS v5.12.0 — závislosti
+# JARVIS v5.13.0 — závislosti
 # pip install -r requirements.txt
 
 # ── Jádro ─────────────────────────────────────────────

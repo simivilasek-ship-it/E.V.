@@ -112,6 +112,16 @@ if [ -f "desktop/jarvis.service" ]; then
     ok "Unit zapsán → $UNIT_DEST"
     echo "    systemctl --user enable --now jarvis.service   # autostart"
     echo "    systemctl --user status jarvis.service"
+    # Create config dir for .env
+    mkdir -p "$HOME/.config/jarvis"
+    if [ ! -f "$HOME/.config/jarvis/.env" ] && [ -f ".env" ]; then
+        cp .env "$HOME/.config/jarvis/.env"
+        ok ".env copiado a ~/.config/jarvis/.env"
+    elif [ ! -f "$HOME/.config/jarvis/.env" ]; then
+        echo "# JARVIS configuration" > "$HOME/.config/jarvis/.env"
+        echo "# Run: python scripts/generate_token.py --write" >> "$HOME/.config/jarvis/.env"
+        ok "Created empty ~/.config/jarvis/.env"
+    fi
 else
     warn "desktop/jarvis.service nenalezen — přeskočeno"
 fi

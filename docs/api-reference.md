@@ -1,4 +1,4 @@
-# API Reference — JARVIS v5.11
+# API Reference — JARVIS v5.12
 
 Backend běží na `http://localhost:8002`. Všechny endpointy vrací JSON pokud není uvedeno jinak.
 
@@ -15,7 +15,7 @@ Rychlý status check backendu.
 {
   "status": "ok",
   "uptime_s": 3621.4,
-  "version": "5.11.0",
+  "version": "5.13.0",
   "ws": "running",
   "ollama": "online",
   "model": "qwen2.5:3b"

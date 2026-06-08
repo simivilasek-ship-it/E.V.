@@ -58,25 +58,26 @@ def cmd_log(argv: list[str] | None = None) -> int:
 
 
 def cmd_release(argv: list[str] | None = None) -> int:
-    """Interactive release assistant — bump version, draft changelog, create checklist."""
+    """Single-source release assistant — bumps ALL version references across the project."""
     import subprocess
     import re
     from pathlib import Path
     from datetime import date
 
-    parser = argparse.ArgumentParser(prog="jarvis release", description="Release assistant")
+    parser = argparse.ArgumentParser(prog="jarvis release", description="JARVIS release assistant")
     parser.add_argument("--bump", choices=["patch", "minor", "major"], default="patch")
-    parser.add_argument("--dry-run", action="store_true", help="Only show what would happen")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would change, don't write")
+    parser.add_argument("--push", action="store_true", help="git tag + push after release")
     args = parser.parse_args(argv)
 
     root = Path(__file__).parent
-    config_path = root / "config.py"
 
-    # Read current version
+    # ── Read current version ──────────────────────────────────────────────────
+    config_path = root / "config.py"
     src = config_path.read_text(encoding="utf-8")
     m = re.search(r'__version__\s*=\s*"([\d.]+)"', src)
     if not m:
-        print("Could not find __version__ in config.py")
+        print("ERROR: __version__ not found in config.py")
         return 1
 
     current = m.group(1)
@@ -87,19 +88,108 @@ def cmd_release(argv: list[str] | None = None) -> int:
     if args.bump == "patch":
         parts[2] += 1
     elif args.bump == "minor":
-        parts[1] += 1
-        parts[2] = 0
+        parts[1] += 1; parts[2] = 0
     elif args.bump == "major":
-        parts[0] += 1
-        parts[1] = 0
-        parts[2] = 0
+        parts[0] += 1; parts[1] = 0; parts[2] = 0
 
-    next_ver = ".".join(str(p) for p in parts)
+    nv = ".".join(str(p) for p in parts)
     today = date.today().isoformat()
 
-    print(f"Current: {current}  →  Next: {next_ver}")
+    print(f"  {current}  →  {nv}")
+    print()
 
-    # Collect recent git commits for changelog draft
+    # ── Define all files + replacement strategies ─────────────────────────────
+    def _bump_regex(path: Path, pattern: str, replacement: str, label: str):
+        if not path.exists():
+            print(f"  SKIP (not found): {path}")
+            return
+        src = path.read_text(encoding="utf-8")
+        new = re.sub(pattern, replacement, src)
+        if new == src:
+            print(f"  ~ unchanged: {label}")
+        else:
+            if not args.dry_run:
+                path.write_text(new, encoding="utf-8")
+            print(f"  ✓ {'(dry) ' if args.dry_run else ''}updated: {label}")
+
+    def _bump_str(path: Path, old: str, new_str: str, label: str):
+        if not path.exists():
+            print(f"  SKIP (not found): {path}")
+            return
+        src = path.read_text(encoding="utf-8")
+        new = src.replace(old, new_str)
+        if new == src:
+            print(f"  ~ unchanged: {label}")
+        else:
+            if not args.dry_run:
+                path.write_text(new, encoding="utf-8")
+            print(f"  ✓ {'(dry) ' if args.dry_run else ''}updated: {label}")
+
+    print("── Version bumps ────────────────────────────────────────────")
+    # config.py
+    _bump_regex(root / "config.py",
+        r'(__version__\s*=\s*)"[\d.]+"', f'\\g<1>"{nv}"', "config.py __version__")
+
+    # pyproject.toml
+    _bump_regex(root / "pyproject.toml",
+        r'^(version\s*=\s*)"[\d.]+"', f'\\g<1>"{nv}"', "pyproject.toml version",)
+
+    # Dockerfile + docker-compose.yml + requirements.txt — comment version strings
+    for fname in ["Dockerfile", "docker-compose.yml", "requirements.txt"]:
+        p = root / fname
+        src2 = p.read_text(encoding="utf-8") if p.exists() else ""
+        new2 = src2.replace(f"v{current}", f"v{nv}").replace(current, nv)
+        if new2 != src2:
+            if not args.dry_run:
+                p.write_text(new2, encoding="utf-8")
+            print(f"  ✓ {'(dry) ' if args.dry_run else ''}updated: {fname}")
+        else:
+            print(f"  ~ unchanged: {fname}")
+
+    # README.md — badges + version mentions
+    readme = root / "README.md"
+    if readme.exists():
+        src3 = readme.read_text(encoding="utf-8")
+        short_cur = ".".join(current.split(".")[:2])
+        short_nv  = ".".join(nv.split(".")[:2])
+        new3 = (src3
+            .replace(f"v{current}", f"v{nv}")
+            .replace(current, nv)
+            .replace(f"v{short_cur}", f"v{short_nv}")
+        )
+        if new3 != src3:
+            if not args.dry_run:
+                readme.write_text(new3, encoding="utf-8")
+            print(f"  ✓ {'(dry) ' if args.dry_run else ''}updated: README.md")
+        else:
+            print(f"  ~ unchanged: README.md")
+
+    # web/components/Sidebar.tsx
+    sidebar = root / "web" / "components" / "Sidebar.tsx"
+    if sidebar.exists():
+        src4 = sidebar.read_text(encoding="utf-8")
+        short_cur = ".".join(current.split(".")[:2])
+        short_nv  = ".".join(nv.split(".")[:2])
+        new4 = src4.replace(f"v{short_cur}", f"v{short_nv}").replace(f"v{current}", f"v{nv}")
+        if new4 != src4:
+            if not args.dry_run:
+                sidebar.write_text(new4, encoding="utf-8")
+            print(f"  ✓ {'(dry) ' if args.dry_run else ''}updated: web/components/Sidebar.tsx")
+        else:
+            print(f"  ~ unchanged: Sidebar.tsx")
+
+    # docs/*.md
+    for doc in (root / "docs").glob("*.md"):
+        src5 = doc.read_text(encoding="utf-8")
+        new5 = src5.replace(f"v{current}", f"v{nv}").replace(current, nv)
+        if new5 != src5:
+            if not args.dry_run:
+                doc.write_text(new5, encoding="utf-8")
+            print(f"  ✓ {'(dry) ' if args.dry_run else ''}updated: docs/{doc.name}")
+
+    # ── Changelog entry ───────────────────────────────────────────────────────
+    print()
+    print("── Changelog draft ──────────────────────────────────────────")
     try:
         log = subprocess.check_output(
             ["git", "log", f"v{current}..HEAD", "--oneline", "--no-decorate"],
@@ -108,57 +198,60 @@ def cmd_release(argv: list[str] | None = None) -> int:
     except Exception:
         log = ""
 
-    changelog_entry = f"""
-## [{next_ver}] - {today}
-
-### Added / Changed
-"""
+    changelog_entry = f"## [{nv}] - {today}\n\n### Added / Changed\n"
     if log:
         for line in log.splitlines()[:20]:
             changelog_entry += f"- {line}\n"
     else:
-        changelog_entry += "- (no commits found since last tag)\n"
+        changelog_entry += "- (no new commits since last tag)\n"
+    changelog_entry += "\n"
 
-    print("\n--- Changelog draft ---")
     print(changelog_entry)
 
-    checklist = [
-        f"[ ] Bump version in config.py: {current} → {next_ver}",
-        f"[ ] Bump version in pyproject.toml",
-        f"[ ] Bump version in Dockerfile / docker-compose.yml",
-        f"[ ] Update CHANGELOG.md",
-        f"[ ] Run: pytest tests/ test_jarvis.py -q",
-        f"[ ] Run: cd web && npm run build",
-        f"[ ] git tag -a v{next_ver} -m 'JARVIS v{next_ver}'",
-        f"[ ] git push origin main && git push origin v{next_ver}",
-    ]
-
-    print("\n--- Release checklist ---")
-    for item in checklist:
-        print(item)
-
-    if args.dry_run:
-        print("\n[dry-run] No files changed.")
-        return 0
-
-    # Apply version bump
-    new_src = re.sub(
-        r'(__version__\s*=\s*)"[\d.]+"',
-        f'\\1"{next_ver}"',
-        src,
-    )
-    config_path.write_text(new_src, encoding="utf-8")
-    print(f"\n✓ config.py bumped to {next_ver}")
-
-    # Prepend changelog entry
     cl_path = root / "CHANGELOG.md"
-    if cl_path.exists():
+    if cl_path.exists() and not args.dry_run:
         existing = cl_path.read_text(encoding="utf-8")
         marker = "# CHANGELOG\n"
         if marker in existing:
-            updated = existing.replace(marker, marker + "\n" + changelog_entry, 1)
-            cl_path.write_text(updated, encoding="utf-8")
-            print(f"✓ CHANGELOG.md updated")
+            cl_path.write_text(existing.replace(marker, marker + "\n" + changelog_entry, 1), encoding="utf-8")
+        else:
+            cl_path.write_text(changelog_entry + existing, encoding="utf-8")
+        print(f"  ✓ CHANGELOG.md prepended")
 
-    print(f"\nNext: run the checklist above to complete release v{next_ver}")
+    # ── Release checklist ─────────────────────────────────────────────────────
+    print()
+    print("── Release checklist ────────────────────────────────────────")
+    checks = [
+        f"[x] config.py → {nv}",
+        f"[x] pyproject.toml → {nv}",
+        f"[x] Dockerfile / docker-compose.yml → v{nv}",
+        f"[x] README.md badges → v{nv}",
+        f"[x] CHANGELOG.md updated",
+        "[ ] pytest tests/ test_jarvis.py -q",
+        "[ ] cd web && npm run build",
+        f"[ ] git tag -a v{nv} -m 'JARVIS v{nv}'",
+        f"[ ] git push origin main && git push origin v{nv}",
+    ]
+    for c in checks:
+        print(f"  {c}")
+
+    if args.dry_run:
+        print("\n[dry-run] No files written.")
+        return 0
+
+    # ── Optional git tag + push ───────────────────────────────────────────────
+    if args.push:
+        print()
+        print("── Git tag + push ───────────────────────────────────────────")
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", f"chore: bump version to {nv}"],
+            cwd=root, check=True,
+        )
+        subprocess.run(["git", "tag", "-a", f"v{nv}", "-m", f"JARVIS v{nv}"], cwd=root, check=True)
+        subprocess.run(["git", "push", "origin", "main"], cwd=root, check=True)
+        subprocess.run(["git", "push", "origin", f"v{nv}"], cwd=root, check=True)
+        print(f"  ✓ Pushed v{nv}")
+
+    print(f"\n✓ Release v{nv} prepared. Run tests, then: git tag -a v{nv} -m 'JARVIS v{nv}' && git push origin main v{nv}")
     return 0

@@ -11,11 +11,11 @@
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.11-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.12-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![Linux-first](https://img.shields.io/badge/Linux--first-22c55e?style=flat-square&logo=linux&logoColor=white)](#linux-out-of-the-box)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-699%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Tests](https://img.shields.io/badge/tests-718%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 
 </div>
 
@@ -263,7 +263,7 @@ web/           Next.js 16 — Chat, Dnes, Feed, Checklist (Alt+W/F/C/D)
 
 Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · CLI: **`jarvis log`**
 
-**Web dashboard (v5.12):** Work Timeline, Activity Feed, daily summary (Alt+D), proactive AI + desktop notify, unified runtime, onboarding, install UX, missions + checklist, live PC context, voice in chat.
+**Web dashboard (v5.13):** Work Timeline, Activity Feed, daily summary (Alt+D), proactive AI + desktop notify, unified runtime, onboarding, install UX, missions + checklist, live PC context, voice in chat.
 
 → **[docs/index.md](docs/index.md)** · **[docs/mcp-servers.md](docs/mcp-servers.md)** · **[docs/CANONICAL.md](docs/CANONICAL.md)** · **[docs/api-reference.md](docs/api-reference.md)** · **[web/README.md](web/README.md)**
 
@@ -287,7 +287,7 @@ Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · CLI: **`jarvis log
 ## Tests · Docs · Contributing
 
 ```bash
-pytest tests/ test_jarvis.py -v   # 699 tests (615 unit + 84 integration)
+pytest tests/ test_jarvis.py -v   # 718 tests (615 unit + 84 integration)
 python scripts/check_utf8.py      # UTF-8 gate (CI)
 ```
 

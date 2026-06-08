@@ -1,4 +1,4 @@
-# JARVIS v5.12.0 — Headless Docker image
+# JARVIS v5.13.0 — Headless Docker image
 # Spustí FastAPI backend (port 8002) + React web UI (/app)
 # Bez Tkinter GUI, bez zvuku — vhodné pro server/NAS/cloud
 

@@ -1,4 +1,4 @@
-# JARVIS v5.12.0 — Docker Compose
+# JARVIS v5.13.0 — Docker Compose
 # Spuštění: docker compose up -d
 # Web UI: http://localhost:8002/app
 # Vyžaduje JARVIS_API_TOKEN v .env (auth zapnuto ve výchozím stavu)

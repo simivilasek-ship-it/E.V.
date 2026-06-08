@@ -1,43 +1,88 @@
-"""Tests for jarvis release CLI."""
+"""Tests for jarvis release CLI (single-source versioning)."""
 import pytest
-import sys
-from io import StringIO
+import re
+from pathlib import Path
 from unittest.mock import patch
 
 pytestmark = pytest.mark.unit
 
 
-def test_release_dry_run_no_changes(tmp_path):
-    """Dry run should print checklist without modifying files."""
-    import shutil
-    from pathlib import Path
+def test_release_dry_run_leaves_files_unchanged(tmp_path):
+    """Dry run should NOT modify any files."""
+    config = tmp_path / "config.py"
+    config.write_text('__version__ = "5.12.0"\n', encoding="utf-8")
+    (tmp_path / "CHANGELOG.md").write_text("# CHANGELOG\n\nold\n", encoding="utf-8")
 
-    # Set up minimal fake project root
-    fake_config = tmp_path / "config.py"
-    fake_config.write_text('__version__ = "5.11.0"\n', encoding="utf-8")
-
-    # Patch __file__ in jarvis_cli to point to tmp_path
     import jarvis_cli
-    original_file = jarvis_cli.__file__
-
     with patch.object(jarvis_cli, "__file__", str(tmp_path / "jarvis_cli.py")):
-        captured = StringIO()
-        with patch("sys.stdout", captured):
-            ret = jarvis_cli.cmd_release(["--dry-run", "--bump", "patch"])
+        ret = jarvis_cli.cmd_release(["--dry-run", "--bump", "patch"])
 
     assert ret == 0
-    # config.py should be unchanged since dry-run
-    content = fake_config.read_text()
-    assert '5.11.0' in content
+    assert config.read_text() == '__version__ = "5.12.0"\n'
 
 
-def test_release_shows_checklist(capsys):
-    """Release command should show a checklist."""
+def test_release_bumps_config_version(tmp_path):
+    """Release (no dry-run) should bump version in config.py."""
+    config = tmp_path / "config.py"
+    config.write_text('__version__ = "5.12.0"\n', encoding="utf-8")
+    cl = tmp_path / "CHANGELOG.md"
+    cl.write_text("# CHANGELOG\n\n", encoding="utf-8")
+
     import jarvis_cli
-    try:
-        # This will try to parse actual config.py — just make sure it doesn't crash
+    with patch.object(jarvis_cli, "__file__", str(tmp_path / "jarvis_cli.py")):
+        ret = jarvis_cli.cmd_release(["--bump", "patch"])
+
+    assert ret == 0
+    content = config.read_text()
+    assert '5.12.1' in content
+
+
+def test_release_minor_bump(tmp_path):
+    config = tmp_path / "config.py"
+    config.write_text('__version__ = "5.12.0"\n', encoding="utf-8")
+    (tmp_path / "CHANGELOG.md").write_text("# CHANGELOG\n\n", encoding="utf-8")
+
+    import jarvis_cli
+    with patch.object(jarvis_cli, "__file__", str(tmp_path / "jarvis_cli.py")):
+        jarvis_cli.cmd_release(["--bump", "minor"])
+
+    assert '5.13.0' in config.read_text()
+
+
+def test_release_major_bump(tmp_path):
+    config = tmp_path / "config.py"
+    config.write_text('__version__ = "5.12.0"\n', encoding="utf-8")
+    (tmp_path / "CHANGELOG.md").write_text("# CHANGELOG\n\n", encoding="utf-8")
+
+    import jarvis_cli
+    with patch.object(jarvis_cli, "__file__", str(tmp_path / "jarvis_cli.py")):
+        jarvis_cli.cmd_release(["--bump", "major"])
+
+    content = config.read_text()
+    assert '6.0.0' in content
+
+
+def test_release_changelog_updated(tmp_path):
+    """Release should prepend entry to CHANGELOG.md."""
+    (tmp_path / "config.py").write_text('__version__ = "5.12.0"\n', encoding="utf-8")
+    cl = tmp_path / "CHANGELOG.md"
+    cl.write_text("# CHANGELOG\n\nexisting\n", encoding="utf-8")
+
+    import jarvis_cli
+    with patch.object(jarvis_cli, "__file__", str(tmp_path / "jarvis_cli.py")):
+        jarvis_cli.cmd_release(["--bump", "patch"])
+
+    changelog = cl.read_text()
+    assert "5.12.1" in changelog
+    assert "existing" in changelog  # original content preserved
+
+
+def test_release_missing_version_returns_error(tmp_path):
+    """Should return error code 1 if config.py has no __version__."""
+    (tmp_path / "config.py").write_text("# no version here\n", encoding="utf-8")
+
+    import jarvis_cli
+    with patch.object(jarvis_cli, "__file__", str(tmp_path / "jarvis_cli.py")):
         ret = jarvis_cli.cmd_release(["--dry-run"])
-        out = capsys.readouterr().out
-        assert "checklist" in out.lower() or ret == 0
-    except SystemExit as e:
-        assert e.code == 0
+
+    assert ret == 1
