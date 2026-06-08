@@ -36,11 +36,11 @@ interface NodeDef {
 }
 
 const NODES: Record<string, NodeDef> = {
-  planner:  { x: 120, y: 60,  label: 'PLANNER',  color: '#0066ff' },
-  router:   { x: 120, y: 160, label: 'ROUTER',   color: '#00d4ff' },
-  executor: { x: 120, y: 260, label: 'EXECUTOR', color: '#00e5a0' },
-  critic:   { x: 120, y: 360, label: 'CRITIC',   color: '#8b5cf6' },
-  done:     { x: 280, y: 210, label: 'DONE',     color: '#00e5a0' },
+  planner:  { x: 120, y: 60,  label: 'PLANNER',  color: 'var(--accent)' },
+  router:   { x: 120, y: 160, label: 'ROUTER',   color: 'var(--cyan)' },
+  executor: { x: 120, y: 260, label: 'EXECUTOR', color: 'var(--green)' },
+  critic:   { x: 120, y: 360, label: 'CRITIC',   color: 'var(--purple)' },
+  done:     { x: 280, y: 210, label: 'DONE',     color: 'var(--green)' },
 }
 
 const EDGES: { from: string; to: string }[] = [
@@ -55,10 +55,10 @@ const NODE_W = 90
 const NODE_H = 30
 
 const REASONING_META: Record<ReasoningType, { icon: string; color: string }> = {
-  thought:     { icon: '🤔', color: '#00d4ff' },
-  action:      { icon: '🔧', color: '#f59e0b' },
-  observation: { icon: '👁️', color: '#8b5cf6' },
-  result:      { icon: '✅', color: '#00e5a0' },
+  thought:     { icon: '🤔', color: 'var(--cyan)' },
+  action:      { icon: '🔧', color: 'var(--amber)' },
+  observation: { icon: '👁️', color: 'var(--purple)' },
+  result:      { icon: '✅', color: 'var(--green)' },
 }
 
 function genId(): string {
@@ -109,7 +109,7 @@ function AnimatedEdge({ from, to, active }: EdgeProps) {
     x2 = tn.x; y2 = tn.y - NODE_H / 2
   }
 
-  const color = active ? '#00d4ff' : '#1a3050'
+  const color = active ? 'var(--cyan)' : 'var(--border-hud)'
   const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
   return (
@@ -120,25 +120,25 @@ function AnimatedEdge({ from, to, active }: EdgeProps) {
           markerWidth="6" markerHeight="6"
           refX="5" refY="3" orient="auto"
         >
-          <path d="M0,0 L6,3 L0,6 Z" fill={color} />
+          <path d="M0,0 L6,3 L0,6 Z" style={{ fill: color }} />
         </marker>
       </defs>
       {/* Base line */}
       <line
         x1={x1} y1={y1} x2={x2} y2={y2}
-        stroke={color} strokeWidth={active ? 2 : 1}
+        strokeWidth={active ? 2 : 1}
         markerEnd={`url(#v2-arrow-${from}-${to})`}
-        style={{ transition: 'stroke 0.4s, stroke-width 0.4s' }}
+        style={{ stroke: color, transition: 'stroke 0.4s, stroke-width 0.4s' }}
       />
       {/* Animated flow dots */}
       {active && (
         <line
           x1={x1} y1={y1} x2={x2} y2={y2}
-          stroke="#00d4ff"
           strokeWidth={3}
           strokeDasharray={`4 ${length}`}
           strokeLinecap="round"
           opacity={0.8}
+          style={{ stroke: 'var(--cyan)' }}
         >
           <animate
             attributeName="stroke-dashoffset"
@@ -170,20 +170,19 @@ function NodeBadge({ id, node, active, passCount }: NodeBadgeProps) {
         <rect
           x={node.x - NODE_W / 2 - 5} y={node.y - NODE_H / 2 - 5}
           width={NODE_W + 10} height={NODE_H + 10}
-          rx="9" fill="none"
-          stroke={color} strokeWidth={1} opacity={0.3}
-          style={{ filter: 'blur(2px)' }}
+          rx="9"
+          style={{ fill: 'none', stroke: color, strokeWidth: 1, opacity: 0.3, filter: 'blur(2px)' }}
         />
       )}
       <rect
         x={node.x - NODE_W / 2} y={node.y - NODE_H / 2}
         width={NODE_W} height={NODE_H}
         rx="6"
-        fill={isActive ? `${color}22` : '#0b1220'}
-        stroke={isActive ? color : '#1a3050'}
         strokeWidth={isActive ? 2 : 1}
         style={{
-          filter: isActive ? `drop-shadow(0 0 12px ${color}99)` : 'none',
+          fill: isActive ? `color-mix(in srgb, ${color} 13%, transparent)` : 'var(--bg-hud)',
+          stroke: isActive ? color : 'var(--border-hud)',
+          filter: isActive ? `drop-shadow(0 0 12px color-mix(in srgb, ${color} 60%, transparent))` : 'none',
           transition: 'all 0.4s',
         }}
       />
@@ -191,8 +190,7 @@ function NodeBadge({ id, node, active, passCount }: NodeBadgeProps) {
         x={node.x} y={node.y + 1}
         textAnchor="middle" dominantBaseline="middle"
         fontSize="9" fontFamily="'Courier New', monospace" letterSpacing="2"
-        fill={isActive ? color : '#7ea8d4'}
-        style={{ transition: 'fill 0.4s' }}
+        style={{ fill: isActive ? color : 'var(--text2)', transition: 'fill 0.4s' }}
       >
         {node.label}
       </text>
@@ -202,13 +200,13 @@ function NodeBadge({ id, node, active, passCount }: NodeBadgeProps) {
           <circle
             cx={node.x + NODE_W / 2 - 2} cy={node.y - NODE_H / 2 + 2}
             r={8}
-            fill="#0b1220" stroke={color} strokeWidth={1}
+            style={{ fill: 'var(--bg-hud)', stroke: color, strokeWidth: 1 }}
           />
           <text
             x={node.x + NODE_W / 2 - 2} y={node.y - NODE_H / 2 + 3}
             textAnchor="middle" dominantBaseline="middle"
             fontSize="7" fontFamily="'Courier New', monospace"
-            fill={color}
+            style={{ fill: color }}
           >
             {passCount > 99 ? '99+' : passCount}
           </text>
@@ -259,7 +257,7 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
         setStepTotal(i => Math.max(i, i + 1))
         setStepStartTs(Date.now())
         setPassCounts(c => ({ ...c, [event.node!]: (c[event.node!] ?? 0) + 1 }))
-        const nodeColor = NODES[event.node]?.color ?? '#7ea8d4'
+        const nodeColor = NODES[event.node]?.color ?? 'var(--text2)'
         setTimeline(t => [
           ...t.filter(e => Date.now() - e.ts < 30 * 60 * 1000),
           { node: event.node!, ts: event.ts ?? Date.now(), color: nodeColor },
@@ -361,9 +359,9 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
         justifyContent: 'center', height: 300, gap: 12,
         fontFamily: "'Courier New', monospace",
       }}>
-        <div style={{ fontSize: 32, color: '#1a3050' }}>⬡</div>
-        <div style={{ color: '#4a6a8a', fontSize: 11, letterSpacing: '0.15em' }}>GRAPH OFFLINE</div>
-        <div style={{ color: '#2a4060', fontSize: 10 }}>WebSocket /ws/graph nedostupný</div>
+        <div style={{ fontSize: 32, color: 'var(--border-hud)' }}>⬡</div>
+        <div style={{ color: 'var(--muted)', fontSize: 11, letterSpacing: '0.15em' }}>GRAPH OFFLINE</div>
+        <div style={{ color: 'var(--border-hud)', fontSize: 10 }}>WebSocket /ws/graph nedostupný</div>
       </div>
     )
   }
@@ -379,22 +377,23 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
       {/* Step counter */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '6px 16px', borderBottom: '1px solid #1a3050',
-        background: '#050a15',
+        padding: '6px 16px', borderBottom: '1px solid var(--border-hud)',
+        background: 'var(--bg-hud)',
       }}>
-        <span style={{ fontSize: 11, color: '#4a6a8a', letterSpacing: '0.15em' }}>
+        <span style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.15em' }}>
           AGENT GRAPH V2
         </span>
         <span style={{
-          marginLeft: 8, fontSize: 11, color: '#00d4ff',
-          background: '#00d4ff11', border: '1px solid #00d4ff33',
+          marginLeft: 8, fontSize: 11, color: 'var(--cyan)',
+          background: 'color-mix(in srgb, var(--cyan) 7%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--cyan) 20%, transparent)',
           borderRadius: 4, padding: '2px 8px',
         }}>
           Krok {stepIndex}/{stepTotal} · {elapsedSec}s
         </span>
         <span style={{
           fontSize: 8, letterSpacing: '0.1em',
-          color: status === 'online' ? '#00e5a0' : '#ffb300',
+          color: status === 'online' ? 'var(--green)' : 'var(--amber)',
           marginLeft: 'auto',
         }}>
           ● {status.toUpperCase()}
@@ -402,9 +401,9 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
         <button
           onClick={() => setShowDebug(d => !d)}
           style={{
-            background: showDebug ? '#1a3050' : '#0b1220',
-            border: '1px solid #1a3050', borderRadius: 4,
-            color: '#7ea8d4', padding: '2px 8px', fontSize: 10,
+            background: showDebug ? 'var(--border-hud)' : 'var(--bg-hud)',
+            border: '1px solid var(--border-hud)', borderRadius: 4,
+            color: 'var(--text2)', padding: '2px 8px', fontSize: 10,
             cursor: 'pointer', ...mono,
           }}
         >
@@ -418,8 +417,8 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
           <svg
             width={340} height={440}
             style={{
-              background: '#070b12',
-              border: '1px solid #1a3050',
+              background: 'var(--bg-hud)',
+              border: '1px solid var(--border-hud)',
               borderRadius: 10,
               display: 'block',
             }}
@@ -427,7 +426,7 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
             <defs>
               <pattern id="v2-hex-bg" x="0" y="0" width="30" height="26" patternUnits="userSpaceOnUse">
                 <path d="M15 0 L30 8 L30 18 L15 26 L0 18 L0 8 Z"
-                  fill="none" stroke="#0d1a2a" strokeWidth="0.5" />
+                  fill="none" strokeWidth="0.5" style={{ stroke: 'var(--bg-hud)' }} />
               </pattern>
             </defs>
             <rect width="340" height="440" fill="url(#v2-hex-bg)" opacity="0.6" />
@@ -454,12 +453,12 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
         <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Reasoning chain */}
           <div>
-            <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a', marginBottom: 8 }}>
+            <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--muted)', marginBottom: 8 }}>
               REASONING CHAIN
             </div>
             <div style={{
-              background: '#050a15',
-              border: '1px solid #1a3050',
+              background: 'var(--bg-hud)',
+              border: '1px solid var(--border-hud)',
               borderRadius: 8,
               padding: 10,
               minHeight: 180,
@@ -470,7 +469,7 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
               gap: 6,
             }}>
               {reasoningSteps.length === 0 ? (
-                <div style={{ color: '#2a4060', fontSize: 10 }}>
+                <div style={{ color: 'var(--border-hud)', fontSize: 10 }}>
                   Čekám na reasoning events…
                 </div>
               ) : (
@@ -478,8 +477,8 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
                   const meta = REASONING_META[step.type]
                   return (
                     <div key={step.id} style={{
-                      background: `${meta.color}0e`,
-                      border: `1px solid ${meta.color}33`,
+                      background: `color-mix(in srgb, ${meta.color} 6%, transparent)`,
+                      border: `1px solid color-mix(in srgb, ${meta.color} 20%, transparent)`,
                       borderRadius: 6,
                       padding: '6px 10px',
                     }}>
@@ -490,15 +489,15 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
                         <span style={{ fontSize: 10, color: meta.color }}>
                           {meta.icon} {step.type.toUpperCase()}
                         </span>
-                        <span style={{ fontSize: 8, color: '#4a6a8a' }}>
+                        <span style={{ fontSize: 8, color: 'var(--muted)' }}>
                           {formatTime(step.ts)}
                         </span>
                       </div>
-                      <div style={{ fontSize: 10, color: '#7ea8d4', lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text2)', lineHeight: 1.5 }}>
                         {step.text}
                       </div>
                       {step.node && step.node !== 'unknown' && (
-                        <div style={{ fontSize: 8, color: `${NODES[step.node]?.color ?? '#4a6a8a'}99`, marginTop: 3 }}>
+                        <div style={{ fontSize: 8, color: `color-mix(in srgb, ${NODES[step.node]?.color ?? 'var(--muted)'} 60%, transparent)`, marginTop: 3 }}>
                           @ {step.node}
                         </div>
                       )}
@@ -514,10 +513,10 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
           {activeNode && (
             <div style={{
               padding: '8px 12px',
-              background: `${NODES[activeNode]?.color ?? '#7ea8d4'}11`,
-              border: `1px solid ${NODES[activeNode]?.color ?? '#7ea8d4'}44`,
+              background: `color-mix(in srgb, ${NODES[activeNode]?.color ?? 'var(--text2)'} 7%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${NODES[activeNode]?.color ?? 'var(--text2)'} 27%, transparent)`,
               borderRadius: 6, fontSize: 10, letterSpacing: '0.15em',
-              color: NODES[activeNode]?.color ?? '#7ea8d4',
+              color: NODES[activeNode]?.color ?? 'var(--text2)',
             }}>
               ◎ ACTIVE: {activeNode.toUpperCase()}
             </div>
@@ -526,23 +525,23 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
           {/* Debug panel */}
           {showDebug && (
             <div style={{
-              background: '#050a15', border: '1px solid #1a3050',
+              background: 'var(--bg-hud)', border: '1px solid var(--border-hud)',
               borderRadius: 8, padding: 10,
             }}>
               <div style={{
                 display: 'flex', justifyContent: 'space-between',
                 alignItems: 'center', marginBottom: 8,
               }}>
-                <span style={{ fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a' }}>
+                <span style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--muted)' }}>
                   DEBUG — LAST EVENT
                 </span>
                 <button
                   onClick={startReplay}
                   disabled={replaying || recorded.length === 0}
                   style={{
-                    background: replaying ? '#1a3050' : '#0b1220',
-                    border: '1px solid #1a3050', borderRadius: 4,
-                    color: replaying ? '#4a6a8a' : '#00d4ff',
+                    background: replaying ? 'var(--border-hud)' : 'var(--bg-hud)',
+                    border: '1px solid var(--border-hud)', borderRadius: 4,
+                    color: replaying ? 'var(--muted)' : 'var(--cyan)',
                     padding: '2px 8px', fontSize: 9, cursor: replaying ? 'default' : 'pointer',
                     ...mono,
                   }}
@@ -551,7 +550,7 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
                 </button>
               </div>
               <pre style={{
-                margin: 0, fontSize: 9, color: '#4a8a6a',
+                margin: 0, fontSize: 9, color: 'var(--muted)',
                 overflowX: 'auto', maxHeight: 120,
                 whiteSpace: 'pre-wrap', wordBreak: 'break-all',
               }}>
@@ -564,16 +563,16 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
 
       {/* Timeline */}
       <div style={{
-        borderTop: '1px solid #1a3050',
+        borderTop: '1px solid var(--border-hud)',
         padding: '8px 16px',
-        background: '#050a15',
+        background: 'var(--bg-hud)',
       }}>
-        <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a', marginBottom: 6 }}>
+        <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--muted)', marginBottom: 6 }}>
           TIMELINE — posledních 30 min
         </div>
         <div style={{
           position: 'relative', height: 28,
-          background: '#070b12', border: '1px solid #1a3050',
+          background: 'var(--bg-hud)', border: '1px solid var(--border-hud)',
           borderRadius: 6, overflow: 'hidden',
         }}>
           {/* Time axis labels */}
@@ -581,7 +580,7 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
             <span key={mins} style={{
               position: 'absolute',
               left: `${((timelineWindowMs + mins * 60000) / timelineWindowMs) * 100}%`,
-              bottom: 2, fontSize: 7, color: '#2a4060',
+              bottom: 2, fontSize: 7, color: 'var(--border-hud)',
               transform: 'translateX(-50%)',
               ...mono,
             }}>
@@ -613,7 +612,7 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
             <div style={{
               position: 'absolute', top: '50%', left: '50%',
               transform: 'translate(-50%, -50%)',
-              fontSize: 9, color: '#1a3050', ...mono,
+              fontSize: 9, color: 'var(--border-hud)', ...mono,
             }}>
               žádné průchody
             </div>
@@ -624,9 +623,9 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
         <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
           {Object.entries(NODES).map(([id, node]) => (
             <div key={id} style={{
-              fontSize: 8, color: `${node.color}cc`,
-              background: `${node.color}10`,
-              border: `1px solid ${node.color}30`,
+              fontSize: 8, color: `color-mix(in srgb, ${node.color} 80%, transparent)`,
+              background: `color-mix(in srgb, ${node.color} 6%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${node.color} 19%, transparent)`,
               borderRadius: 4, padding: '2px 6px',
               ...mono,
             }}>

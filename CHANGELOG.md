@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [5.15.2] - 2026-06-08
+
+### Changed — Complete design system unification
+- **AgentGraphV2** — 61 hex colors → CSS vars; `color-mix()` for opacity tints; SVG attrs → `style={}`
+- **PluginMarketplace** — 16 hex colors → CSS vars; category badges, status, stars, action buttons
+- **MemoryGraph** — GROUP_COLORS, SVG edges/labels, detail panel → CSS vars
+- **WorkTimeline, SettingsPanel, CenterDashboard, ActivityFeed, AuditLogPanel, SystemWidget, SkillGenerator** — remaining hex → CSS vars
+- **Chat** — remark-gfm tables, Copilot-style markdown rendering, wider bubbles
+- All 32 panels now use single design system; light theme works everywhere
+
+
 ## [5.15.0] - 2026-06-08
 
 ### Changed — Unified Design System

@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useJarvis } from '@/store/jarvis'
 
 const LEVEL_COLORS: Record<string, string> = {
-  info: 'var(--muted)', success: 'var(--green)', warning: '#fbbf24', error: 'var(--red)',
+  info: 'var(--muted)', success: 'var(--green)', warning: 'var(--amber)', error: 'var(--red)',
 }
 
 interface FeedEntry {
@@ -49,7 +49,7 @@ function ProactiveCard({ sug, onDismiss, onAction }: {
   onDismiss: (id: string) => void
   onAction: (action: string) => void
 }) {
-  const sev = sug.severity === 'error' ? 'var(--red)' : sug.severity === 'warning' ? '#fbbf24' : 'var(--cyan)'
+  const sev = sug.severity === 'error' ? 'var(--red)' : sug.severity === 'warning' ? 'var(--amber)' : 'var(--cyan)'
   return (
     <div className="card p-3 mb-2" style={{ borderColor: `${sev}44` }}>
       <div className="font-medium text-sm">{sug.title}</div>

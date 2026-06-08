@@ -110,7 +110,7 @@ export default function SkillGenerator() {
             disabled={loading || !prompt.trim()}
             style={{
               marginLeft: 'auto', background: loading ? 'var(--border-hud)' : 'var(--metric-cpu)',
-              border: 'none', borderRadius: 6, color: '#000', padding: '6px 16px',
+              border: 'none', borderRadius: 6, color: 'var(--bg)', padding: '6px 16px',
               fontSize: 12, fontWeight: 600, cursor: loading ? 'default' : 'pointer',
             }}>
             {loading ? '⟳ Generuji…' : '⚡ Generovat'}
@@ -144,7 +144,7 @@ export default function SkillGenerator() {
               )}
               <button onClick={save} disabled={saved} style={{
                 background: saved ? 'rgba(16,185,129,.15)' : 'var(--green)',
-                border: 'none', borderRadius: 6, color: '#000', padding: '5px 14px',
+                border: 'none', borderRadius: 6, color: 'var(--bg)', padding: '5px 14px',
                 fontSize: 11, fontWeight: 600, cursor: saved ? 'default' : 'pointer',
               }}>
                 {saved ? '✓ Uloženo' : '💾 Uložit plugin'}

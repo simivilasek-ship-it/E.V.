@@ -45,9 +45,9 @@ function Stars({ rating, size = 12 }: { rating: number; size?: number }) {
 
 function TagBadge({ tag }: { tag: string }) {
   const colors: Record<string, string> = {
-    builtin: '#1e3a5f', mcp: '#1e4a3f', math: '#3a2a1e',
-    search: '#2a1e4a', system: '#2a2a2a', demo: '#3a3a1e',
-    productivity: '#1e3a2a', files: '#1e2a3a', conversation: '#2a1e3a',
+    builtin: 'rgba(99,102,241,.12)', mcp: 'rgba(0,229,160,.1)', math: 'rgba(245,158,11,.1)',
+    search: 'rgba(139,92,246,.1)', system: 'var(--bg-elevated)', demo: 'rgba(245,158,11,.08)',
+    productivity: 'rgba(0,229,160,.08)', files: 'rgba(99,102,241,.08)', conversation: 'rgba(139,92,246,.08)',
   }
   return (
     <span style={{
@@ -176,7 +176,7 @@ export default function PluginMarketplace() {
 
   const btn = (color: string, disabled = false): React.CSSProperties => ({
     padding: '5px 12px', fontSize: 10, borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer',
-    border: `1px solid ${color}44`, background: `${color}18`, color: disabled ? '#4a6a8a' : color,
+    border: `1px solid ${color}44`, background: `${color}18`, color: disabled ? 'var(--muted)' : color,
     letterSpacing: '0.1em', opacity: disabled ? 0.6 : 1, ...mono,
   })
 
@@ -213,12 +213,12 @@ export default function PluginMarketplace() {
         {/* Seznam pluginů */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {loading && (
-            <div style={{ color: '#4a6a8a', fontSize: 11, padding: 20, textAlign: 'center' }}>
+            <div style={{ color: 'var(--muted)', fontSize: 11, padding: 20, textAlign: 'center' }}>
               Načítám katalog…
             </div>
           )}
           {!loading && visible.length === 0 && (
-            <div style={{ color: '#4a6a8a', fontSize: 11, padding: 20, textAlign: 'center' }}>
+            <div style={{ color: 'var(--muted)', fontSize: 11, padding: 20, textAlign: 'center' }}>
               Žádné pluginy nenalezeny.
             </div>
           )}
@@ -237,14 +237,14 @@ export default function PluginMarketplace() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>{p.name}</span>
                 <span style={{ fontSize: 9, color: 'var(--muted)' }}>v{p.version}</span>
-                {p.installed && <span style={{ fontSize: 9, color: '#00e5a0' }}>✓ nainstalován</span>}
+                {p.installed && <span style={{ fontSize: 9, color: 'var(--green)' }}>✓ nainstalován</span>}
                 {p.has_update && (
-                  <span style={{ fontSize: 9, color: '#ffb300' }}>⬆ {p.new_version}</span>
+                  <span style={{ fontSize: 9, color: 'var(--amber)' }}>⬆ {p.new_version}</span>
                 )}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 6 }}>{p.description}</div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ color: '#f59e0b', fontSize: 11 }}>
+                <span style={{ color: 'var(--amber)', fontSize: 11 }}>
                   <Stars rating={p.rating} />
                 </span>
                 <span style={{ fontSize: 9, color: 'var(--muted)' }}>{p.rating} ({p.reviews})</span>
@@ -278,28 +278,28 @@ export default function PluginMarketplace() {
               {!selected.installed && (
                 <button onClick={() => action('install', selected.id)}
                   disabled={actionBusy === selected.id + 'install'}
-                  style={btn('#00e5a0', actionBusy === selected.id + 'install')}>
+                  style={btn('var(--green)', actionBusy === selected.id + 'install')}>
                   {actionBusy === selected.id + 'install' ? '…' : '↓ Instalovat'}
                 </button>
               )}
               {selected.installed && (
                 <button onClick={() => action('uninstall', selected.id)}
                   disabled={!!actionBusy}
-                  style={btn('#ef4444', !!actionBusy)}>
+                  style={btn('var(--red)', !!actionBusy)}>
                   Odinstalovat
                 </button>
               )}
               {selected.has_update && (
                 <button onClick={() => action('update', selected.id)}
                   disabled={!!actionBusy}
-                  style={btn('#ffb300', !!actionBusy)}>
+                  style={btn('var(--amber)', !!actionBusy)}>
                   ⬆ Aktualizovat na {selected.new_version}
                 </button>
               )}
             </div>
 
             {actionMsg && (
-              <div style={{ marginTop: 8, fontSize: 10, color: '#00e5a0', lineHeight: 1.5 }}>
+              <div style={{ marginTop: 8, fontSize: 10, color: 'var(--green)', lineHeight: 1.5 }}>
                 {actionMsg}
               </div>
             )}
@@ -308,7 +308,7 @@ export default function PluginMarketplace() {
           {/* Hodnocení */}
           <div style={{ ...panel, padding: 14 }}>
             <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--muted)', marginBottom: 10 }}>
-              HODNOCENÍ · <span style={{ color: '#f59e0b' }}><Stars rating={reviewAvg} /></span> {reviewAvg} ({reviews.length})
+              HODNOCENÍ · <span style={{ color: 'var(--amber)' }}><Stars rating={reviewAvg} /></span> {reviewAvg} ({reviews.length})
             </div>
 
             {/* Přidat hodnocení */}
@@ -333,7 +333,7 @@ export default function PluginMarketplace() {
                 }}
               />
               <button onClick={submitReview} disabled={actionBusy === 'review'}
-                style={btn('#6366f1', actionBusy === 'review')}>
+                style={btn('var(--accent)', actionBusy === 'review')}>
                 Odeslat hodnocení
               </button>
             </div>
@@ -348,7 +348,7 @@ export default function PluginMarketplace() {
                   padding: '6px 8px', background: 'var(--bg-elevated)',
                   borderRadius: 4, border: '1px solid var(--border-hud)',
                 }}>
-                  <div style={{ color: '#f59e0b', fontSize: 11, marginBottom: 2 }}>
+                  <div style={{ color: 'var(--amber)', fontSize: 11, marginBottom: 2 }}>
                     <Stars rating={r.rating} size={10} /> {r.rating}★
                   </div>
                   {r.comment && (
@@ -365,7 +365,7 @@ export default function PluginMarketplace() {
       ) : (
         <div style={{
           width: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#2a4060', fontSize: 11, ...mono, textAlign: 'center',
+          color: 'var(--border-hud)', fontSize: 11, ...mono, textAlign: 'center',
         }}>
           Vyber plugin pro detail,<br />instalaci nebo hodnocení.
         </div>

@@ -5,7 +5,7 @@ interface Metrics { cpu: number; ram: number; disk: number; cpu_temp: number | n
 
 function MiniBar({ label, value, color }: { label: string; value: number; color: string }) {
   const pct = Math.min(100, Math.max(0, value))
-  const warn = pct > 90 ? '#f43f5e' : pct > 75 ? '#f59e0b' : color
+  const warn = pct > 90 ? 'var(--red)' : pct > 75 ? 'var(--amber)' : color
   return (
     <div className="flex items-center gap-2">
       <span className="font-mono text-[10px] w-10 shrink-0" style={{ color: 'var(--muted)' }}>{label}</span>

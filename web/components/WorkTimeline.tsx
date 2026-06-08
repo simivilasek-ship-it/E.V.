@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react'
 import { apiUrl } from '@/lib/api'
 
 const TYPE_COLORS: Record<string, string> = {
-  'git.commit': '#10b981', 'git.push': '#3b82f6',
-  'app.open': '#8b5cf6', 'build.fail': '#ef4444',
-  'command.done': '#10b981', 'release.create': '#22d3a5',
+  'git.commit': 'var(--green)', 'git.push': 'var(--blue)',
+  'app.open': 'var(--purple)', 'build.fail': 'var(--red)',
+  'command.done': 'var(--green)', 'release.create': 'var(--green)',
 }
 
 interface ActivityEvent {

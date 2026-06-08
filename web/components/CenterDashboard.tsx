@@ -65,8 +65,8 @@ function AgentStatus() {
   const display = list.length > 0 ? list : fallback
 
   const dot = (s: string) => {
-    if (s === 'running') return '#22d3a5'
-    if (s === 'error')   return '#f43f5e'
+    if (s === 'running') return 'var(--green)'
+    if (s === 'error')   return 'var(--red)'
     return 'var(--muted)'
   }
 
@@ -180,7 +180,7 @@ function OpenWindows() {
           border: '1px solid rgba(255,255,255,.05)',
           borderRadius: 8,
         }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#a855f7', flexShrink: 0 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--purple)', flexShrink: 0 }}>
             {w.app || '□'}
           </span>
           <span style={{

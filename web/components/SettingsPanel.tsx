@@ -677,7 +677,7 @@ export default function SettingsPanel() {
               Checks: {health.checks_ok}/{health.checks_total} · MCP: {health.mcp.ready_total}/{health.mcp.enabled_total} ready
             </div>
             {health.mcp.ready_total < health.mcp.enabled_total && (
-              <div className="text-[10px] px-2 py-1.5 rounded" style={{ background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', color: '#fbbf24' }}>
+              <div className="text-[10px] px-2 py-1.5 rounded" style={{ background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', color: 'var(--amber)' }}>
                 ⚠ {health.mcp.enabled_total - health.mcp.ready_total} MCP server(y) nejsou připraveny — zkontroluj chybějící balíčky v sekci MCP Servery
               </div>
             )}
@@ -730,8 +730,8 @@ export default function SettingsPanel() {
             className="self-start px-3 py-1.5 text-sm rounded-lg font-mono transition-all duration-150"
             style={{
               background: generatingToken ? 'rgba(59,130,246,.06)' : 'rgba(59,130,246,.12)',
-              border: '1px solid #3b82f6',
-              color: '#3b82f6',
+              border: '1px solid var(--blue)',
+              color: 'var(--blue)',
               opacity: generatingToken ? 0.6 : 1,
               cursor: generatingToken ? 'not-allowed' : 'pointer',
             }}

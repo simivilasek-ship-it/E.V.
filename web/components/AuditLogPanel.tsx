@@ -95,7 +95,7 @@ export default function AuditLogPanel() {
             <div
               key={`${e.timestamp}-${e.action}-${i}`}
               className="px-3 py-2 border-b"
-              style={{ borderColor: 'var(--border)', color: e.allowed ? 'var(--text)' : '#f87171' }}
+              style={{ borderColor: 'var(--border)', color: e.allowed ? 'var(--text)' : 'var(--red)' }}
             >
               <div className="flex justify-between gap-2">
                 <span style={{ color: 'var(--cyan)' }}>{e.action}</span>

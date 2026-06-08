@@ -298,6 +298,25 @@ Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · CLI: **`jarvis log
 
 ---
 
+
+## Web UI — Design System
+
+All 32 panels use a single unified design system (`web/app/globals.css`):
+
+| Token | Value | Used for |
+|-------|-------|----------|
+| `--bg-hud` | `#0b1220` | Panel backgrounds (dark) |
+| `--accent` | `#6366f1` | Buttons, active states |
+| `--cyan` | `#38bdf8` | CPU metrics, code |
+| `--green` | `#34d399` | Success, RAM |
+| `--purple` | `#a78bfa` | Agent, disk |
+| `--amber` | `#fbbf24` | Warnings |
+| `--red` | `#f87171` | Errors |
+
+CSS classes: `.panel`, `.card`, `.glass-panel`, `.btn-primary`, `.btn-ghost`, `.btn-hud`, `.metric-badge`, `.font-hud`, `.skeleton`
+
+Light theme (`data-theme="light"`) works across **all** panels.
+
 ## Security
 
 - API listens on **`127.0.0.1` by default** — override with `JARVIS_BIND_HOST` only if you need LAN access

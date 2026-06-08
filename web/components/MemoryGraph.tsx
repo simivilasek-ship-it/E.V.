@@ -4,16 +4,16 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { apiUrl } from '@/lib/api'
 
 const GROUP_COLORS: Record<string, string> = {
-  memory:         '#00d4ff',
-  conversation:   '#8b5cf6',
-  daily_summary:  '#10b981',
-  user:           '#f59e0b',
-  fact:           '#ef4444',
-  task:           '#3b82f6',
+  memory:         'var(--cyan)',
+  conversation:   'var(--purple)',
+  daily_summary:  'var(--green)',
+  user:           'var(--amber)',
+  fact:           'var(--red)',
+  task:           'var(--accent)',
 }
 
 function color(group: string): string {
-  return GROUP_COLORS[group] || '#4a6a8a'
+  return GROUP_COLORS[group] || 'var(--muted)'
 }
 
 interface MemoryNode {
@@ -162,7 +162,7 @@ export default function MemoryGraph() {
       {/* Legenda */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
         {Object.entries(GROUP_COLORS).map(([g, c]) => (
-          <span key={g} style={{ fontSize: 10, color: '#475569', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span key={g} style={{ fontSize: 10, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, display: 'inline-block' }} />
             {g}
           </span>
@@ -188,7 +188,7 @@ export default function MemoryGraph() {
               return (
                 <line key={i}
                   x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                  stroke="#1a3050" strokeWidth={1} strokeOpacity={0.7}
+                  stroke="var(--border-hud)" strokeWidth={1} strokeOpacity={0.7}
                 />
               )
             })}
@@ -214,7 +214,7 @@ export default function MemoryGraph() {
                     style={{ filter: `drop-shadow(0 0 ${sel ? 10 : 4}px ${col})` }}
                   />
                   <text x={p.x} y={p.y + r + 11}
-                    textAnchor="middle" fontSize={8} fill="#7ea8d4"
+                    textAnchor="middle" fontSize={8} fill="var(--text2)"
                     style={{ pointerEvents: 'none', userSelect: 'none' }}>
                     {n.label.slice(0, 22)}{n.label.length > 22 ? '…' : ''}
                   </text>
@@ -227,18 +227,18 @@ export default function MemoryGraph() {
 
       {/* Detail vybraného uzlu */}
       {selected && (
-        <div style={{ marginTop: 10, background: '#0b1220', border: `1px solid ${color(selected.group)}44`,
+        <div style={{ marginTop: 10, background: 'var(--bg-hud)', border: `1px solid ${color(selected.group)}44`,
           borderRadius: 8, padding: '12px 14px' }}>
           <div style={{ color: color(selected.group), fontSize: 10, letterSpacing: '.1em', marginBottom: 6 }}>
             DETAIL VZPOMÍNKY
           </div>
-          <div style={{ fontSize: 12, color: '#e2f0ff', marginBottom: 6 }}>{selected.label}</div>
-          <div style={{ display: 'flex', gap: 16, fontSize: 10, color: '#475569' }}>
-            <span>důležitost: <span style={{ color: '#00d4ff' }}>{selected.importance}</span></span>
+          <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: 6 }}>{selected.label}</div>
+          <div style={{ display: 'flex', gap: 16, fontSize: 10, color: 'var(--muted)' }}>
+            <span>důležitost: <span style={{ color: 'var(--cyan)' }}>{selected.importance}</span></span>
             <span>skupina: <span style={{ color: color(selected.group) }}>{selected.group}</span></span>
             {selected.tags && selected.tags.length > 0 && (
               <span>tagy: {selected.tags.map(t => (
-                <span key={t} style={{ background: '#1a3050', borderRadius: 3, padding: '1px 5px', marginLeft: 4 }}>{t}</span>
+                <span key={t} style={{ background: 'var(--border-hud)', borderRadius: 3, padding: '1px 5px', marginLeft: 4 }}>{t}</span>
               ))}</span>
             )}
           </div>
