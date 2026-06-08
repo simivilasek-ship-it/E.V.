@@ -29,11 +29,29 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # ── DB path ──────────────────────────────────────────────────────────────────
-_DB_PATH = Path(__file__).parent / "memory_data" / "missions.db"
+_DB_PATH: Optional[Path] = None
 
 # ── Singleton ─────────────────────────────────────────────────────────────────
 _instance: Optional["MissionManager"] = None
 _instance_lock = threading.Lock()
+
+
+def get_db_path() -> Path:
+    if _DB_PATH is not None:
+        return _DB_PATH
+    return Path(__file__).parent / "memory_data" / "missions.db"
+
+
+def set_db_path(path: Path) -> None:
+    """Test / custom DB path override."""
+    global _DB_PATH, _instance
+    _DB_PATH = path
+    _instance = None
+
+
+def reset_mission_manager() -> None:
+    global _instance
+    _instance = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -41,14 +59,15 @@ _instance_lock = threading.Lock()
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _get_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
+    db = get_db_path()
+    conn = sqlite3.connect(str(db), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def _init_db() -> None:
     """Vytvoří tabulky a indexy pokud neexistují."""
-    _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    get_db_path().parent.mkdir(parents=True, exist_ok=True)
     with _get_conn() as conn:
         conn.executescript("""
         CREATE TABLE IF NOT EXISTS missions (
@@ -89,13 +108,58 @@ def _init_db() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_events_mission ON mission_events(mission_id);
         """)
-        try:
-            conn.execute(
-                "ALTER TABLE missions ADD COLUMN agent_mode TEXT NOT NULL DEFAULT 'single'"
-            )
-        except sqlite3.OperationalError:
-            pass
+        for ddl in (
+            "ALTER TABLE missions ADD COLUMN agent_mode TEXT NOT NULL DEFAULT 'single'",
+            "ALTER TABLE missions ADD COLUMN mission_type TEXT NOT NULL DEFAULT 'autonomous'",
+        ):
+            try:
+                conn.execute(ddl)
+            except sqlite3.OperationalError:
+                pass
         conn.commit()
+    _migrate_json_checklists()
+
+
+def _migrate_json_checklists() -> None:
+    """Jednorázová migrace ~/.jarvis/missions.json → SQLite."""
+    json_path = Path.home() / ".jarvis" / "missions.json"
+    if not json_path.exists():
+        return
+    try:
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+        missions = data.get("missions") or []
+        if not missions:
+            json_path.rename(json_path.with_suffix(".json.migrated"))
+            return
+        with _get_conn() as conn:
+            for m in missions:
+                mid = m.get("id") or str(uuid.uuid4())[:12]
+                exists = conn.execute(
+                    "SELECT 1 FROM missions WHERE id=?", (mid,)
+                ).fetchone()
+                if exists:
+                    continue
+                now = _now()
+                conn.execute(
+                    "INSERT INTO missions (id, title, description, deadline, status, "
+                    "agent_mode, mission_type, created_at, updated_at) "
+                    "VALUES (?, ?, '', NULL, ?, 'single', 'checklist', ?, ?)",
+                    (mid, m.get("title", "Checklist"), m.get("status", "active"), now, now),
+                )
+                for i, item in enumerate(m.get("items") or []):
+                    sid = item.get("id") or f"{mid}-i{i+1}"
+                    done = item.get("done", False)
+                    conn.execute(
+                        "INSERT INTO mission_steps "
+                        "(id, mission_id, description, due_date, status, attempts, created_at, updated_at) "
+                        "VALUES (?, ?, ?, NULL, ?, 0, ?, ?)",
+                        (sid, mid, item.get("label", ""), "done" if done else "pending", now, now),
+                    )
+            conn.commit()
+        json_path.rename(json_path.with_suffix(".json.migrated"))
+        logger.info("Checklisty z missions.json migrovány do SQLite")
+    except Exception as e:
+        logger.warning(f"Migrace missions.json selhala: {e}")
 
 
 def _now() -> str:
@@ -190,8 +254,9 @@ class MissionPlanner:
 
         with _get_conn() as conn:
             conn.execute(
-                "INSERT INTO missions (id, title, description, deadline, status, agent_mode, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, 'active', ?, ?, ?)",
+                "INSERT INTO missions (id, title, description, deadline, status, agent_mode, "
+                "mission_type, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, 'active', ?, 'autonomous', ?, ?)",
                 (mission_id, title, description, deadline, mode, now, now),
             )
             step_rows = []
@@ -303,6 +368,7 @@ class MissionExecutor:
             JOIN missions m ON m.id = s.mission_id
             WHERE s.status = 'pending'
               AND m.status = 'active'
+              AND (m.mission_type IS NULL OR m.mission_type = 'autonomous')
               AND (s.due_date IS NULL OR s.due_date <= ?)
             ORDER BY s.due_date ASC
             LIMIT 20
@@ -580,7 +646,8 @@ class MissionManager:
         try:
             with _get_conn() as conn:
                 missions = conn.execute(
-                    "SELECT * FROM missions ORDER BY created_at DESC"
+                    "SELECT * FROM missions WHERE mission_type IS NULL OR mission_type = 'autonomous' "
+                    "ORDER BY created_at DESC"
                 ).fetchall()
                 result = []
                 for m in missions:
@@ -678,6 +745,199 @@ class MissionManager:
         except Exception as e:
             logger.error(f"get_events selhal: {e}")
             return []
+
+    # ── Release Checklist (mission_type='checklist') ─────────────────────
+
+    @staticmethod
+    def _enrich_checklist(mission: Dict[str, Any], steps: List[Dict[str, Any]]) -> Dict[str, Any]:
+        items = []
+        for i, s in enumerate(steps):
+            sid = s["id"]
+            short_id = sid.rsplit("-i", 1)[-1] if "-i" in sid else str(i + 1)
+            items.append({
+                "id": short_id,
+                "label": s["description"],
+                "done": s.get("status") == "done",
+            })
+        done = sum(1 for it in items if it["done"])
+        total = len(items)
+        created = mission.get("created_at", "")
+        try:
+            ts = datetime.fromisoformat(created).timestamp()
+        except Exception:
+            ts = 0.0
+        return {
+            "id": mission["id"],
+            "title": mission["title"],
+            "status": mission.get("status", "active"),
+            "created_at": ts,
+            "items": items,
+            "progress": round(done / total * 100) if total else 0,
+            "done_count": done,
+            "total_count": total,
+        }
+
+    def list_checklists(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        try:
+            with _get_conn() as conn:
+                q = "SELECT * FROM missions WHERE mission_type='checklist'"
+                params: tuple = ()
+                if status:
+                    q += " AND status=?"
+                    params = (status,)
+                q += " ORDER BY created_at DESC"
+                rows = conn.execute(q, params).fetchall()
+                out = []
+                for m in rows:
+                    steps = conn.execute(
+                        "SELECT id, description, status FROM mission_steps "
+                        "WHERE mission_id=? ORDER BY created_at",
+                        (m["id"],),
+                    ).fetchall()
+                    out.append(self._enrich_checklist(dict(m), [dict(s) for s in steps]))
+                return out
+        except Exception as e:
+            logger.error(f"list_checklists selhal: {e}")
+            return []
+
+    def create_checklist(self, title: str,
+                         items: Optional[List[str]] = None) -> Dict[str, Any]:
+        mission_id = f"mission-{uuid.uuid4().hex[:8]}"
+        now = _now()
+        step_rows: List[Dict[str, Any]] = []
+        with _get_conn() as conn:
+            conn.execute(
+                "INSERT INTO missions (id, title, description, status, agent_mode, "
+                "mission_type, created_at, updated_at) "
+                "VALUES (?, ?, '', 'active', 'single', 'checklist', ?, ?)",
+                (mission_id, title, now, now),
+            )
+            for i, label in enumerate(items or []):
+                sid = f"{mission_id}-i{i + 1}"
+                conn.execute(
+                    "INSERT INTO mission_steps "
+                    "(id, mission_id, description, status, attempts, created_at, updated_at) "
+                    "VALUES (?, ?, ?, 'pending', 0, ?, ?)",
+                    (sid, mission_id, label, now, now),
+                )
+                step_rows.append({"id": sid, "description": label, "status": "pending"})
+            conn.commit()
+        try:
+            from activity_store import get_activity_store
+            get_activity_store().record(
+                "mission.update", title=f"Nová mise: {title}",
+                source="missions", meta={"mission_id": mission_id},
+            )
+        except Exception:
+            pass
+        return self._enrich_checklist(
+            {"id": mission_id, "title": title, "status": "active", "created_at": now},
+            step_rows,
+        )
+
+    def toggle_checklist_item(self, mission_id: str,
+                              item_id: str) -> Optional[Dict[str, Any]]:
+        try:
+            with _get_conn() as conn:
+                m = conn.execute(
+                    "SELECT * FROM missions WHERE id=? AND mission_type='checklist'",
+                    (mission_id,),
+                ).fetchone()
+                if not m:
+                    return None
+                step = conn.execute(
+                    "SELECT * FROM mission_steps WHERE mission_id=? AND "
+                    "(id=? OR id=? OR id LIKE ?)",
+                    (mission_id, item_id, f"{mission_id}-i{item_id}",
+                     f"{mission_id}-i{item_id}"),
+                ).fetchone()
+                if not step:
+                    return None
+                new_status = "pending" if step["status"] == "done" else "done"
+                now = _now()
+                conn.execute(
+                    "UPDATE mission_steps SET status=?, updated_at=? WHERE id=?",
+                    (new_status, now, step["id"]),
+                )
+                all_steps = conn.execute(
+                    "SELECT status FROM mission_steps WHERE mission_id=?",
+                    (mission_id,),
+                ).fetchall()
+                if all_steps and all(s["status"] == "done" for s in all_steps):
+                    conn.execute(
+                        "UPDATE missions SET status='completed', updated_at=? WHERE id=?",
+                        (now, mission_id),
+                    )
+                conn.commit()
+                steps = conn.execute(
+                    "SELECT id, description, status FROM mission_steps WHERE mission_id=?",
+                    (mission_id,),
+                ).fetchall()
+                enriched = self._enrich_checklist(dict(m), [dict(s) for s in steps])
+                try:
+                    from activity_store import get_activity_store
+                    get_activity_store().record(
+                        "mission.update",
+                        title=f"{step['description']}: "
+                              f"{'✓' if new_status == 'done' else '○'}",
+                        source="missions",
+                        meta={"mission_id": mission_id, "item_id": item_id},
+                    )
+                    if enriched["progress"] == 100:
+                        get_activity_store().record(
+                            "mission.complete", title=m["title"],
+                            source="missions", meta={"mission_id": mission_id},
+                        )
+                except Exception:
+                    pass
+                return enriched
+        except Exception as e:
+            logger.error(f"toggle_checklist_item selhal: {e}")
+            return None
+
+    def add_checklist_item(self, mission_id: str, label: str) -> Optional[Dict[str, Any]]:
+        try:
+            with _get_conn() as conn:
+                m = conn.execute(
+                    "SELECT * FROM missions WHERE id=? AND mission_type='checklist'",
+                    (mission_id,),
+                ).fetchone()
+                if not m:
+                    return None
+                count = conn.execute(
+                    "SELECT COUNT(*) AS c FROM mission_steps WHERE mission_id=?",
+                    (mission_id,),
+                ).fetchone()["c"]
+                sid = f"{mission_id}-i{count + 1}"
+                now = _now()
+                conn.execute(
+                    "INSERT INTO mission_steps "
+                    "(id, mission_id, description, status, attempts, created_at, updated_at) "
+                    "VALUES (?, ?, ?, 'pending', 0, ?, ?)",
+                    (sid, mission_id, label, now, now),
+                )
+                conn.commit()
+                steps = conn.execute(
+                    "SELECT id, description, status FROM mission_steps WHERE mission_id=?",
+                    (mission_id,),
+                ).fetchall()
+                return self._enrich_checklist(dict(m), [dict(s) for s in steps])
+        except Exception as e:
+            logger.error(f"add_checklist_item selhal: {e}")
+            return None
+
+    def delete_checklist(self, mission_id: str) -> bool:
+        try:
+            with _get_conn() as conn:
+                cur = conn.execute(
+                    "DELETE FROM missions WHERE id=? AND mission_type='checklist'",
+                    (mission_id,),
+                )
+                conn.commit()
+                return cur.rowcount > 0
+        except Exception as e:
+            logger.error(f"delete_checklist selhal: {e}")
+            return False
 
 
 # ─────────────────────────────────────────────────────────────────────────────

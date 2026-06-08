@@ -37,16 +37,20 @@ class TestActivityStore:
 
 
 class TestMissionStore:
-    def test_create_and_toggle(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("missions.Path.home", lambda: tmp_path)
+    def test_create_and_toggle_sqlite(self, tmp_path):
+        from mission_manager import reset_mission_manager, set_db_path
         from missions import MissionStore
-        ms = MissionStore(path=tmp_path / "missions.json")
+
+        set_db_path(tmp_path / "missions.db")
+        reset_mission_manager()
+        ms = MissionStore()
         m = ms.create("Test Release", ["Item A", "Item B"])
         assert m["total_count"] == 2
         assert m["progress"] == 0
         updated = ms.toggle_item(m["id"], "1")
         assert updated["done_count"] == 1
         assert updated["progress"] == 50
+        assert ms.delete_mission(m["id"]) is True
 
 
 class TestActivityBridge:

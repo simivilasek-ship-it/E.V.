@@ -56,7 +56,7 @@ just dev-hmr   # backend :8002 + Next dev :3000 v jednom skriptu
 | UI | API | Backend |
 |----|-----|---------|
 | **Agent mise** (Alt+M) | `/api/missions` | `mission_manager.py` — LLM plánuje a executor běží kroky |
-| **Release** (Alt+C) | `/api/missions/checklist` | `missions.py` — ruční checklist, toggle položek |
+| **Release** (Alt+C) | `/api/missions/checklist` | `mission_manager.py` (`mission_type='checklist'`) |
 
 ## Chat — Copilot · Agent · Akce
 

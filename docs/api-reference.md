@@ -1,4 +1,4 @@
-# API Reference — JARVIS v5.9
+# API Reference — JARVIS v5.10
 
 Backend běží na `http://localhost:8002`. Všechny endpointy vrací JSON pokud není uvedeno jinak.
 
@@ -15,7 +15,7 @@ Rychlý status check backendu.
 {
   "status": "ok",
   "uptime_s": 3621.4,
-  "version": "5.9.0",
+  "version": "5.10.0",
   "ws": "running",
   "ollama": "online",
   "model": "qwen2.5:3b"
@@ -409,9 +409,9 @@ Smaže misi a všechny její kroky.
 
 ---
 
-## Release Checklist (`missions.py`)
+## Release Checklist (`mission_type='checklist'`)
 
-Oddělený systém od **Mission Manager** — ruční checklisty v UI (záložka **Release**, Alt+C), ne LLM-plánované mise.
+Ruční checklisty v UI (záložka **Release**, Alt+C). Ukládány ve **stejné SQLite DB** jako autonomní mise (`memory_data/missions.db`), rozlišení přes `mission_type`. API shim: `missions.py` → `mission_manager.py`.
 
 ### `GET /api/missions/checklist`
 

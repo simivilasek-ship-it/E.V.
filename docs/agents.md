@@ -296,6 +296,8 @@ JARVIS má **dva oddělené systémy** — neslučují se do jedné databáze:
 | Systém | Modul | API | UI | Účel |
 |--------|-------|-----|-----|------|
 | **Autonomní mise** | `mission_manager.py` | `/api/missions` | Agent mise (Alt+M) | LLM plánuje kroky, executor je běží v čase |
-| **Release Checklist** | `missions.py` | `/api/missions/checklist` | Release (Alt+C) | Ruční checklist, člověk toggleuje položky |
+| **Release Checklist** | `missions.py` (shim) → `mission_manager.py` | `/api/missions/checklist` | Release (Alt+C) | Ruční checklist, člověk toggleuje položky |
+
+Oba typy misí sdílí **jednu SQLite DB** (`memory_data/missions.db`), rozlišené sloupcem `mission_type` (`autonomous` | `checklist`). Starý `~/.jarvis/missions.json` se migruje automaticky při startu.
 
 Checklist události se zapisují do Work Timeline (`activity_store`).

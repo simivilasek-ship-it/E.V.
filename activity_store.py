@@ -289,8 +289,15 @@ class ActivityStore:
 _store: Optional[ActivityStore] = None
 
 
+def reset_activity_store() -> None:
+    global _store
+    _store = None
+
+
 def get_activity_store() -> ActivityStore:
     global _store
     if _store is None:
-        _store = ActivityStore()
+        import os
+        env = os.environ.get("JARVIS_ACTIVITY_DB")
+        _store = ActivityStore(db_path=Path(env) if env else None)
     return _store

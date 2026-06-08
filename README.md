@@ -11,7 +11,7 @@
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.9-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.10-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![Linux-first](https://img.shields.io/badge/Linux--first-22c55e?style=flat-square&logo=linux&logoColor=white)](#linux-out-of-the-box)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
@@ -121,7 +121,8 @@ JARVIS: Opening Chrome...                      ✓  0.3s
 - **Agent Activity Feed** — live feed via `/ws/activity` (*18:31 Reading repository → 18:32 Running tests*)
 - **Next.js UI** — jeden frontend v `web/` (Next.js 16); záložky **Dnes**, **Feed**, **Release**, **Agent mise**; Alt+W/F/C/M
 - **Background workers** — email, git, Slack, GitHub, calendar — need `.env` tokens
-- **Long-horizon missions** — autonomní mise (`mission_manager`) + ruční release checklisty (`missions.py`)
+- **Long-horizon missions** — autonomní mise + release checklisty v jedné SQLite DB (`mission_manager`)
+- **E2E API tests in CI** — `pytest -m integration` (activity, missions, agent timeline)
 - **Install UX** — snap/flatpak progress in chat, cancel, structured errors
 - **Onboarding wizard** — first run checks Ollama, snap, microphone
 - **100% local option** — Ollama + on-device Whisper; no cloud API key required

@@ -48,14 +48,24 @@ jobs:
           Xvfb :99 -screen 0 1024x768x24 &
           sleep 1
 
-      - name: Run tests
+      - name: Run unit tests
         run: |
           python -m pytest tests/ test_jarvis.py -q --timeout=30 \
+            -m "not integration" \
             --cov=. --cov-report=xml --cov-report=term-missing \
             --cov-fail-under=70 \
             --cov-omit="test_*,setup.py,web/*,gui_legacy/*,scripts/split_dashboard.py"
         env:
           DISPLAY: ":99"
+
+      - name: Run E2E / integration API tests
+        run: |
+          python -m pytest tests/ -m integration -q --timeout=60 -v
+        env:
+          DISPLAY: ":99"
+          JARVIS_TEST_MODE: "1"
+          JARVIS_ACTIVITY_DB: /tmp/jarvis-test-activity.db
+          JARVIS_MISSIONS_DB: /tmp/jarvis-test-missions.db
 
       - name: Upload coverage
         if: always()

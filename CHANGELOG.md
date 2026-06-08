@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [5.10.0] - 2026-06-08
+
+### Added
+- **E2E API testy** — `tests/test_e2e_api.py`, `api_client` fixture v `conftest.py`
+- CI krok `Run E2E / integration API tests` (`pytest -m integration`)
+- **Windows ActivityCollector** — `source/repos`, OneDrive, Documents, foreground process fallback
+- `tests/test_collector_windows.py` — unit testy Windows paths a project inference
+
+### Changed
+- **Unified Mission DB** — checklisty (`missions.py`) migrovány do SQLite `missions.db` (`mission_type='checklist'`)
+- `missions.py` je tenký shim nad `mission_manager.py`
+- Autonomní mise (`/api/missions`) a checklisty (`/api/missions/checklist`) sdílí jednu DB, oddělené `mission_type`
+- `activity_store.reset_activity_store()` + env `JARVIS_ACTIVITY_DB` pro izolované testy
+
+---
+
 ## [5.9.0] - 2026-06-08
 
 ### Changed — sjednocení projektu

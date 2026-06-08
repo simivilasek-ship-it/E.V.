@@ -173,12 +173,55 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "e2e: end-to-end tests with minimal mocks")
 
 
+@pytest.fixture
+def api_client(tmp_path, monkeypatch):
+    """FastAPI TestClient pro integrační / E2E API testy."""
+    monkeypatch.setenv("JARVIS_TEST_MODE", "1")
+    monkeypatch.setenv("JARVIS_ACTIVITY_DB", str(tmp_path / "activity.db"))
+    monkeypatch.setenv("JARVIS_MISSIONS_DB", str(tmp_path / "missions.db"))
+
+    import activity_store
+    activity_store.reset_activity_store()
+
+    from mission_manager import reset_mission_manager, set_db_path
+    set_db_path(tmp_path / "missions.db")
+    reset_mission_manager()
+    try:
+        from missions import reset_mission_store
+        reset_mission_store()
+    except Exception:
+        pass
+
+    try:
+        from fastapi.testclient import TestClient
+        from src.api.app import app
+    except Exception as e:
+        pytest.skip(f"FastAPI app unavailable: {e}")
+
+    try:
+        cm = TestClient(app, lifespan="off")
+    except TypeError:
+        cm = TestClient(app, raise_server_exceptions=False)
+    with cm as client:
+        yield client
+
+
 # Autouse fixtures
 @pytest.fixture(autouse=True)
 def reset_modules():
     """Reset singleton state between tests to prevent test interference."""
     yield
     import importlib, sys
+    try:
+        import activity_store as _as
+        _as.reset_activity_store()
+    except Exception:
+        pass
+    try:
+        from mission_manager import reset_mission_manager
+        reset_mission_manager()
+    except Exception:
+        pass
     # Reset agent singletons
     for mod_name in ("agent_react", "agent_graph"):
         mod = sys.modules.get(mod_name)

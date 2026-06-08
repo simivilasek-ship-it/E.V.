@@ -9,6 +9,7 @@ import logging
 import os
 import platform
 import re
+import shutil
 import subprocess
 import threading
 import time
@@ -100,11 +101,24 @@ class ActivityCollector:
         try:
             if system == "Windows":
                 import ctypes
-                hwnd = ctypes.windll.user32.GetForegroundWindow()
-                length = ctypes.windll.user32.GetWindowTextLengthW(hwnd) + 1
+                user32 = ctypes.windll.user32
+                hwnd = user32.GetForegroundWindow()
+                length = user32.GetWindowTextLengthW(hwnd) + 1
                 buf = ctypes.create_unicode_buffer(length)
-                ctypes.windll.user32.GetWindowTextW(hwnd, buf, length)
-                return buf.value[:120]
+                user32.GetWindowTextW(hwnd, buf, length)
+                title = buf.value[:120]
+                if title:
+                    return title
+                # Fallback: název procesu popředí
+                pid = ctypes.c_ulong()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                if pid.value:
+                    try:
+                        proc = psutil.Process(pid.value)
+                        return (proc.name() or "")[:120]
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+                return ""
             elif system == "Linux":
                 r = subprocess.run(
                     ["xdotool", "getactivewindow", "getwindowname"],
@@ -138,16 +152,23 @@ class ActivityCollector:
 
     def _infer_project(self, window: str) -> str:
         """Odhad projektu z titulku okna."""
+        ide_markers = ("Visual Studio Code", "Cursor", "Code")
+        if any(m in window for m in ide_markers):
+            # VS Code/Cursor: "file.py - project - Visual Studio Code"
+            parts = [p.strip() for p in re.split(r"\s+[\-—|]\s+", window) if p.strip()]
+            for part in reversed(parts):
+                if (part not in ide_markers and "Visual Studio" not in part
+                        and not part.endswith(".md") and not part.endswith(".py")
+                        and not part.endswith(".ts") and len(part) > 2):
+                    return part
         for part in re.split(r"[\-—|/\\]", window):
             part = part.strip()
             if part and len(part) > 2 and part not in (
                 "Visual Studio Code", "Cursor", "Chrome", "Google Chrome",
-                "Mozilla Firefox", "Docker Desktop",
+                "Mozilla Firefox", "Docker Desktop", "Windows Terminal",
             ):
-                # VS Code: "file.py - project - Visual Studio Code"
-                if "Visual Studio Code" in window or "Cursor" in window:
+                if any(m in window for m in ide_markers):
                     return part
-        # Git repo z cwd
         try:
             cwd = Path.cwd()
             if (cwd / ".git").exists():
@@ -184,19 +205,44 @@ class ActivityCollector:
 
     # ── Git ───────────────────────────────────────────
 
-    def _find_git_repos(self) -> List[Path]:
-        repos: List[Path] = []
-        candidates = [
+    def _git_repo_candidates(self) -> List[Path]:
+        """Základní adresáře pro hledání git repozitářů (Linux + Windows)."""
+        home = Path.home()
+        bases = [
             Path.cwd(),
-            Path.home() / "Projects",
-            Path.home() / "Developer",
-            Path.home() / "repos",
             Path(__file__).parent,
+            home / "Projects",
+            home / "Developer",
+            home / "repos",
+            home / "Documents",
+            home / "source" / "repos",
+            home / "Desktop",
         ]
+        if platform.system() == "Windows":
+            for env in ("USERPROFILE", "OneDrive", "OneDriveCommercial"):
+                val = os.environ.get(env)
+                if val:
+                    od = Path(val)
+                    bases.extend([od, od / "Documents", od / "source" / "repos"])
         seen: Set[str] = set()
-        for base in candidates:
-            if not base.exists():
+        out: List[Path] = []
+        for base in bases:
+            try:
+                key = str(base.resolve())
+            except Exception:
                 continue
+            if key in seen or not base.exists():
+                continue
+            seen.add(key)
+            out.append(base)
+        return out
+
+    def _find_git_repos(self) -> List[Path]:
+        if not shutil.which("git"):
+            return []
+        repos: List[Path] = []
+        seen: Set[str] = set()
+        for base in self._git_repo_candidates():
             if (base / ".git").exists():
                 key = str(base.resolve())
                 if key not in seen:
@@ -204,12 +250,14 @@ class ActivityCollector:
                     repos.append(base)
             try:
                 for child in base.iterdir():
-                    if child.is_dir() and (child / ".git").exists():
+                    if not child.is_dir():
+                        continue
+                    if (child / ".git").exists():
                         key = str(child.resolve())
                         if key not in seen:
                             seen.add(key)
                             repos.append(child)
-            except PermissionError:
+            except (PermissionError, OSError):
                 pass
         return repos[:20]
 

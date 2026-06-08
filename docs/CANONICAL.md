@@ -11,7 +11,7 @@ At runtime, **root-level modules are canonical**. The app is started from the re
 | Routing / chat | `routing.py`, `local_router.py` | — |
 | LLM | `llm.py`, `cloud_router.py`, `llm_router.py`, `prompt_tuner.py`, `router_dsl.py` | `src/llm/__init__.py` re-exports |
 | Memory | `memory.py`, `memory_graph.py`, `graph_extractor.py`, `cache_manager.py`, `user_profile.py` | `src/memory/__init__.py` re-exports |
-| Agents | `agent_*.py`, `agents.py`, `mission_manager.py`, `missions.py` | `src/agents/__init__.py` re-exports |
+| Agents / Missions | `agent_*.py`, `agents.py`, `mission_manager.py` (SQLite `missions.db`, `mission_type`) | `missions.py` = checklist shim |
 | Work Timeline | `activity_store.py`, `activity_collector.py`, `activity_bridge.py` | `src/api/routers/activity.py` |
 | Workers | `event_bus.py`, `scheduler.py`, `proactive.py`, `autonomous_workers.py`, `notification_engine.py`, `workflow_engine.py` | `src/workers/__init__.py` re-exports; `context_suggestions.py` is src-only |
 | Plugins | `mcp_bridge.py`, `plugin_system.py`, `mcp_hub.py`, `mcp_installer.py`, `plugin_marketplace.py` | — |

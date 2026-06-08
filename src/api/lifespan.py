@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from contextlib import asynccontextmanager
 
 from src.api.deps import HAS_FASTAPI, logger
@@ -60,6 +61,11 @@ async def lifespan(application):
         logger.info("Dashboard: install progress → /ws/logs")
     except Exception as e:
         logger.warning(f"Dashboard: install notify init failed: {e}")
+
+    if os.environ.get("JARVIS_TEST_MODE"):
+        logger.debug("JARVIS_TEST_MODE: přeskočena activity/runtime init")
+        yield
+        return
 
     # Work Timeline — ActivityCollector + ActivityBridge
     try:
