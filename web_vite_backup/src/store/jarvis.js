@@ -23,6 +23,9 @@ export const useJarvis = create((set, get) => ({
   system:      { cpu: 0, ram: 0, disk: 0, cpu_temp: null, net: null, gpu: null },
   agents:      [],
   plugins:     [],
+  activityFeed:         [],
+  proactiveSuggestions: [],
+  workSummary:          null,
   currentModel: 'qwen2.5:3b',
   isConnected: false,
   connStatus:  'disconnected', // disconnected | connecting | connected | error | failed
@@ -33,6 +36,7 @@ export const useJarvis = create((set, get) => ({
   _attempt:  0,
   _retryId:  null,
   _metricsWs: null,
+  _activityWs: null,
   _chatWs:      null,   // persistent chat WebSocket
   _chatRetryId: null,   // cancel handle pro reconnect timeout
 
@@ -101,8 +105,9 @@ export const useJarvis = create((set, get) => ({
       clearTimeout(timeout)
       set({ isConnected: true, connStatus: 'connected', _ws: ws, _attempt: 0, connError: null })
       get().addToast('WebSocket připojen', 'success', 2000)
-      // Spusť metriky WebSocket
       get().connectMetrics()
+      get().connectActivity()
+      get().fetchWorkSummary()
     }
 
     ws.onclose = (ev) => {
@@ -118,7 +123,14 @@ export const useJarvis = create((set, get) => ({
     }
 
     ws.onmessage = (e) => {
-      if (e.data === '{"type":"ping"}') return  // ignore keep-alive
+      if (e.data === '{"type":"ping"}') return
+      try {
+        const d = JSON.parse(e.data)
+        if (d.type === 'log') {
+          set(s => ({ logs: [...s.logs.slice(-300), { text: d.message, level: d.level, ts: d.ts || Date.now() }] }))
+          return
+        }
+      } catch {}
       set(s => ({ logs: [...s.logs.slice(-300), { text: e.data, ts: Date.now() }] }))
     }
 
@@ -137,16 +149,70 @@ export const useJarvis = create((set, get) => ({
   },
 
   disconnect() {
-    const { _ws, _retryId, _metricsWs } = get()
+    const { _ws, _retryId, _metricsWs, _activityWs } = get()
     if (_retryId) { clearTimeout(_retryId); set({ _retryId: null }) }
     _ws?.close(1000)
     _metricsWs?.close(1000)
-    set({ isConnected: false, connStatus: 'disconnected', _ws: null, _metricsWs: null, _attempt: 0 })
+    _activityWs?.close(1000)
+    set({ isConnected: false, connStatus: 'disconnected', _ws: null, _metricsWs: null, _activityWs: null, _attempt: 0 })
   },
 
   retry() {
     set({ _attempt: 0, connError: null })
     get().connect()
+  },
+
+  // ── /ws/activity — live activity feed ────────────────
+
+  connectActivity() {
+    const { _activityWs } = get()
+    if (_activityWs?.readyState === WebSocket.OPEN) return
+    let ws
+    try { ws = new WebSocket(`${WS_URL}/ws/activity`) } catch { return }
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data)
+        if (d.type === 'ping') return
+        if (d.type === 'proactive') {
+          set(s => ({
+            proactiveSuggestions: [...s.proactiveSuggestions.filter(x => x.id !== d.id), d].slice(-10),
+          }))
+          get().addToast(d.title, d.severity === 'error' ? 'error' : 'warning', 6000)
+        } else if (d.type === 'activity') {
+          set(s => ({
+            activityFeed: [...s.activityFeed, {
+              id: d.id || `${Date.now()}-${Math.random()}`,
+              message: d.message || d.title || '',
+              detail: d.detail || '',
+              level: d.level || 'info',
+              ts: d.ts || Date.now() / 1000,
+              time: d.time || new Date().toLocaleTimeString('cs', { hour: '2-digit', minute: '2-digit' }),
+            }].slice(-100),
+          }))
+        }
+      } catch {}
+    }
+    ws.onclose = () => {
+      set({ _activityWs: null })
+      if (get().isConnected) setTimeout(() => get().connectActivity(), 5000)
+    }
+    set({ _activityWs: ws })
+  },
+
+  dismissSuggestion(id) {
+    fetch(`${API}/api/proactive/dismiss`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }).catch(() => {})
+    set(s => ({ proactiveSuggestions: s.proactiveSuggestions.filter(x => x.id !== id) }))
+  },
+
+  async fetchWorkSummary() {
+    try {
+      const d = await fetch(`${API}/api/activity/today`).then(r => r.json())
+      set({ workSummary: d.summary || null })
+    } catch {}
   },
 
   // ── /ws/agents — real-time metriky ───────────────────

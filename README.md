@@ -11,7 +11,7 @@
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.6-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.7-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![Linux-first](https://img.shields.io/badge/Linux--first-22c55e?style=flat-square&logo=linux&logoColor=white)](#linux-out-of-the-box)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
@@ -70,6 +70,7 @@ docker compose up -d    # http://localhost:8002/app — set JARVIS_API_TOKEN in 
 | **Power user tired of cloud context** | Live PC context (active window, CPU/RAM, open apps) injected into every reply |
 | **Cautious about automation** | Computer use and UI clicks are **opt-in**; vision sandbox previews before execute |
 | **Tinkerer** | Workflows, missions, GraphRAG memory, background workers — all on your disk |
+| **Developer who forgets what they did** | **Work Timeline** — *"What did I do today?"*, git commits, build fails, time per project |
 
 Not for you if you want a hosted SaaS with zero setup, or if you need polished Windows/macOS parity (Linux is primary).
 
@@ -115,6 +116,9 @@ JARVIS: Opening Chrome...                      ✓  0.3s
 - **Voice in web UI** — mic button / duplex stream (`/ws/audio`); Whisper STT when configured
 - **Wake word** (“jarvis”) — desktop app only
 - **Long-term memory** — GraphRAG knowledge graph (SQLite MVP)
+- **Work Timeline + Memory** — tracks apps, git, Docker, builds; answers *"What did I do last week?"* (`/api/activity/query`)
+- **Proactive AI** — CPU/RAM alerts, Docker RAM warnings, build-fail → GitHub issue suggestion
+- **Agent Activity Feed** — live feed via `/ws/activity` (*18:31 Reading repository → 18:32 Running tests*)
 - **Background workers** — email, git, Slack, GitHub, calendar — need `.env` tokens
 - **Long-horizon missions** — multi-step plans executed over time
 - **Install UX** — snap/flatpak progress in chat, cancel, structured errors

@@ -14,6 +14,7 @@ Vítejte v dokumentaci JARVIS — lokálního AI asistenta ve stylu **Copilot / 
 | Napsat vlastní plugin | [Vývoj pluginů](plugin-development.md) |
 | Pochopit agentní systém | [Agenti](agents.md) |
 | Rozumět paměti a GraphRAG | [Paměť](memory.md) |
+| Work Timeline — co jsem dělal | [Paměť → Work Timeline](memory.md#work-timeline) |
 | Ovládat počítač přes vision | [Vision & Computer Use](vision-computer-use.md) |
 
 ---

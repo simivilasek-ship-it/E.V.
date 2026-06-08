@@ -61,6 +61,23 @@ async def lifespan(application):
     except Exception as e:
         logger.warning(f"Dashboard: install notify init failed: {e}")
 
+    # Work Timeline — ActivityCollector + ActivityBridge
+    try:
+        from activity_bridge import install_activity_bridge
+        from activity_collector import get_activity_collector
+        from agents import AgentManager
+        from event_bus import get_event_bus
+
+        bus = get_event_bus()
+        mgr = AgentManager.get_instance() or AgentManager.create_default(bus)
+        if not any(a._running for a in mgr._agents.values()):
+            mgr.start_all()
+        get_activity_collector().start()
+        install_activity_bridge()
+        logger.info("Dashboard: ActivityCollector + ActivityBridge spuštěny")
+    except Exception as e:
+        logger.warning(f"Dashboard: activity init failed: {e}")
+
     # Plný JARVIS runtime — Copilot + Agent pipeline
     try:
         from src.api.runtime import init_runtime

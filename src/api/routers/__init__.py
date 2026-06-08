@@ -1,5 +1,6 @@
 """Register all API routers on the FastAPI app."""
 from src.api.routers import (
+    activity,
     agents,
     broadcast,
     chat,
@@ -27,6 +28,7 @@ ROUTERS = (
     config,
     workflows,
     missions,
+    activity,
     vision,
     agents,
     skills,

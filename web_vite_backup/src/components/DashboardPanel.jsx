@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useJarvis } from '../store/jarvis'
+import ActivityFeed from './ActivityFeed'
 
 const API = import.meta.env.PROD ? `${window.location.protocol}//${window.location.host}` : 'http://localhost:8002'
 
@@ -31,9 +32,11 @@ function MetricCard({ label, value, color='#00d4ff' }) {
 }
 
 export default function DashboardPanel() {
-  const system  = useJarvis(s => s.system)
-  const logs    = useJarvis(s => s.logs)
-  const agents  = useJarvis(s => s.agents)
+  const system       = useJarvis(s => s.system)
+  const logs         = useJarvis(s => s.logs)
+  const agents       = useJarvis(s => s.agents)
+  const workSummary  = useJarvis(s => s.workSummary)
+  const suggestions  = useJarvis(s => s.proactiveSuggestions)
 
   const [audit,     setAudit]     = useState([])
   const [scheduler, setScheduler] = useState([])
@@ -88,6 +91,35 @@ export default function DashboardPanel() {
           <div style={{ fontSize:10, color:'#475569', marginTop:4 }}>{ollama.model}</div>
           <div style={{ fontSize:10, color:'#1a3050', marginTop:2 }}>uptime {uptime}</div>
         </div>
+      </div>
+
+      {/* Dnešní přehled */}
+      {workSummary?.summary?.length > 0 && (
+        <div style={S.card}>
+          <div style={S.title}>DNES — WORK TIMELINE</div>
+          {workSummary.summary.map((line, i) => (
+            <div key={i} style={{ fontSize: 13, color: '#e2f0ff', padding: '4px 0' }}>{line}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Proaktivní návrhy */}
+      {suggestions.length > 0 && (
+        <div style={S.card}>
+          <div style={S.title}>PROAKTIVNÍ AI</div>
+          {suggestions.slice(-3).map(s => (
+            <div key={s.id} style={{ padding: '6px 0', borderBottom: '1px solid #0b1220' }}>
+              <div style={{ fontSize: 12, color: s.severity === 'error' ? '#ef4444' : '#fbbf24' }}>{s.title}</div>
+              {s.detail && <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>{s.detail}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Activity Feed */}
+      <div style={S.card}>
+        <div style={S.title}>AGENT ACTIVITY FEED</div>
+        <ActivityFeed compact />
       </div>
 
       {/* Agenti */}

@@ -598,6 +598,54 @@ Odešle desktopovou notifikaci.
 
 ## Audit log
 
+## Work Timeline + Activity
+
+### `GET /api/activity/today`
+
+Dnešní události + agregovaný přehled.
+
+```json
+{
+  "events": [
+    { "id": "abc", "type": "git.commit", "title": "feat: timeline", "project": "Jarvis", "ts": 1748901234 }
+  ],
+  "summary": {
+    "summary": ["4h práce na Jarvis", "7 commitů", "2 buildy selhaly"],
+    "commits": 7,
+    "builds_failed": 2,
+    "total_hours": 4.0
+  }
+}
+```
+
+### `GET /api/activity/query?q=`
+
+Přirozený dotaz o aktivitě.
+
+```
+GET /api/activity/query?q=Co%20jsem%20d%C4%9Blal%20dnes%3F
+→ { "answer": "• 4h práce na Jarvis\n• 7 commitů", "data": {...} }
+```
+
+### `GET /api/workspace`
+
+Workspace bundle — repo, git branch, Docker, aktivní okno.
+
+### `GET /api/proactive`
+
+Proaktivní návrhy (CPU, Docker RAM, build fail).
+
+### `WS /ws/activity`
+
+Live Agent Activity Feed + proaktivní alerty.
+
+```json
+{ "type": "activity", "message": "Agent start: analyze repo", "level": "info", "time": "18:31" }
+{ "type": "proactive", "title": "Docker používá 8 GB RAM", "action_label": "Restartovat" }
+```
+
+---
+
 ### `GET /api/audit`
 
 Vrátí poslední security záznamy z `~/.jarvis_audit.jsonl`.

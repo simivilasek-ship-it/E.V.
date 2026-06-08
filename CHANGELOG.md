@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## [5.7.0] - 2026-06-08
+
+### Added — Work Timeline + Memory
+- `activity_store.py` — SQLite append-only log pracovní aktivity (`~/.jarvis/activity.db`)
+- `activity_collector.py` — sledování aplikací, git commitů, Docker kontejnerů
+- `activity_bridge.py` — EventBus → ActivityStore → WebSocket feed
+- `missions.py` — Mission Control checklist (doplňuje `mission_manager.py`)
+- `src/api/routers/activity.py` — API `/api/activity/*`, `/api/workspace`, `/api/proactive`, `WS /ws/activity`
+- UI komponenty v `web_vite_backup/`: `WorkTimeline`, `ActivityFeed`, `MissionControl`
+
+### Added — Proaktivní AI
+- CPU/RAM alerty → toast + návrh akce
+- Docker RAM > 4 GB → alert s návrhem restartu
+- 3× build fail → návrh GitHub issue
+
+### Changed
+- `context_orchestrator.py` — workspace bundle (git + docker + nedávná aktivita)
+- `DailySummarizer` zahrnuje i pracovní aktivitu z Work Timeline
+- `memory.py` emituje `MEMORY_STORED` přes EventBus
+- `src/api/lifespan.py` spouští ActivityCollector + ActivityBridge
+
+### Tests
+- `tests/test_activity.py` — ActivityStore, MissionStore, ActivityBridge
+
+---
+
 ## [5.6.0] - 2026-06-07
 
 ### Added

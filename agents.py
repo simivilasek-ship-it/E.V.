@@ -248,15 +248,18 @@ class AgentManager:
         """Vrátí poslední vytvořenou instanci (singleton pro dashboard)."""
         return cls._instance
 
-    def status(self) -> Dict[str, Any]:
-        """Alias pro get_status() — zpětná kompatibilita s dashboard.py."""
-        return self.get_status()
+    def status(self) -> list:
+        """Stav agentů jako seznam pro frontend."""
+        return [
+            {"name": name, "running": a._running, "interval": a._interval}
+            for name, a in self._agents.items()
+        ]
 
     @classmethod
     def create_default(cls, bus: Optional[EventBus] = None) -> "AgentManager":
         """Vytvoří výchozí sadu agentů."""
         mgr = cls(bus)
         mgr.register(SystemMonitorAgent(bus))
-        mgr.register(ProcessWatcherAgent(bus, watch=["ollama"]))
+        mgr.register(ProcessWatcherAgent(bus, watch=["ollama", "docker"]))
         mgr.register(IdleDetectorAgent(bus, idle_timeout=600))
         return mgr

@@ -1,7 +1,7 @@
 """
 JARVIS Context Orchestrator v2
-Sbírá kontext prostředí a vkládá ho do system promptu.
-Kontext = aktivní okno + seznam oken + clipboard + systém + čas.
+Sb�r� kontext prost?ed� a vkl�d� ho do system promptu.
+Kontext = aktivn� okno + seznam oken + clipboard + syst�m + ?as.
 """
 
 import os
@@ -11,13 +11,13 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Ignorovaná okna (panel, plocha...) při sestavování seznamu
+# Ignorovan� okna (panel, plocha...) p?i sestavov�n� seznamu
 _IGNORE_NAMES = {
-    "horní panel", "spodní panel", "pracovní plocha", "desktop",
+    "horn� panel", "spodn� panel", "pracovn� plocha", "desktop",
     "top panel", "bottom panel", "panel",
 }
 _IGNORE_SUBSTR = (
-    "uložit snímek", "save screenshot", "screenshot", "snímek obrazovky",
+    "ulo?it sn�mek", "save screenshot", "screenshot", "sn�mek obrazovky",
 )
 
 
@@ -29,7 +29,7 @@ class ContextOrchestrator:
         self._last_update: float = 0
 
     def get_context(self) -> str:
-        """Vrátí naformátovaný kontext prostředí pro system prompt."""
+        """Vr�t� naform�tovan� kontext prost?ed� pro system prompt."""
         now = time.time()
         if now - self._last_update < self._cache_ttl:
             return self._cache.get("formatted", "")
@@ -40,6 +40,8 @@ class ContextOrchestrator:
         ctx["windows"]   = self._get_open_windows()
         ctx["clipboard"] = self._get_clipboard()
         ctx["system"]    = self._get_system_quick()
+        ctx["workspace"] = self._get_workspace()
+        ctx["activity"]  = self._get_recent_activity()
 
         # Emit event if active window changed
         try:
@@ -59,17 +61,17 @@ class ContextOrchestrator:
         return formatted
 
     def get_context_data(self) -> dict:
-        """Strukturovaná data kontextu (po get_context refresh)."""
+        """Strukturovan� data kontextu (po get_context refresh)."""
         self.get_context()
         return dict(self._cache.get("data", {}))
 
-    # ── Čas ───────────────────────────────────────────
+    # ?? ?as ???????????????????????????????????????????
 
     def _get_time(self) -> str:
         from datetime import datetime
         return datetime.now().strftime("%H:%M, %A %d.%m.%Y")
 
-    # ── Okna (ewmh → xdotool → wmctrl → ps) ──────────
+    # ?? Okna (ewmh ? xdotool ? wmctrl ? ps) ??????????
 
     def _decode_wm_name(self, raw) -> str:
         if isinstance(raw, bytes):
@@ -103,7 +105,7 @@ class ContextOrchestrator:
         return ""
 
     def _xlib_desktop_windows(self) -> tuple[str, list[str]]:
-        """Čistý Xlib EWMH fallback (bez balíčku ewmh)."""
+        """?ist� Xlib EWMH fallback (bez bal�?ku ewmh)."""
         for disp in [os.environ.get("DISPLAY", ""), ":0.0", ":0", ":1"]:
             if not disp:
                 continue
@@ -178,7 +180,7 @@ class ContextOrchestrator:
         except Exception:
             pass
 
-        # 4. čistý Xlib (bez ewmh balíčku)
+        # 4. ?ist� Xlib (bez ewmh bal�?ku)
         active, _ = self._xlib_desktop_windows()
         if active:
             return active
@@ -186,7 +188,7 @@ class ContextOrchestrator:
         return ""
 
     def _get_open_windows(self) -> list[str]:
-        """Vrátí seznam názvů otevřených oken (bez systémových panelů)."""
+        """Vr�t� seznam n�zv? otev?en�ch oken (bez syst�mov�ch panel?)."""
         names: list[str] = []
 
         # 1. ewmh
@@ -227,14 +229,14 @@ class ContextOrchestrator:
         except Exception:
             pass
 
-        # 3. čistý Xlib
+        # 3. ?ist� Xlib
         _, names = self._xlib_desktop_windows()
         if names:
             return names
 
         return names
 
-    # ── Clipboard ─────────────────────────────────────
+    # ?? Clipboard ?????????????????????????????????????
 
     def _get_clipboard(self) -> str:
         try:
@@ -259,7 +261,7 @@ class ContextOrchestrator:
             pass
         return ""
 
-    # ── Systém ────────────────────────────────────────
+    # ?? Syst�m ????????????????????????????????????????
 
     def _get_system_quick(self) -> dict:
         try:
@@ -282,13 +284,60 @@ class ContextOrchestrator:
         except Exception:
             return {}
 
-    # ── Formátování ───────────────────────────────────
+    def _get_workspace(self) -> dict:
+        """Git repo, docker ? workspace bundle."""
+        ws: dict = {"repo": "", "branch": "", "dirty": False, "docker": []}
+        try:
+            from pathlib import Path
+            import subprocess
+            cwd = Path.cwd()
+            if (cwd / ".git").exists():
+                ws["repo"] = cwd.name
+                r = subprocess.run(
+                    ["git", "branch", "--show-current"],
+                    capture_output=True, text=True, timeout=3,
+                )
+                if r.returncode == 0:
+                    ws["branch"] = r.stdout.strip()
+                r2 = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    capture_output=True, text=True, timeout=3,
+                )
+                ws["dirty"] = bool(r2.stdout.strip()) if r2.returncode == 0 else False
+        except Exception:
+            pass
+        try:
+            import subprocess
+            r = subprocess.run(
+                ["docker", "ps", "--format", "{{.Names}}"],
+                capture_output=True, text=True, timeout=3,
+            )
+            if r.returncode == 0:
+                ws["docker"] = [n for n in r.stdout.strip().splitlines() if n][:5]
+        except Exception:
+            pass
+        return ws
+
+    def _get_recent_activity(self) -> str:
+        """Posledn� aktivita z Work Timeline."""
+        try:
+            from activity_store import get_activity_store
+            events = get_activity_store().get_events(limit=5)
+            if not events:
+                return ""
+            return "; ".join(
+                f"{e['title'][:40]}" for e in events[-3:] if e.get("title")
+            )
+        except Exception:
+            return ""
+
+    # ?? Form�tov�n� ???????????????????????????????????
 
     def _format(self, ctx: dict) -> str:
-        parts = [f"Aktuální čas: {ctx['time']}"]
+        parts = [f"Aktu�ln� ?as: {ctx['time']}"]
 
         if ctx.get("active"):
-            parts.append(f"Aktivní okno: {ctx['active']}")
+            parts.append(f"Aktivn� okno: {ctx['active']}")
 
         windows = [w for w in ctx.get("windows", []) if w != ctx.get("active")]
         if windows:
@@ -300,17 +349,27 @@ class ContextOrchestrator:
                     seen.add(w)
                     unique.append(w)
             shown = unique[:8]
-            parts.append("Otevřená okna: " + ", ".join(shown))
+            parts.append("Otev?en� okna: " + ", ".join(shown))
+
+        ws = ctx.get("workspace", {})
+        if ws.get("repo"):
+            branch = f" ({ws['branch']})" if ws.get("branch") else ""
+            dirty = " [necommitovano]" if ws.get("dirty") else ""
+            parts.append(f"Repo: {ws['repo']}{branch}{dirty}")
+        if ws.get("docker"):
+            parts.append("Docker: " + ", ".join(ws["docker"]))
+        if ctx.get("activity"):
+            parts.append(f"Nedavna aktivita: {ctx['activity']}")
 
         if ctx.get("clipboard"):
             clip = ctx["clipboard"][:120]
-            parts.append(f"Schránka: {clip}{'…' if len(ctx['clipboard']) > 120 else ''}")
+            parts.append(f"Schr�nka: {clip}{'?' if len(ctx['clipboard']) > 120 else ''}")
 
         sys_info = ctx.get("system", {})
         if sys_info:
             host = sys_info.get("hostname", "")
             os_name = sys_info.get("os", "")
-            prefix = f"{host} ({os_name})" if host else "Systém"
+            prefix = f"{host} ({os_name})" if host else "Syst�m"
             parts.append(
                 f"{prefix}: CPU {sys_info.get('cpu', 0)}%, "
                 f"RAM {sys_info.get('ram', 0)}% "

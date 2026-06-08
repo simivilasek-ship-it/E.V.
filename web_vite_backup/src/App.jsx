@@ -18,6 +18,9 @@ import ToastContainer from './components/Toast'
 import DashboardPanel from './components/DashboardPanel'
 import MemoryGraph from './components/MemoryGraph'
 import AgentTimeline from './components/AgentTimeline'
+import WorkTimeline from './components/WorkTimeline'
+import ActivityFeed from './components/ActivityFeed'
+import MissionControl from './components/MissionControl'
 import SkillGenerator from './components/SkillGenerator'
 import CommandPalette from './components/CommandPalette'
 
@@ -28,6 +31,9 @@ const I = {
   system:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
   agent:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>,
   timeline: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+  work:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  feed:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+  mission:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>,
   memory:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
   skill:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
   dash:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>,
@@ -54,15 +60,18 @@ const NAV_GROUPS = [
   {
     label: 'INTELIGENCE',
     items: [
-      { id: 'AGENT',    label: 'Agent',     icon: I.agent,    key: '5', hint: 'Graf agentů' },
-      { id: 'TIMELINE', label: 'Timeline',  icon: I.timeline, key: '6', hint: 'Historie akcí' },
-      { id: 'MEMORY',   label: 'Paměť',     icon: I.memory,   key: '7', hint: 'Knowledge graph' },
+      { id: 'WORK',     label: 'Dnes',      icon: I.work,     key: '5', hint: 'Work Timeline' },
+      { id: 'FEED',     label: 'Feed',      icon: I.feed,     key: '6', hint: 'Activity Feed' },
+      { id: 'MISSIONS', label: 'Missions',  icon: I.mission,  key: '7', hint: 'Mission Control' },
+      { id: 'AGENT',    label: 'Agent',     icon: I.agent,    key: '8', hint: 'Graf agentů' },
+      { id: 'TIMELINE', label: 'Timeline',  icon: I.timeline, key: '9', hint: 'Agent kroky' },
+      { id: 'MEMORY',   label: 'Paměť',     icon: I.memory,   key: '0', hint: 'Knowledge graph' },
     ],
   },
   {
     label: 'MONITOR',
     items: [
-      { id: 'DASHBOARD',label: 'Dashboard', icon: I.dash,     key: '8', hint: 'Přehled systému' },
+      { id: 'DASHBOARD',label: 'Dashboard', icon: I.dash,     key: '-', hint: 'Přehled systému' },
     ],
   },
 ]
@@ -308,6 +317,9 @@ export default function App() {
               </div>
             </div>
           )}
+          {tab === 'WORK'     && <div className="page-wrap-center"><WorkTimeline /></div>}
+          {tab === 'FEED'     && <div className="page-wrap-center"><ActivityFeed /></div>}
+          {tab === 'MISSIONS' && <div className="page-wrap-center"><MissionControl /></div>}
           {tab === 'TIMELINE' && <div className="page-wrap-center"><AgentTimeline /></div>}
           {tab === 'MEMORY'   && <div className="page-wrap-center"><MemoryGraph /></div>}
           {tab === 'SKILL'    && <div className="page-wrap-center"><SkillGenerator /></div>}

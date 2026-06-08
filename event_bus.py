@@ -59,6 +59,15 @@ class EventType:
     TASK_SCHEDULED    = "scheduler.task"     # úkol naplánován
     TASK_FIRED        = "scheduler.fired"    # úkol se spustil
 
+    # Activity / Timeline
+    ACTIVITY_RECORDED = "activity.recorded"  # nová událost v timeline
+    AGENT_STEP        = "agent.step"         # krok agenta
+    AGENT_RUN_START   = "agent.run_start"    # začátek agent run
+    AGENT_RUN_END     = "agent.run_end"      # konec agent run
+    PROACTIVE_SUGGEST = "proactive.suggestion"  # proaktivní návrh
+    WORKSPACE_CHANGED = "workspace.changed"  # změna workspace kontextu
+    BUILD_FAIL        = "build.fail"         # build selhal
+
     # System
     JARVIS_READY      = "system.ready"       # JARVIS připraven
     JARVIS_SHUTDOWN   = "system.shutdown"    # JARVIS se ukončuje

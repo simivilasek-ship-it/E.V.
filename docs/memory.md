@@ -273,3 +273,41 @@ print(context)
 store = memory._store  # _SQLiteMemoryStore instance
 rows = store.recall(query="python", top_k=10, min_importance=0.5)
 ```
+
+---
+
+## Work Timeline
+
+Kromě konverzační paměti JARVIS sleduje **pracovní aktivitu** na počítači.
+
+### Úložiště
+
+- Soubor: `~/.jarvis/activity.db` (SQLite)
+- Modul: `activity_store.py`
+- Kolektor: `activity_collector.py` (background thread, interval 20s)
+
+### Sledované události
+
+| Typ | Příklad |
+|-----|---------|
+| `app.open` / `app.focus` | VS Code, Chrome, Cursor |
+| `git.commit` / `git.push` | Automaticky z git log |
+| `docker.start` / `docker.stop` | Docker events |
+| `build.fail` / `build.success` | Detekce z terminálu |
+| `command.run` / `command.done` | Uživatelské příkazy |
+| `proactive.suggestion` | CPU alert, Docker RAM |
+
+### Dotazy
+
+```
+"Co jsem dělal dnes?"
+"Na čem jsem skončil?"
+"Kolik času jsem strávil na projektu Jarvis?"
+"Jaké bugy jsem řešil?"
+```
+
+API: `GET /api/activity/query?q=...`
+
+### DailySummarizer integrace
+
+Večerní shrnutí (`DailySummarizer` v `memory.py`) zahrnuje i pracovní aktivitu — nejen chat konverzace.
