@@ -19,7 +19,9 @@ At runtime, **root-level modules are canonical**. The app is started from the re
 | Vision | `vision.py`, `vision_v2.py`, `vision_computer_use.py`, `computer_use.py`, `vision_pipeline.py` | `src/vision/__init__.py` re-exports |
 | Security | `security_v2.py`, `shadow_mode.py` | `src/security/__init__.py` re-exports |
 | App lifecycle | `app_core.py` | — |
-| Web dashboard | `dashboard.py` | `src/api/` (FastAPI app, routers, runtime) |
+| Web dashboard | `dashboard.py` → `src/api/runner.py` | `src/api/` (FastAPI app, routers, runtime) |
+| CLI | `jarvis.py`, `jarvis_cli.py` (`jarvis log`) | — |
+| Desktop (legacy) | `gui/` — **deprecated** | Produkční UI = Next.js `web/` |
 
 ## Shims
 

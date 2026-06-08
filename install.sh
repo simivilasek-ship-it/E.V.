@@ -20,7 +20,7 @@ echo "============================================"
 echo
 
 # ── Python verze ──────────────────────────────
-echo "[1/5] Kontrola Python..."
+echo "[1/6] Kontrola Python..."
 PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
 PY_MAJOR=$(echo "$PY_VER" | cut -d. -f1)
 PY_MINOR=$(echo "$PY_VER" | cut -d. -f2)
@@ -32,7 +32,7 @@ fi
 ok "Python $PY_VER"
 
 # ── Virtuální prostředí ───────────────────────
-echo "[2/5] Virtuální prostředí..."
+echo "[2/6] Virtuální prostředí..."
 if [ ! -d "venv" ]; then
     python3 -m venv venv
     ok "venv vytvořeno"
@@ -43,11 +43,11 @@ source venv/bin/activate
 python3 -m pip install --upgrade pip --quiet
 
 # ── Systémové závislosti ──────────────────────
-echo "[3/5] Systémové závislosti..."
+echo "[3/6] Systémové závislosti..."
 if command -v apt-get &>/dev/null; then
     sudo apt-get install -y -qq \
         portaudio19-dev python3-pyaudio espeak espeak-ng ffmpeg \
-        tesseract-ocr tesseract-ocr-ces 2>/dev/null || warn "Některé apt balíčky se nepodařilo nainstalovat (pokračuji)"
+        tesseract-ocr tesseract-ocr-ces libnotify-bin 2>/dev/null || warn "Některé apt balíčky se nepodařilo nainstalovat (pokračuji)"
     ok "apt závislosti"
 elif command -v pacman &>/dev/null; then
     sudo pacman -S --noconfirm --needed portaudio espeak-ng ffmpeg tesseract 2>/dev/null || warn "Některé pacman balíčky selhaly"
@@ -60,9 +60,11 @@ else
 fi
 
 # ── Python balíčky ────────────────────────────
-echo "[4/5] Python závislosti..."
+echo "[4/6] Python závislosti..."
 pip install -r requirements.txt --quiet
 ok "requirements.txt nainstalováno"
+
+python3 -c "import mcp" 2>/dev/null && ok "mcp SDK (MCP servery)" || warn "mcp balíček chybí — MCP nástroje nebudou fungovat"
 
 # Volitelné — doporučené
 echo "  Instaluji doporučené balíčky (rapidfuzz, sentence-transformers)..."
@@ -71,7 +73,7 @@ pip install rapidfuzz sentence-transformers --quiet 2>/dev/null && \
     warn "sentence-transformers se nepodařilo nainstalovat — paměť bude bez embeddings"
 
 # ── Ollama ────────────────────────────────────
-echo "[5/5] Ollama..."
+echo "[5/6] Ollama..."
 if ! command -v ollama &>/dev/null; then
     warn "Ollama není nainstalovaná — stahuji..."
     curl -fsSL https://ollama.com/install.sh | sh
@@ -95,6 +97,20 @@ else
     warn "Model ${DEFAULT_MODEL} se nepodařilo stáhnout — zkus ručně: ollama pull ${DEFAULT_MODEL}"
 fi
 
+# ── Systemd (volitelné) ─────────────────────
+echo "[6/6] Systemd user služba (volitelné)..."
+UNIT_DIR="$HOME/.config/systemd/user"
+UNIT_DEST="$UNIT_DIR/jarvis.service"
+if [ -f "desktop/jarvis.service" ]; then
+    mkdir -p "$UNIT_DIR"
+    sed "s|@JARVIS_DIR@|${SCRIPT_DIR}|g" desktop/jarvis.service > "$UNIT_DEST"
+    ok "Unit zapsán → $UNIT_DEST"
+    echo "    systemctl --user enable --now jarvis.service   # autostart"
+    echo "    systemctl --user status jarvis.service"
+else
+    warn "desktop/jarvis.service nenalezen — přeskočeno"
+fi
+
 # ── Hotovo ────────────────────────────────────
 echo
 echo "============================================"
@@ -104,8 +120,9 @@ echo
 echo "  Rychlý start:"
 echo "    source venv/bin/activate"
 echo "    python jarvis.py --setup   # průvodce prvního spuštění"
-echo "    python jarvis.py           # nebo rovnou spustit"
+echo "    python dashboard.py        # http://localhost:8002/app"
 echo
-echo "  Web dashboard:"
-echo "    python dashboard.py        # localhost:8002"
+echo "  Work Timeline:"
+echo "    python jarvis.py log --today"
+echo "    python jarvis.py log --markdown --today"
 echo "============================================"

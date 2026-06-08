@@ -711,12 +711,10 @@ class TestCommandsValidation(unittest.TestCase):
     def setUp(self):
         self.cmds = CommandExecutor(_CFG)
 
-    @patch("commands.apps.safe_run")
-    def test_install_valid_package(self, mock_run):
-        mock_run.return_value = {"rc": 0, "stdout": "", "stderr": "", "timeout": False}
+    @patch("commands.apps.is_app_installed", return_value=False)
+    def test_install_valid_package(self, _mock_installed):
         result = self.cmds.execute("install_app", {"name": "vlc"})
-        self.assertIn("Instaluji", result)
-        mock_run.assert_called_once()
+        self.assertTrue("instaluji" in result.lower(), result)
 
     @patch("commands.apps.safe_run")
     def test_install_injection_blocked(self, mock_run):

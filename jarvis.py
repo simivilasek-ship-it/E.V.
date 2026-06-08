@@ -24,6 +24,12 @@ def _check_setup() -> None:
 
 
 def main():
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "log":
+        from jarvis_cli import cmd_log
+        raise SystemExit(cmd_log(sys.argv[2:]))
+
     import argparse
     parser = argparse.ArgumentParser(
         prog="jarvis",

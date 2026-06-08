@@ -60,6 +60,8 @@ export default function JarvisApp() {
   const connectConfirm = useJarvis(s => s.connectConfirm)
   const connError      = useJarvis(s => s.connError)
   const clearMessages  = useJarvis(s => s.clearMessages)
+  const addMessage     = useJarvis(s => s.addMessage)
+  const addToast       = useJarvis(s => s.addToast)
   const retry          = useJarvis(s => s.retry)
   const [tab, setTab]  = useState<Tab>('CHAT')
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -77,10 +79,20 @@ export default function JarvisApp() {
       if (e.altKey && e.code === 'Space') { e.preventDefault(); setSpotlightOpen(p => !p) }
       if (e.key === 'Escape') { setPaletteOpen(false); setSpotlightOpen(false) }
       if (e.altKey && !e.ctrlKey && NAV_KEYS[e.key]) { e.preventDefault(); setTab(NAV_KEYS[e.key]) }
+      if (e.altKey && e.key === 'd') {
+        e.preventDefault()
+        fetch(`${process.env.NODE_ENV === 'production' ? '' : 'http://127.0.0.1:8002'}/api/activity/report?format=md`)
+          .then(r => r.json())
+          .then(d => {
+            addMessage(d.markdown || d.summary_text || 'Žádná aktivita.', 'jarvis')
+            addToast('Denní shrnutí (Alt+D)', 'success', 3000)
+          })
+          .catch(() => addToast('Shrnutí dne selhalo', 'error', 3000))
+      }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [])
+  }, [addMessage, addToast])
 
   const PageWrapper = ({ children }: { children: React.ReactNode }) => (
     <div className="flex-1 overflow-y-auto flex flex-col items-center p-3 gap-3">

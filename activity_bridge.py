@@ -213,6 +213,18 @@ def add_proactive_suggestion(
         "action_label": action_label,
     })
 
+    if severity in ("warning", "error", "critical"):
+        try:
+            from notification_engine import Notification, send_desktop_notification
+            send_desktop_notification(Notification(
+                title=f"JARVIS — {title}",
+                body=detail or title,
+                icon="dialog-warning" if severity == "warning" else "dialog-error",
+                urgent=severity in ("error", "critical"),
+            ))
+        except Exception:
+            pass
+
 
 def _on_event(event: Event):
     """Centrální handler EventBus → ActivityStore + Feed."""

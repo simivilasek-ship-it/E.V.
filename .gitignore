@@ -19,6 +19,8 @@ jarvis.log
 # Python env
 venv/
 .venv/
+.claude/
+web_vite_backup/
 
 # Pytest cache
 .pytest_cache/

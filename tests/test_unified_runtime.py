@@ -44,7 +44,7 @@ class TestLocalRouterRoutes:
         _msg, action = router.route("jake je pocasi v praze")
         assert action is not None
         assert action["action"] == "weather"
-        assert action["params"]["city"] == "praze"
+        assert action["params"]["city"] == "Praha"
 
     def test_stahni_instagram_is_install_not_video(self, router):
         msg, action = router.route("stahni instagram")

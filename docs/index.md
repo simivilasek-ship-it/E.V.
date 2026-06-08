@@ -1,4 +1,4 @@
-# JARVIS v5.10 — Dokumentace
+# JARVIS v5.11 — Dokumentace
 
 Vítejte v dokumentaci JARVIS — lokálního AI asistenta ve stylu **Copilot / Gemini**, s **agentním** plánováním a **plnou správou PC**.
 
@@ -15,6 +15,8 @@ Vítejte v dokumentaci JARVIS — lokálního AI asistenta ve stylu **Copilot / 
 | Pochopit agentní systém | [Agenti](agents.md) |
 | Rozumět paměti a GraphRAG | [Paměť](memory.md) |
 | Work Timeline — co jsem dělal | [Paměť → Work Timeline](memory.md#work-timeline) |
+| Které MCP servery fungují | [MCP servery](mcp-servers.md) |
+| CLI denní log | `jarvis log --today` / `jarvis log --markdown` |
 | Ovládat počítač přes vision | [Vision & Computer Use](vision-computer-use.md) |
 
 ---

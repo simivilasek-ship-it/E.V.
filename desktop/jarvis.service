@@ -1,0 +1,16 @@
+[Unit]
+Description=JARVIS — local AI assistant (backend + web UI)
+Documentation=https://github.com/simivilasek-ship-it/Jarvis
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@JARVIS_DIR@
+ExecStart=@JARVIS_DIR@/venv/bin/python dashboard.py --no-open
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

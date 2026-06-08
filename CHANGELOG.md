@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [5.11.0] - 2026-06-08
+
+### Added
+- **`jarvis log --today`** — CLI přehled Work Timeline (`jarvis_cli.py`)
+- **`GET /api/activity/report?format=md`** — denní markdown report
+- **Alt+D** + tlačítko „Shrnutí dne" v dashboardu
+- **Systemd user unit** — `desktop/jarvis.service`, instalace v `install.sh`
+- **Desktop notifikace** pro proaktivní alerty (warning/error → `notify-send`)
+- **UTF-8 CI gate** — `scripts/check_utf8.py`
+- **MCP docs** — `docs/mcp-servers.md` (doporučená sada pro Linux)
+
+### Fixed
+- **`dashboard.py`** — obnoven `if __name__ == "__main__"` entrypoint
+- **`memory.py`** — převedeno na UTF-8 (školní cp1250 export)
+- **`install.sh`** — explicitní kontrola `mcp`, `libnotify-bin`, 6 kroků včetně systemd
+
+### Changed
+- Verze **5.11.0** sjednocena (`config.py`, `pyproject.toml`, Docker, requirements, README)
+- Sidebar **v5.11 · Work OS**
+- `.gitignore` — `.claude/`, `web_vite_backup/`
+
+---
+
 ## [5.10.0] - 2026-06-08
 
 ### Added

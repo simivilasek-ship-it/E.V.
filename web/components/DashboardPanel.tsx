@@ -127,14 +127,33 @@ export default function DashboardPanel() {
         </div>
       </div>
 
-      {workSummary?.summary && workSummary.summary.length > 0 && (
-        <div style={S.card}>
+      <div style={S.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={S.title}>DNES — WORK TIMELINE</div>
-          {workSummary.summary.map((line, i) => (
-            <div key={i} style={{ fontSize: 13, color: '#e2f0ff', padding: '4px 0' }}>{line}</div>
-          ))}
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const d = await fetch(apiUrl('/api/activity/report?format=md')).then(r => r.json())
+                useJarvis.getState().addMessage(d.markdown || d.summary_text || 'Žádná aktivita.', 'jarvis')
+                useJarvis.getState().addToast('Denní shrnutí vloženo do chatu', 'success', 3000)
+              } catch {
+                useJarvis.getState().addToast('Shrnutí dne selhalo', 'error', 3000)
+              }
+            }}
+            style={{ fontSize: 10, padding: '4px 10px', borderRadius: 4, border: '1px solid #1a3050', background: '#0f1a2e', color: '#7dd3fc', cursor: 'pointer' }}
+          >
+            Shrnutí dne (Alt+D)
+          </button>
         </div>
-      )}
+        {workSummary?.summary && workSummary.summary.length > 0 ? (
+          workSummary.summary.map((line, i) => (
+            <div key={i} style={{ fontSize: 13, color: '#e2f0ff', padding: '4px 0' }}>{line}</div>
+          ))
+        ) : (
+          <div style={{ fontSize: 12, color: '#475569' }}>Zatím žádná aktivita — pracuj v IDE/terminálu, JARVIS to zaznamená.</div>
+        )}
+      </div>
 
       {suggestions.length > 0 && (
         <div style={S.card}>

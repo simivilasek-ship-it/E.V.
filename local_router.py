@@ -713,6 +713,12 @@ class LocalRouter:
                     city = m.group(1)
             if city.lower() in ("pocasi", "počasí", "weather", "dnes", "zitra", "bude", "jake", "je"):
                 city = ""
+            elif city:
+                _cities = {
+                    "praha": "Praha", "praze": "Praha", "brno": "Brno", "ostrava": "Ostrava",
+                    "plzen": "Plzeň", "plzni": "Plzeň", "liberec": "Liberec", "olomouc": "Olomouc",
+                }
+                city = _cities.get(city.lower(), city[0].upper() + city[1:])
             return f"Počasí{' — ' + city if city else ''}:", {
                 "action": "weather", "params": {"city": city}}
 

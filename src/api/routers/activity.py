@@ -50,6 +50,19 @@ def register(app):
         d = _date.fromisoformat(day) if day else None
         return get_activity_store().daily_summary(d)
 
+    @app.get("/api/activity/report")
+    async def activity_report(day: str = "", format: str = "json"):
+        """Denní report — JSON nebo markdown (`?format=md`)."""
+        from activity_store import get_activity_store
+        from datetime import date as _date
+        from jarvis_cli import _format_summary_markdown
+
+        d = _date.fromisoformat(day) if day else None
+        data = get_activity_store().daily_summary(d)
+        if format in ("md", "markdown"):
+            return {"markdown": _format_summary_markdown(data), **data}
+        return data
+
     @app.get("/api/activity/query")
     async def activity_query(q: str = ""):
         from activity_store import get_activity_store

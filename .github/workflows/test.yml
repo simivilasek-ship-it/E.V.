@@ -34,6 +34,9 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: UTF-8 encoding check
+        run: python scripts/check_utf8.py
+
       - name: Lint (ruff)
         run: ruff check . --output-format=github
 

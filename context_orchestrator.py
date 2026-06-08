@@ -334,10 +334,10 @@ class ContextOrchestrator:
     # ?? Form�tov�n� ???????????????????????????????????
 
     def _format(self, ctx: dict) -> str:
-        parts = [f"Aktu�ln� ?as: {ctx['time']}"]
+        parts = [f"Aktuální čas: {ctx['time']}"]
 
         if ctx.get("active"):
-            parts.append(f"Aktivn� okno: {ctx['active']}")
+            parts.append(f"Aktivní okno: {ctx['active']}")
 
         windows = [w for w in ctx.get("windows", []) if w != ctx.get("active")]
         if windows:
@@ -349,7 +349,7 @@ class ContextOrchestrator:
                     seen.add(w)
                     unique.append(w)
             shown = unique[:8]
-            parts.append("Otev?en� okna: " + ", ".join(shown))
+            parts.append("Otevřená okna: " + ", ".join(shown))
 
         ws = ctx.get("workspace", {})
         if ws.get("repo"):

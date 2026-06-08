@@ -11,11 +11,11 @@
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.10-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.11-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![Linux-first](https://img.shields.io/badge/Linux--first-22c55e?style=flat-square&logo=linux&logoColor=white)](#linux-out-of-the-box)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-563%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Tests](https://img.shields.io/badge/tests-699%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 
 </div>
 
@@ -27,7 +27,13 @@
 git clone https://github.com/simivilasek-ship-it/Jarvis.git && cd Jarvis && ./install.sh && python3 dashboard.py
 ```
 
-Open **http://localhost:8002/app** — chat, live PC context, and quick actions work immediately.
+Open **http://localhost:8002/app** — chat, live PC context, and Work Timeline work immediately.
+
+```bash
+python jarvis.py log --today          # CLI — co jsi dělal dnes
+python jarvis.py log --markdown       # markdown report
+systemctl --user enable jarvis.service  # autostart (po ./install.sh)
+```
 
 <details>
 <summary><strong>Full setup (Ollama, API keys, Docker, restart)</strong></summary>
@@ -123,8 +129,12 @@ JARVIS: Opening Chrome...                      ✓  0.3s
 - **Background workers** — email, git, Slack, GitHub, calendar — need `.env` tokens
 - **Long-horizon missions** — autonomní mise + release checklisty v jedné SQLite DB (`mission_manager`)
 - **E2E API tests in CI** — `pytest -m integration` (activity, missions, agent timeline)
+- **Daily summary** — Alt+D nebo `jarvis log --today` / `GET /api/activity/report?format=md`
+- **Systemd autostart** — `desktop/jarvis.service` (instaluje `install.sh`)
+- **Desktop notifications** — proaktivní alerty přes `notify-send` (Linux)
 - **Install UX** — snap/flatpak progress in chat, cancel, structured errors
 - **Onboarding wizard** — first run checks Ollama, snap, microphone
+- **MCP guide** — [docs/mcp-servers.md](docs/mcp-servers.md) — které servery reálně fungují
 - **100% local option** — Ollama + on-device Whisper; no cloud API key required
 
 ---
@@ -242,23 +252,21 @@ RAM: **~34 MB** idle backend · **~650 MB+** with Ollama loaded · runs on any m
 ## Architecture
 
 ```
-src/
-├── api/       FastAPI routers · WebSocket runtime · LAN auth
-├── agents/    ReactAgent · GraphAgent · MissionManager  (root canonical)
-├── llm/       Engine · CloudRouter · LocalRouter
-├── memory/    SQLite + embeddings · GraphRAG knowledge graph
-├── vision/    OCR pipeline · VisionAgent · Screen monitor
-├── workers/   Email · Git · Slack · Calendar · GitHub watchers
-├── plugins/   Marketplace · Sandbox · MCP bridge
-├── security/  Shell blacklist · Audit log · Permission levels
-└── audio/     Whisper Live · Duplex · VAD · Edge-TTS
+activity_*.py  Work Timeline — collector, store, bridge
+src/api/       FastAPI · WebSocket · LAN auth · activity routes
+routing.py     Local router (<1 ms) + agent pipeline
+memory.py      Neural memory + GraphRAG + daily summarizer
+mission_*.py   Agent missions + release checklists (SQLite)
+web/           Next.js 16 — Chat, Dnes, Feed, Checklist (Alt+W/F/C/D)
 ```
 
-Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · Desktop: **pywebview**
+Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · CLI: **`jarvis log`**
 
-**Web dashboard (v5.6):** Unified runtime (`src/api/runtime.py`), onboarding wizard, install progress/cancel, Agent Graph V2 (Alt+5), Plugin Marketplace (Alt+3), Workflow Editor (Alt+0), Vision Sandbox (Alt+V), Missions (Alt+M), live PC context (`GET /api/context`), voice in chat, security confirmation modal.
+**Web dashboard (v5.11):** Work Timeline, Activity Feed, daily summary (Alt+D), proactive AI + desktop notify, unified runtime, onboarding, install UX, missions + checklist, live PC context, voice in chat.
 
-→ Full docs: **[docs/index.md](docs/index.md)** · Web UI: **[web/README.md](web/README.md)** · Layout: **[docs/CANONICAL.md](docs/CANONICAL.md)** · API: **[docs/api-reference.md](docs/api-reference.md)**
+→ **[docs/index.md](docs/index.md)** · **[docs/mcp-servers.md](docs/mcp-servers.md)** · **[docs/CANONICAL.md](docs/CANONICAL.md)** · **[docs/api-reference.md](docs/api-reference.md)** · **[web/README.md](web/README.md)**
+
+> **Legacy:** `gui/` (Tkinter) je deprecated — produkční UI je Next.js na `/app`.
 
 ---
 
@@ -278,10 +286,11 @@ Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · Desktop: **pywebvi
 ## Tests · Docs · Contributing
 
 ```bash
-pytest tests/ test_jarvis.py -v   # 563 tests
+pytest tests/ test_jarvis.py -v   # 699 tests (615 unit + 84 integration)
+python scripts/check_utf8.py      # UTF-8 gate (CI)
 ```
 
-[API Reference](docs/api-reference.md) · [Configuration](docs/configuration.md) · [Plugin Dev](docs/plugin-development.md) · [Benchmarks](docs/benchmarks.md) · [CHANGELOG](CHANGELOG.md)
+[API Reference](docs/api-reference.md) · [MCP Servers](docs/mcp-servers.md) · [Configuration](docs/configuration.md) · [Plugin Dev](docs/plugin-development.md) · [CHANGELOG](CHANGELOG.md)
 
 ---
 
