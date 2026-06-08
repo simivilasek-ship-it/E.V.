@@ -24,11 +24,15 @@ const WorkflowEditor = dynamic(() => import('./WorkflowEditor'), { ssr: false })
 const SettingsPanel  = dynamic(() => import('./SettingsPanel'),  { ssr: false })
 const MissionPanel   = dynamic(() => import('./MissionPanel'), { ssr: false })
 const VisionSandboxPanel = dynamic(() => import('./VisionSandboxPanel'), { ssr: false })
+const WorkTimeline   = dynamic(() => import('./WorkTimeline'), { ssr: false })
+const ActivityFeed   = dynamic(() => import('./ActivityFeed'), { ssr: false })
+const MissionChecklist = dynamic(() => import('./MissionChecklist'), { ssr: false })
 
 const NAV_KEYS: Record<string, Tab> = {
   '1': 'CHAT', '2': 'SYSTEM', '3': 'PLUGINS', '4': 'SKILL',
   '5': 'AGENT', '6': 'TIMELINE', '7': 'MEMORY', '8': 'DASHBOARD',
   '9': 'SETTINGS', '0': 'WORKFLOW', 'm': 'MISSIONS', 'v': 'VISION',
+  'w': 'WORK', 'f': 'FEED', 'c': 'CHECKLIST',
 }
 
 function useTheme() {
@@ -130,6 +134,15 @@ export default function JarvisApp() {
                 <div className="card p-5"><ErrorBoundary><PluginMarketplace /></ErrorBoundary></div>
               </PageWrapper>
             )}
+            {tab === 'WORK' && (
+              <PageWrapper><ErrorBoundary><WorkTimeline /></ErrorBoundary></PageWrapper>
+            )}
+            {tab === 'FEED' && (
+              <PageWrapper><ErrorBoundary><ActivityFeed /></ErrorBoundary></PageWrapper>
+            )}
+            {tab === 'CHECKLIST' && (
+              <PageWrapper><ErrorBoundary><MissionChecklist /></ErrorBoundary></PageWrapper>
+            )}
             {tab === 'AGENT' && (
               <PageWrapper>
                 <div className="card p-0 overflow-hidden">
@@ -191,7 +204,7 @@ export default function JarvisApp() {
               onClick={e => e.stopPropagation()}>
               <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="font-display text-sm font-semibold">Paleta příkazů</div>
-                <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Alt+1–9 pro rychlou navigaci</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Alt+1–9, Alt+W/F/C (Dnes/Feed/Checklist)</div>
               </div>
               <div className="p-2">
                 {Object.entries(NAV_KEYS).map(([key, id]) => (

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useJarvis } from '@/store/jarvis'
 import { Icons } from './Icons'
 
-export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW' | 'MISSIONS' | 'VISION'
+export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'WORK' | 'FEED' | 'CHECKLIST' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW' | 'MISSIONS' | 'VISION'
 
 interface NavItem { id: Tab; label: string; icon: React.ReactNode; key: string }
 
@@ -16,6 +16,9 @@ const ADVANCED_NAV: NavItem[] = [
   { id: 'PLUGINS', label: 'Pluginy', icon: Icons.plugins, key: '3' },
   { id: 'SKILL', label: 'Skill Gen', icon: Icons.skill, key: '4' },
   { id: 'WORKFLOW', label: 'Workflow', icon: Icons.workflow, key: '0' },
+  { id: 'WORK', label: 'Dnes', icon: Icons.work, key: 'w' },
+  { id: 'FEED', label: 'Feed', icon: Icons.feed, key: 'f' },
+  { id: 'CHECKLIST', label: 'Checklist', icon: Icons.checklist, key: 'c' },
   { id: 'AGENT', label: 'Agent', icon: Icons.agent, key: '5' },
   { id: 'MISSIONS', label: 'Mise', icon: Icons.mission, key: 'm' },
   { id: 'VISION', label: 'Vision', icon: Icons.eye, key: 'v' },

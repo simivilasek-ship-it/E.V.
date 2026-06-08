@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [5.8.0] - 2026-06-08
+
+### Added
+- **Next.js UI parity** — `WorkTimeline`, `ActivityFeed`, `MissionChecklist` v primárním `web/`
+- Sidebar taby: **Dnes**, **Feed**, **Checklist** (Alt+W/F/C)
+- `jarvis.ts` — `connectActivity()`, `activityFeed`, `proactiveSuggestions`, `workSummary`
+- Dashboard — dnešní přehled, proaktivní návrhy, live feed
+- `src/api/routers/missions_checklist.py` — checklist API oddělené od agent missions
+- Proaktivní akce — tlačítka volají chat příkazy (procesy, GitHub issue, Docker restart)
+- `tests/test_activity_api.py` — integrační testy activity API
+
+### Fixed
+- WS activity broadcast race — `wire_activity_broadcaster()` v lifespan místo při importu
+- Agent timeline schema — `/api/agent/timeline` vrací `answer`, `duration_ms`, `started_at`
+- ActivityCollector shutdown při ukončení dashboardu
+
+---
+
 ## [5.7.0] - 2026-06-08
 
 ### Added — Work Timeline + Memory

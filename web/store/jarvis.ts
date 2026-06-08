@@ -63,12 +63,16 @@ interface JarvisState {
     method?: string
     error?: string
   } | null
+  activityFeed: Array<{ id?: string; message: string; detail?: string; level?: string; time?: string; ts?: number }>
+  proactiveSuggestions: Array<{ id: string; title: string; detail?: string; action?: string; action_label?: string; severity?: string }>
+  workSummary: Record<string, unknown> | null
 
   // Internal
   _ws:        WebSocket | null
   _attempt:   number
   _retryId:   ReturnType<typeof setTimeout> | null
   _metricsWs: WebSocket | null
+  _activityWs: WebSocket | null
   _chatWs:    WebSocket | null
   _confirmWs: WebSocket | null
   _recognition: SpeechRecognition | null
@@ -79,7 +83,10 @@ interface JarvisState {
   disconnect:     () => void
   retry:          () => void
   connectMetrics: () => void
+  connectActivity: () => void
   connectChat:    () => void
+  dismissSuggestion: (id: string) => void
+  fetchWorkSummary: () => Promise<void>
   connectConfirm: () => void
   respondConfirm: (approved: boolean) => void
   toggleMic:      () => void
@@ -138,7 +145,9 @@ export const useJarvis = create<JarvisState>((set, get) => ({
   pendingConfirm: null,
   quickActionHistory: [],
   activeInstall: null,
-  _ws: null, _attempt: 0, _retryId: null, _metricsWs: null, _chatWs: null, _confirmWs: null,
+  activityFeed: [], proactiveSuggestions: [], workSummary: null,
+  _ws: null, _attempt: 0, _retryId: null, _metricsWs: null, _activityWs: null,
+  _chatWs: null, _confirmWs: null,
   _recognition: null, _audioDuplex: null,
 
   async checkBackend() {
@@ -181,6 +190,8 @@ export const useJarvis = create<JarvisState>((set, get) => ({
       set({ isConnected: true, connStatus: 'connected', _ws: ws, _attempt: 0, connError: null })
       get().addToast('WebSocket připojen', 'success', 2000)
       get().connectMetrics()
+      get().connectActivity()
+      get().fetchWorkSummary()
       get().fetchDuplexFlag()
     }
     ws.onclose = (ev) => {
@@ -236,13 +247,65 @@ export const useJarvis = create<JarvisState>((set, get) => ({
   },
 
   disconnect() {
-    const { _ws, _retryId, _metricsWs } = get()
+    const { _ws, _retryId, _metricsWs, _activityWs } = get()
     if (_retryId) { clearTimeout(_retryId); set({ _retryId: null }) }
-    _ws?.close(1000); _metricsWs?.close(1000)
-    set({ isConnected: false, connStatus: 'disconnected', _ws: null, _metricsWs: null, _attempt: 0 })
+    _ws?.close(1000); _metricsWs?.close(1000); _activityWs?.close(1000)
+    set({ isConnected: false, connStatus: 'disconnected', _ws: null, _metricsWs: null, _activityWs: null, _attempt: 0 })
   },
 
   retry() { set({ _attempt: 0, connError: null }); get().connect() },
+
+  connectActivity() {
+    const { _activityWs } = get()
+    if (_activityWs?.readyState === WebSocket.OPEN) return
+    let ws: WebSocket
+    try { ws = new WebSocket(`${getWsBase()}/ws/activity`) } catch { return }
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data)
+        if (d.type === 'ping') return
+        if (d.type === 'proactive') {
+          set(s => ({
+            proactiveSuggestions: [...s.proactiveSuggestions.filter(x => x.id !== d.id), {
+              id: d.id, title: d.title, detail: d.detail, action: d.action,
+              action_label: d.action_label, severity: d.severity,
+            }].slice(-10),
+          }))
+          get().addToast(d.title, d.severity === 'error' ? 'error' : 'warning', 6000)
+        } else if (d.type === 'activity') {
+          set(s => ({
+            activityFeed: [...s.activityFeed, {
+              id: d.id || `${Date.now()}`,
+              message: d.message || d.title || '',
+              detail: d.detail, level: d.level || 'info',
+              ts: d.ts, time: d.time || new Date().toLocaleTimeString('cs', { hour: '2-digit', minute: '2-digit' }),
+            }].slice(-100),
+          }))
+        }
+      } catch {}
+    }
+    ws.onclose = () => {
+      set({ _activityWs: null })
+      if (get().isConnected) setTimeout(() => get().connectActivity(), 5000)
+    }
+    set({ _activityWs: ws })
+  },
+
+  dismissSuggestion(id) {
+    fetch(`${getApiBase()}/api/proactive/dismiss`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }).catch(() => {})
+    set(s => ({ proactiveSuggestions: s.proactiveSuggestions.filter(x => x.id !== id) }))
+  },
+
+  async fetchWorkSummary() {
+    try {
+      const d = await fetch(`${getApiBase()}/api/activity/today`).then(r => r.json())
+      set({ workSummary: d.summary || null })
+    } catch {}
+  },
 
   connectMetrics() {
     const { _metricsWs } = get()

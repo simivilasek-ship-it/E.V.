@@ -82,12 +82,23 @@ def register(app):
                 rows = con.execute(
                     "SELECT * FROM agent_runs ORDER BY ts DESC LIMIT ?", (limit,)
                 ).fetchall()
-            runs = [{
-                "id": r["id"], "task": r["task"],
-                "steps": _j.loads(r["steps"]),
-                "result": r["result"], "status": r["status"],
-                "duration": r["duration"], "ts": r["ts"],
-            } for r in rows]
+            runs = []
+            for r in rows:
+                steps = _j.loads(r["steps"]) if r["steps"] else []
+                dur = r["duration"] or 0
+                runs.append({
+                    "id": r["id"],
+                    "task": r["task"],
+                    "agent_type": "graph",
+                    "steps": steps,
+                    "answer": r["result"] or "",
+                    "result": r["result"],
+                    "status": r["status"] or "done",
+                    "duration": dur,
+                    "duration_ms": int(dur * 1000) if dur < 1000 else int(dur),
+                    "started_at": r["ts"],
+                    "ts": r["ts"],
+                })
             return {"runs": runs, "total": len(runs)}
         except Exception as e:
             return {"runs": [], "error": str(e)}

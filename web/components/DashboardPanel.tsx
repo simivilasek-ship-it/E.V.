@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useJarvis } from '@/store/jarvis'
 import { apiUrl } from '@/lib/api'
+import ActivityFeed from './ActivityFeed'
 
 const S = {
   card:  { background:'#0b1220', border:'1px solid #1a3050', borderRadius:8, padding:'14px 16px', marginBottom:12 },
@@ -60,10 +61,16 @@ interface AuditEntry {
   reason?: string
 }
 
+interface WorkSummary {
+  summary?: string[]
+}
+
 export default function DashboardPanel() {
   const system  = useJarvis(s => s.system) as SystemData
   const logs    = useJarvis(s => s.logs) as LogEntry[]
   const agents  = useJarvis(s => s.agents) as unknown as AgentEntry[]
+  const workSummary = useJarvis(s => s.workSummary) as WorkSummary | null
+  const suggestions = useJarvis(s => s.proactiveSuggestions)
 
   const [audit,     setAudit]     = useState<AuditEntry[]>([])
   const [scheduler, setScheduler] = useState<SchedulerEntry[]>([])
@@ -118,6 +125,32 @@ export default function DashboardPanel() {
           <div style={{ fontSize:10, color:'#475569', marginTop:4 }}>{ollama.model}</div>
           <div style={{ fontSize:10, color:'#1a3050', marginTop:2 }}>uptime {uptime}</div>
         </div>
+      </div>
+
+      {workSummary?.summary && workSummary.summary.length > 0 && (
+        <div style={S.card}>
+          <div style={S.title}>DNES — WORK TIMELINE</div>
+          {workSummary.summary.map((line, i) => (
+            <div key={i} style={{ fontSize: 13, color: '#e2f0ff', padding: '4px 0' }}>{line}</div>
+          ))}
+        </div>
+      )}
+
+      {suggestions.length > 0 && (
+        <div style={S.card}>
+          <div style={S.title}>PROAKTIVNÍ AI</div>
+          {suggestions.slice(-3).map(s => (
+            <div key={s.id} style={{ padding: '6px 0', borderBottom: '1px solid #0b1220' }}>
+              <div style={{ fontSize: 12, color: s.severity === 'error' ? '#ef4444' : '#fbbf24' }}>{s.title}</div>
+              {s.detail && <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>{s.detail}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={S.card}>
+        <div style={S.title}>AGENT ACTIVITY FEED</div>
+        <ActivityFeed compact />
       </div>
 
       {/* Agenti */}

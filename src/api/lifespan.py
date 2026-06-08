@@ -74,6 +74,8 @@ async def lifespan(application):
             mgr.start_all()
         get_activity_collector().start()
         install_activity_bridge()
+        from src.api.routers.activity import wire_activity_broadcaster
+        wire_activity_broadcaster(ws_mod.main_loop)
         logger.info("Dashboard: ActivityCollector + ActivityBridge spuštěny")
     except Exception as e:
         logger.warning(f"Dashboard: activity init failed: {e}")
@@ -89,6 +91,11 @@ async def lifespan(application):
 
     yield
 
+    try:
+        from activity_collector import get_activity_collector
+        get_activity_collector().stop()
+    except Exception:
+        pass
     try:
         from src.api.runtime import shutdown_runtime
         shutdown_runtime()

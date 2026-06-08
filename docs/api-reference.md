@@ -404,6 +404,30 @@ Smaže misi a všechny její kroky.
 
 ---
 
+## Mission Checklist (`missions.py`)
+
+Oddělený systém od **Mission Manager** výše — ruční checklisty v UI (záložka **Checklist**), ne LLM-plánované mise.
+
+### `GET /api/missions/checklist`
+
+```json
+{ "missions": [{ "id": "mc_abc", "title": "Release v5.8", "items": [{ "id": "i1", "label": "Bump version", "done": true }] }] }
+```
+
+### `POST /api/missions/checklist`
+
+Body: `{ "title": "...", "items": ["krok 1", "krok 2"] }`
+
+### `POST /api/missions/checklist/{id}/toggle`
+
+Body: `{ "item_id": "i1" }`
+
+### `POST /api/missions/checklist/{id}/items`
+
+Body: `{ "label": "nový krok" }`
+
+---
+
 ## Vision
 
 ### `GET /api/vision/analyze`

@@ -2,6 +2,7 @@
 from src.api.routers import (
     activity,
     agents,
+    missions_checklist,
     broadcast,
     chat,
     commands,
@@ -10,6 +11,7 @@ from src.api.routers import (
     marketplace,
     memory,
     missions,
+    missions_checklist,
     monitoring,
     settings,
     skills,
@@ -28,6 +30,7 @@ ROUTERS = (
     config,
     workflows,
     missions,
+    missions_checklist,
     activity,
     vision,
     agents,

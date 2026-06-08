@@ -98,15 +98,12 @@ def register(app):
         except Exception:
             _activity_clients.discard(ws)
 
-    # Wire activity broadcaster into bridge
-    try:
-        from activity_bridge import set_broadcasters
-        from src.api import ws as ws_mod
 
-        async def _emit(entry: dict):
-            await _broadcast_activity(entry)
+def wire_activity_broadcaster(loop):
+    """Voláno z lifespan po nastavení main_loop."""
+    from activity_bridge import set_broadcasters
 
-        if ws_mod.main_loop:
-            set_broadcasters(activity_fn=_emit, loop=ws_mod.main_loop)
-    except Exception as e:
-        logger.debug(f"Activity broadcaster init: {e}")
+    async def _emit(entry: dict):
+        await _broadcast_activity(entry)
+
+    set_broadcasters(activity_fn=_emit, loop=loop)
