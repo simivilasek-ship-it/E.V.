@@ -1,6 +1,8 @@
 # JARVIS Web UI (Next.js)
 
-Frontend pro JARVIS v5 — HUD dashboard napojený na FastAPI backend (`:8002`).
+Jediný frontend pro JARVIS v5.9 — HUD dashboard napojený na FastAPI backend (`:8002`).
+
+> Legacy Vite stack (`web/src/`, `web_vite_backup/`) byl odstraněn v5.9. Všechny panely jsou v `web/components/`.
 
 ## Stack
 
@@ -29,7 +31,7 @@ python3 dashboard.py --rebuild    # vynutit rebuild frontendu
 just dev-hmr   # backend :8002 + Next dev :3000 v jednom skriptu
 ```
 
-## Panely (Alt+1..0)
+## Panely
 
 | Klávesa | Panel | Komponenta |
 |---------|-------|------------|
@@ -37,12 +39,24 @@ just dev-hmr   # backend :8002 + Next dev :3000 v jednom skriptu
 | Alt+2 | Systém | `SystemPanel` |
 | Alt+3 | Pluginy | `PluginMarketplace` |
 | Alt+4 | Skill Gen | `SkillGenerator` |
-| Alt+5 | Agent | `AgentGraphV2` — live graph + reasoning |
-| Alt+6 | Timeline | `AgentTimeline` |
-| Alt+7 | Paměť | `MemoryGraph` |
-| Alt+8 | Dashboard | `DashboardPanel` |
-| Alt+9 | Nastavení | `SettingsPanel` + `AuditLogPanel` |
 | Alt+0 | Workflow | `WorkflowEditor` |
+| Alt+W | Dnes | `WorkTimeline` — Work Timeline + dotazy |
+| Alt+F | Feed | `ActivityFeed` — live WS feed + proaktivní AI |
+| Alt+C | Release | `MissionChecklist` — ruční release checklisty |
+| Alt+5 | Agent | `AgentGraphV2` — live graph + reasoning |
+| Alt+M | Agent mise | `MissionPanel` — autonomní LLM mise |
+| Alt+V | Vision | `VisionSandboxPanel` |
+| Alt+6 | Timeline | `AgentTimeline` — historie agent běhů |
+| Alt+7 | Paměť | `MemoryGraph` |
+| Alt+8 | Dashboard | `DashboardPanel` — metriky + work summary + feed |
+| Alt+9 | Nastavení | `SettingsPanel` + `AuditLogPanel` |
+
+## Mission Control — dva systémy
+
+| UI | API | Backend |
+|----|-----|---------|
+| **Agent mise** (Alt+M) | `/api/missions` | `mission_manager.py` — LLM plánuje a executor běží kroky |
+| **Release** (Alt+C) | `/api/missions/checklist` | `missions.py` — ruční checklist, toggle položek |
 
 ## Chat — Copilot · Agent · Akce
 
@@ -64,6 +78,7 @@ Status zprávy: `💬 Copilot…` · `⚡ Provádím akci…` · `🤖 Agent pra
 | `/ws/logs` | Live logy |
 | `/ws/agents` | CPU/RAM metriky (2s) |
 | `/ws/graph` | Agent graph events |
+| `/ws/activity` | Work Timeline feed + proaktivní návrhy |
 | `/ws/confirm` | Potvrzování nebezpečných akcí |
 | `/ws/audio` | VAD / duplex audio (backend) |
 
@@ -92,7 +107,7 @@ npm run typecheck  # tsc --noEmit
 ```
 web/
 ├── app/              # Next.js App Router
-├── components/       # UI panely
+├── components/       # UI panely (jediný zdroj pravdy)
 ├── store/jarvis.ts   # Zustand + WS
 └── lib/api.ts        # API base helper
 ```

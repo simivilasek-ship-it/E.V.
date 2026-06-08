@@ -286,3 +286,16 @@ ws.onmessage = (e) => console.log(JSON.parse(e.data))
 ### Replay zaznamenaných kroků
 
 V `AgentGraphV2` komponentě klikni na **Debug** → **Replay** pro přehrání posledního agentatního běhu.
+
+---
+
+## Dva typy „misí“
+
+JARVIS má **dva oddělené systémy** — neslučují se do jedné databáze:
+
+| Systém | Modul | API | UI | Účel |
+|--------|-------|-----|-----|------|
+| **Autonomní mise** | `mission_manager.py` | `/api/missions` | Agent mise (Alt+M) | LLM plánuje kroky, executor je běží v čase |
+| **Release Checklist** | `missions.py` | `/api/missions/checklist` | Release (Alt+C) | Ruční checklist, člověk toggleuje položky |
+
+Checklist události se zapisují do Work Timeline (`activity_store`).

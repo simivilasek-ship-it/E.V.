@@ -3,7 +3,7 @@ JARVIS — Konfigurace
 Načítání a validace z .env, config.json s fallbackem na defaults
 """
 
-__version__ = "5.8.0"
+__version__ = "5.9.0"
 
 import os
 import json

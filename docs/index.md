@@ -1,4 +1,4 @@
-# JARVIS v5 — Dokumentace
+# JARVIS v5.9 — Dokumentace
 
 Vítejte v dokumentaci JARVIS — lokálního AI asistenta ve stylu **Copilot / Gemini**, s **agentním** plánováním a **plnou správou PC**.
 

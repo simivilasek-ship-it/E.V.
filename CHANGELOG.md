@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [5.9.0] - 2026-06-08
+
+### Changed — sjednocení projektu
+- **Jeden frontend** — odstraněn `web_vite_backup/` a lokální legacy `web/src/` (Vite)
+- Smazány nepoužívané komponenty `AgentGraph.tsx`, `PluginStore.tsx`
+- Mission Control sjednocen v dokumentaci a UI:
+  - **Agent mise** (Alt+M) → `mission_manager.py` → `/api/missions`
+  - **Release** (Alt+C) → `missions.py` → `/api/missions/checklist`
+- `DELETE /api/missions/checklist/{id}` — smazání checklistu
+- Odstraněn hardcoded seed „Release v5.0“ z `missions.py`
+
+### Docs
+- Všechny docs aktualizovány na v5.9 (`architecture`, `api-reference`, `agents`, `CANONICAL`, `web/README`)
+- Diagram architektury: produkční UI na `:8002/app`, Work Timeline moduly
+
+---
+
 ## [5.8.0] - 2026-06-08
 
 ### Added

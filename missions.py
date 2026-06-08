@@ -1,6 +1,6 @@
 """
-JARVIS — Mission Control
-Sledování dlouhodobých úkolů / release s checklistem.
+JARVIS — Release Checklist (Mission Control)
+Ruční checklisty pro release / úkoly. Oddělené od mission_manager.py (autonomní mise).
 """
 
 from __future__ import annotations
@@ -36,22 +36,7 @@ class MissionStore:
         return {"missions": self._default_missions()}
 
     def _default_missions(self) -> List[dict]:
-        return [
-            {
-                "id": "mission-jarvis-v5",
-                "title": "Release v5.0",
-                "status": "active",
-                "created_at": time.time(),
-                "items": [
-                    {"id": "1", "label": "Work Timeline", "done": True},
-                    {"id": "2", "label": "Proactive AI", "done": True},
-                    {"id": "3", "label": "Workspace Awareness", "done": True},
-                    {"id": "4", "label": "Mission Control", "done": True},
-                    {"id": "5", "label": "Activity Feed", "done": True},
-                    {"id": "6", "label": "Voice V2", "done": False},
-                ],
-            },
-        ]
+        return []
 
     def _save(self):
         with self._lock:

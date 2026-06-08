@@ -47,31 +47,39 @@ export default function MissionChecklist() {
     }).then(() => { setNewTitle(''); refresh() }).catch(() => {})
   }
 
+  const remove = (missionId: string) => {
+    fetch(apiUrl(`/api/missions/checklist/${missionId}`), { method: 'DELETE' })
+      .then(() => refresh()).catch(() => {})
+  }
+
   return (
     <div className="w-full max-w-xl font-mono">
-      <div className="text-[9px] tracking-widest uppercase mb-3" style={{ color: 'var(--muted)' }}>Mission Control — checklist</div>
+      <div className="text-[9px] tracking-widest uppercase mb-3" style={{ color: 'var(--muted)' }}>Release Checklist</div>
 
       <div className="flex gap-2 mb-4">
         <input
           value={newTitle}
           onChange={e => setNewTitle(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && create()}
-          placeholder="Nová mise, např. Release v6.0"
+          placeholder="Nový checklist, např. Release v5.9"
           className="flex-1 bg-transparent border rounded px-3 py-2 text-sm outline-none"
           style={{ borderColor: 'var(--border)' }}
         />
-        <button onClick={create} className="btn-primary text-xs px-3">+ Mise</button>
+        <button onClick={create} className="btn-primary text-xs px-3">+ Checklist</button>
       </div>
 
       {missions.length === 0 ? (
-        <div className="text-sm" style={{ color: 'var(--muted)' }}>Žádné aktivní mise</div>
+        <div className="text-sm" style={{ color: 'var(--muted)' }}>Žádné checklisty</div>
       ) : missions.map(m => (
         <div key={m.id} className="card p-4 mb-3">
           <div className="flex justify-between items-center mb-2">
             <div className="font-semibold">{m.title}</div>
-            <span className="text-[10px] px-2 py-0.5 rounded" style={{ color: 'var(--cyan)', background: 'rgba(0,212,255,.1)' }}>
-              {m.done_count}/{m.total_count}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] px-2 py-0.5 rounded" style={{ color: 'var(--cyan)', background: 'rgba(0,212,255,.1)' }}>
+                {m.done_count}/{m.total_count}
+              </span>
+              <button onClick={() => remove(m.id)} className="text-[10px] btn-ghost px-1" title="Smazat">✕</button>
+            </div>
           </div>
           <div className="h-1 rounded mb-3" style={{ background: 'var(--border)' }}>
             <div className="h-full rounded transition-all" style={{ width: `${m.progress}%`, background: 'var(--cyan)' }} />

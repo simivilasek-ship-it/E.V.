@@ -1,4 +1,4 @@
-# JARVIS v5.0 — Benchmarky
+# JARVIS v5.9 — Benchmarky
 
 Měřeno na: **Intel i7, 30 GB RAM, Ubuntu 24.04 LTS**  
 Datum: 2026-06-03 · Branch: security/headless-confirm-fix

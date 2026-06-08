@@ -1,4 +1,4 @@
-# Architektura JARVIS v5.4
+# Architektura JARVIS v5.9
 
 ## Přehled
 
@@ -12,9 +12,9 @@ JARVIS je vrstvená aplikace složená z Python backendu, Next.js frontendu a de
                 │                                  │
                 ▼                                  ▼
 ┌───────────────────────────┐      ┌───────────────────────────────┐
-│    Whisper Live (STT)     │      │   Next.js Dashboard :3000     │
-│  WebRTC VAD → Groq/local  │      │  Chat · SystemPanel · Agents  │
-│  ~200ms latence           │      │  WorkflowEditor · Marketplace │
+│    Whisper Live (STT)     │      │   Next.js UI → :8002/app      │
+│  WebRTC VAD → Groq/local  │      │  Chat · Timeline · Feed · Mise │
+│  ~200ms latence           │      │  Workflow · Release checklist │
 └──────────┬────────────────┘      └────────────┬──────────────────┘
            │                                    │
            ▼                                    ▼
@@ -51,8 +51,12 @@ JARVIS je vrstvená aplikace složená z Python backendu, Next.js frontendu a de
 │                                                                  │
 │  ┌─────────────────┐  ┌──────────────┐  ┌──────────────────┐   │
 │  │ Mission Manager │  │  Autonomous  │  │  Vision v2       │   │
-│  │ (dlouhodobé     │  │  Workers     │  │  OCR + Computer  │   │
-│  │  mise)          │  │  (monitoring)│  │  Use             │   │
+│  │ (agent mise)    │  │  Workers     │  │  OCR + Computer  │   │
+│  └─────────────────┘  └──────────────┘  └──────────────────┘   │
+│  ┌─────────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │ Release         │  │  Activity    │  │  ActivityBridge  │   │
+│  │ Checklist       │  │  Store       │  │  + Collector     │   │
+│  │ (missions.py)   │  │  (timeline)  │  │  (WS feed)       │   │
 │  └─────────────────┘  └──────────────┘  └──────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```

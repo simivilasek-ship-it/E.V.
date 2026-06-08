@@ -46,3 +46,10 @@ def register(app):
         if not result:
             return {"error": "Mise nenalezena"}
         return result
+
+    @app.delete("/api/missions/checklist/{mission_id}")
+    async def delete_checklist(mission_id: str):
+        from missions import get_mission_store
+        if get_mission_store().delete_mission(mission_id):
+            return {"ok": True}
+        return {"error": "Mise nenalezena"}

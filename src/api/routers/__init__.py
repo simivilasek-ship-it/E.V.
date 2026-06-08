@@ -2,7 +2,6 @@
 from src.api.routers import (
     activity,
     agents,
-    missions_checklist,
     broadcast,
     chat,
     commands,

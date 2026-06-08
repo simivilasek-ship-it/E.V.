@@ -96,7 +96,7 @@ export default function MissionPanel() {
     <div className="flex flex-col gap-4 w-full">
       <div className="card p-5 flex flex-col gap-3">
         <h3 className="font-hud text-[9px] tracking-widest uppercase" style={{ color: 'var(--muted)' }}>
-          Nová mise
+          Autonomní mise — LLM plánování
         </h3>
         <input
           value={title}

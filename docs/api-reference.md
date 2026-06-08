@@ -1,4 +1,4 @@
-# API Reference — JARVIS v5.4
+# API Reference — JARVIS v5.9
 
 Backend běží na `http://localhost:8002`. Všechny endpointy vrací JSON pokud není uvedeno jinak.
 
@@ -15,7 +15,7 @@ Rychlý status check backendu.
 {
   "status": "ok",
   "uptime_s": 3621.4,
-  "version": "5.4.0",
+  "version": "5.9.0",
   "ws": "running",
   "ollama": "online",
   "model": "qwen2.5:3b"
@@ -320,7 +320,7 @@ Live události agent pipeline — krok po kroku.
 
 ### `WS /ws/graph`
 
-Real-time vizualizace agent grafu (pro `AgentGraph.tsx`).
+Real-time vizualizace agent grafu (pro `AgentGraphV2.tsx`).
 
 **Přijímané zprávy:**
 ```json
@@ -333,11 +333,13 @@ Real-time vizualizace agent grafu (pro `AgentGraph.tsx`).
 
 ---
 
-## Mise (Mission Manager)
+## Autonomní mise (Mission Manager)
+
+UI: záložka **Agent mise** (Alt+M) · `MissionPanel.tsx` · backend `mission_manager.py`
 
 ### `GET /api/missions`
 
-Seznam všech misí.
+Seznam všech autonomních misí s kroky.
 
 **Response:**
 ```json
@@ -349,11 +351,11 @@ Seznam všech misí.
       "description": "Napiš 7 blog postů o AI, jeden každý den",
       "status": "active",
       "deadline": "2026-06-10",
-      "steps_total": 7,
-      "steps_done": 3,
-      "steps_failed": 0,
-      "created_at": 1748901234.5,
-      "last_activity": 1748987634.5
+      "agent_mode": "multi",
+      "steps": [
+        { "id": "s_1", "description": "Napiš post o LLM", "status": "done", "attempts": 1 }
+      ],
+      "created_at": 1748901234.5
     }
   ]
 }
@@ -370,9 +372,12 @@ Vytvoří novou misi. LLM automaticky rozplánuje kroky.
 {
   "title": "Denní blog o AI",
   "description": "Napiš 7 blog postů o AI trendech, jeden každý den",
-  "deadline": "2026-06-10"
+  "deadline": "2026-06-10",
+  "agent_mode": "multi"
 }
 ```
+
+`agent_mode`: `"single"` | `"multi"` | `"parallel"` (default `"single"`)
 
 **Response:**
 ```json
@@ -404,14 +409,14 @@ Smaže misi a všechny její kroky.
 
 ---
 
-## Mission Checklist (`missions.py`)
+## Release Checklist (`missions.py`)
 
-Oddělený systém od **Mission Manager** výše — ruční checklisty v UI (záložka **Checklist**), ne LLM-plánované mise.
+Oddělený systém od **Mission Manager** — ruční checklisty v UI (záložka **Release**, Alt+C), ne LLM-plánované mise.
 
 ### `GET /api/missions/checklist`
 
 ```json
-{ "missions": [{ "id": "mc_abc", "title": "Release v5.8", "items": [{ "id": "i1", "label": "Bump version", "done": true }] }] }
+{ "missions": [{ "id": "mc_abc", "title": "Release v5.9", "progress": 50, "items": [{ "id": "i1", "label": "Bump version", "done": true }] }] }
 ```
 
 ### `POST /api/missions/checklist`
@@ -425,6 +430,10 @@ Body: `{ "item_id": "i1" }`
 ### `POST /api/missions/checklist/{id}/items`
 
 Body: `{ "label": "nový krok" }`
+
+### `DELETE /api/missions/checklist/{id}`
+
+Smaže checklist.
 
 ---
 

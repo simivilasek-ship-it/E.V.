@@ -44,3 +44,12 @@ class TestActivityAPI:
         r = client.get("/api/missions/checklist")
         assert r.status_code == 200
         assert "missions" in r.json()
+
+    def test_missions_checklist_crud(self, client):
+        r = client.post("/api/missions/checklist", json={"title": "Test release", "items": ["step 1"]})
+        assert r.status_code == 200
+        mid = r.json().get("id")
+        assert mid
+        r2 = client.delete(f"/api/missions/checklist/{mid}")
+        assert r2.status_code == 200
+        assert r2.json().get("ok") is True

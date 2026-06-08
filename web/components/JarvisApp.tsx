@@ -204,7 +204,7 @@ export default function JarvisApp() {
               onClick={e => e.stopPropagation()}>
               <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="font-display text-sm font-semibold">Paleta příkazů</div>
-                <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Alt+1–9, Alt+W/F/C (Dnes/Feed/Checklist)</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Alt+1–9, Alt+W/F/C/M (Dnes/Feed/Release/Mise)</div>
               </div>
               <div className="p-2">
                 {Object.entries(NAV_KEYS).map(([key, id]) => (
