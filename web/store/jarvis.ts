@@ -30,6 +30,7 @@ export interface SystemMetrics {
   net: { recv: number; sent: number } | null
   gpu: { usage: number | null; vram: number | null; name: string | null } | null
   ram_gb?: number; ram_total?: number
+  load?: number
 }
 
 export interface PendingConfirm {

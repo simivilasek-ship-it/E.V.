@@ -137,10 +137,10 @@ export default function MemoryGraph() {
   const pos = useForce(filtered, visLinks, W, H)
 
   return (
-    <div style={{ fontFamily: 'var(--font-mono,monospace)', color: '#e2f0ff' }}>
+    <div style={{ fontFamily: 'var(--font-mono,monospace)', color: 'var(--text)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <div style={{ color: '#475569', fontSize: 9, letterSpacing: '.15em' }}>
+        <div style={{ color: 'var(--muted)', fontSize: 9, letterSpacing: '.15em' }}>
           MEMORY GRAPH — {data.nodes.length} uzlů · {data.links.length} vztahů
         </div>
         <input
@@ -148,14 +148,14 @@ export default function MemoryGraph() {
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
           placeholder="Hledat v paměti…"
           style={{
-            marginLeft: 'auto', background: '#0b1220', border: '1px solid #1a3050',
-            borderRadius: 6, color: '#e2f0ff', padding: '4px 10px', fontSize: 11,
+            marginLeft: 'auto', background: 'var(--bg-hud)', border: '1px solid var(--border)',
+            borderRadius: 6, color: 'var(--text)', padding: '4px 10px', fontSize: 11,
             outline: 'none', width: 200,
           }}
         />
         <button onClick={load} style={{
-          background: '#0b1220', border: '1px solid #1a3050', borderRadius: 6,
-          color: '#00d4ff', fontSize: 11, padding: '4px 10px', cursor: 'pointer',
+          background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6,
+          color: 'var(--cyan)', fontSize: 11, padding: '4px 10px', cursor: 'pointer',
         }}>↺</button>
       </div>
 
@@ -170,13 +170,13 @@ export default function MemoryGraph() {
       </div>
 
       {/* SVG graf */}
-      <div style={{ background: '#050a15', borderRadius: 8, border: '1px solid #1a3050', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>
+          <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>
             Načítám paměť…
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2d3748' }}>
+          <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>
             {search ? 'Nic nenalezeno' : 'Paměť je prázdná'}
           </div>
         ) : (

@@ -264,7 +264,7 @@ RAM: **~34 MB** idle backend · **~650 MB+** with Ollama loaded · runs on any m
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    JARVIS v5.14                      │
+│                    JARVIS v5.15                      │
 │                                                     │
 │  ┌──────────┐    ┌─────────────┐    ┌───────────┐  │
 │  │ Next.js  │◄──►│  FastAPI    │◄──►│  Ollama   │  │
@@ -290,7 +290,7 @@ web/           Next.js 16 — Chat, Dnes, Feed, Checklist (Alt+W/F/C/D)
 
 Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · CLI: **`jarvis log`**
 
-**Web dashboard (v5.14):** Work Timeline, Activity Feed, daily summary (Alt+D), proactive AI + desktop notify, unified runtime, onboarding, install UX, missions + checklist, live PC context, voice in chat.
+**Web dashboard (v5.15):** Work Timeline, Activity Feed, daily summary (Alt+D), proactive AI + desktop notify, unified runtime, onboarding, install UX, missions + checklist, live PC context, voice in chat.
 
 → **[docs/index.md](docs/index.md)** · **[docs/mcp-servers.md](docs/mcp-servers.md)** · **[docs/CANONICAL.md](docs/CANONICAL.md)** · **[docs/api-reference.md](docs/api-reference.md)** · **[web/README.md](web/README.md)**
 

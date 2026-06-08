@@ -23,16 +23,16 @@ function OllamaStatus() {
   return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
       padding:'8px 14px', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
-      <span style={{ fontFamily:'var(--font-hud)', fontSize:8, letterSpacing:'.15em', color:'var(--text2)' }}>
+      <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:8, letterSpacing:'.15em', color:'var(--text2)' }}>
         OLLAMA
       </span>
       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-        <span style={{ fontFamily:'var(--font-mono)', fontSize:10,
+        <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:10,
           color: status.ollama ? 'var(--green)' : 'var(--red)' }}>
           {status.ollama ? '● ONLINE' : '○ OFFLINE'}
         </span>
         {status.model && (
-          <span style={{ fontFamily:'var(--font-mono)', fontSize:9,
+          <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:9,
             color:'var(--text2)', padding:'1px 6px',
             border:'1px solid var(--border)', borderRadius:3 }}>
             {status.model}
@@ -53,7 +53,7 @@ function CircularGauge({ value, max = 100, label, color, size = 80 }: {
   const dash = pct * circ
 
   // Dynamická barva dle zatížení
-  const gaugeColor = value > 85 ? '#f43f5e' : value > 65 ? '#f59e0b' : color
+  const gaugeColor = value > 85 ? 'var(--red)' : value > 65 ? 'var(--amber)' : color
 
   return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
@@ -64,10 +64,11 @@ function CircularGauge({ value, max = 100, label, color, size = 80 }: {
             fill="none" stroke="rgba(255,255,255,.06)" strokeWidth={6} />
           {/* Progress */}
           <circle cx={size/2} cy={size/2} r={r}
-            fill="none" stroke={gaugeColor} strokeWidth={6}
+            fill="none" strokeWidth={6}
             strokeLinecap="round"
             strokeDasharray={`${dash} ${circ}`}
             style={{
+              stroke: gaugeColor,
               filter:`drop-shadow(0 0 4px ${gaugeColor})`,
               transition:'stroke-dasharray 0.6s ease, stroke 0.3s ease',
             }}
@@ -79,23 +80,23 @@ function CircularGauge({ value, max = 100, label, color, size = 80 }: {
           display:'flex', flexDirection:'column',
           alignItems:'center', justifyContent:'center',
         }}>
-          <span style={{ fontFamily:'var(--font-mono)', fontSize:15, fontWeight:700, color:gaugeColor,
+          <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:15, fontWeight:700, color:gaugeColor,
             transition:'color 0.3s ease', textShadow:`0 0 8px ${gaugeColor}` }}>
             {Math.round(value)}
           </span>
-          <span style={{ fontFamily:'var(--font-mono)', fontSize:8, color:'var(--muted,var(--text2))' }}>%</span>
+          <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:8, color:'var(--muted,var(--text2))' }}>%</span>
         </div>
       </div>
-      <span style={{ fontFamily:'var(--font-hud)', fontSize:9, letterSpacing:'.12em', color:'var(--muted,var(--text2))' }}>
+      <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:9, letterSpacing:'.12em', color:'var(--muted,var(--text2))' }}>
         {label}
       </span>
       {value > 85 && (
-        <span style={{ fontFamily:'var(--font-hud)', fontSize:7, letterSpacing:'.1em', color:'#f43f5e', marginTop:-4 }}>
+        <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:7, letterSpacing:'.1em', color:'var(--red)', marginTop:-4 }}>
           HIGH
         </span>
       )}
       {value > 65 && value <= 85 && (
-        <span style={{ fontFamily:'var(--font-hud)', fontSize:7, letterSpacing:'.1em', color:'#f59e0b', marginTop:-4 }}>
+        <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:7, letterSpacing:'.1em', color:'var(--amber)', marginTop:-4 }}>
           WARN
         </span>
       )}
@@ -123,7 +124,7 @@ function Sparkline({ data, color, height = 36, width = '100%' }: {
 
   if (!data || data.length < 2) return (
     <div ref={ref} style={{ height, opacity:.3, display:'flex', alignItems:'center',
-      fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text2)' }}>
+      fontFamily:'IBM Plex Mono, monospace', fontSize:10, color:'var(--text2)' }}>
       collecting...
     </div>
   )
@@ -145,18 +146,18 @@ function Sparkline({ data, color, height = 36, width = '100%' }: {
         preserveAspectRatio="none" style={{ display:'block', overflow:'visible' }}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor={color} stopOpacity=".35"/>
-            <stop offset="100%" stopColor={color} stopOpacity="0"/>
+            <stop offset="0%"   style={{ stopColor: color, stopOpacity: .35 }}/>
+            <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }}/>
           </linearGradient>
         </defs>
         {/* Fill area */}
         <polygon points={fillPts} fill={`url(#${gradId})`} />
         {/* Line */}
-        <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5"
-          style={{ filter:`drop-shadow(0 0 3px ${color})` }} />
+        <polyline points={pts} fill="none" strokeWidth="1.5"
+          style={{ stroke: color, filter:`drop-shadow(0 0 3px ${color})` }} />
         {/* Live dot at current value */}
-        <circle cx={lastX} cy={lastY} r="3" fill={color}
-          style={{ filter:`drop-shadow(0 0 5px ${color})` }} />
+        <circle cx={lastX} cy={lastY} r="3"
+          style={{ fill: color, filter:`drop-shadow(0 0 5px ${color})` }} />
       </svg>
     </div>
   )
@@ -184,8 +185,8 @@ function AdvancedMetrics({ system }: { system: SystemData }) {
 
       {hasCpuTemp && (
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-          <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text2)' }}>CPU TEMP</span>
-          <span style={{ fontFamily:'var(--font-mono)', fontSize:12,
+          <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:10, color:'var(--text2)' }}>CPU TEMP</span>
+          <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:12,
             color: (system.cpu_temp ?? 0) > 80 ? 'var(--red)' : (system.cpu_temp ?? 0) > 70 ? 'var(--amber)' : 'var(--cyan)' }}>
             {system.cpu_temp}°C
           </span>
@@ -195,13 +196,13 @@ function AdvancedMetrics({ system }: { system: SystemData }) {
       {hasNet && system.net && (
         <div style={{ marginBottom:8 }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
-            <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text2)' }}>NETWORK</span>
+            <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:10, color:'var(--text2)' }}>NETWORK</span>
           </div>
           <div style={{ display:'flex', gap:12 }}>
-            <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--green)' }}>
+            <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:10, color:'var(--green)' }}>
               ↓ {system.net.recv} KB/s
             </span>
-            <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--cyan)' }}>
+            <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:10, color:'var(--cyan)' }}>
               ↑ {system.net.sent} KB/s
             </span>
           </div>
@@ -210,10 +211,10 @@ function AdvancedMetrics({ system }: { system: SystemData }) {
 
       {hasGpu && system.gpu && (
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-          <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text2)' }}>
+          <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:10, color:'var(--text2)' }}>
             GPU {system.gpu.name ? `(${system.gpu.name.slice(0,12)})` : ''}
           </span>
-          <span style={{ fontFamily:'var(--font-mono)', fontSize:12, color:'var(--purple)' }}>
+          <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:12, color:'var(--purple)' }}>
             {system.gpu.usage}%
           </span>
         </div>
@@ -272,15 +273,15 @@ export default function SystemPanel(_props: SystemPanelProps = {}) {
       <div className="panel">
         <div className="panel-header">
           <span className="panel-title">SYSTEM METRICS</span>
-          <span style={{ fontFamily:'var(--font-mono)', fontSize:9, color: isConn ? 'var(--green)' : 'var(--red)' }}>
+          <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:9, color: isConn ? 'var(--green)' : 'var(--red)' }}>
             {isConn ? '● LIVE' : '○ OFFLINE'}
           </span>
         </div>
         <OllamaStatus />
         <div className="arc-row" style={{ padding:'16px 12px 12px' }}>
-          <CircularGauge value={cpu}  color="#00d4ff" label="CPU"  size={80} />
-          <CircularGauge value={ram}  color="#0066ff" label="RAM"  size={80} />
-          <CircularGauge value={disk} color="#8b5cf6" label="DISK" size={80} />
+          <CircularGauge value={cpu}  color="var(--metric-cpu)" label="CPU"  size={80} />
+          <CircularGauge value={ram}  color="var(--accent)"     label="RAM"  size={80} />
+          <CircularGauge value={disk} color="var(--purple)"     label="DISK" size={80} />
         </div>
       </div>
 
@@ -289,23 +290,23 @@ export default function SystemPanel(_props: SystemPanelProps = {}) {
         <div style={{ marginBottom:12 }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
             <span className="arc-label">CPU HISTORY (60s)</span>
-            <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--cyan)' }}>{cpu}%</span>
+            <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:10, color:'var(--cyan)' }}>{cpu}%</span>
           </div>
-          <Sparkline data={cpuHist} color="#00d4ff" height={32} />
+          <Sparkline data={cpuHist} color="var(--metric-cpu)" height={32} />
         </div>
         <div style={{ marginBottom:12 }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
             <span className="arc-label">RAM HISTORY (60s)</span>
-            <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'#0066ff' }}>{ram}%</span>
+            <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:10, color:'var(--accent)' }}>{ram}%</span>
           </div>
-          <Sparkline data={ramHist} color="#0066ff" height={32} />
+          <Sparkline data={ramHist} color="var(--accent)" height={32} />
         </div>
         <div style={{ marginTop:10 }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
             <span className="arc-label">DISK USAGE</span>
-            <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--purple)' }}>{disk}%</span>
+            <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:10, color:'var(--purple)' }}>{disk}%</span>
           </div>
-          <Sparkline data={diskHist} color="#8b5cf6" height={24} />
+          <Sparkline data={diskHist} color="var(--purple)" height={24} />
         </div>
       </div>
 
@@ -318,10 +319,10 @@ export default function SystemPanel(_props: SystemPanelProps = {}) {
           <div className="panel-title" style={{ marginBottom:10 }}>AGENTS</div>
           {agents.map((ag, i) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-              <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text2)' }}>
+              <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:10, color:'var(--text2)' }}>
                 {(ag.name as string) || (ag.type as string) || `agent_${i}`}
               </span>
-              <span style={{ fontFamily:'var(--font-mono)', fontSize:9, padding:'2px 8px', borderRadius:10,
+              <span style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:9, padding:'2px 8px', borderRadius:10,
                 background: ag.running ? 'rgba(0,229,160,.1)' : 'rgba(255,51,102,.1)',
                 color: ag.running ? 'var(--green)' : 'var(--red)',
                 border:`1px solid ${ag.running ? 'rgba(0,229,160,.2)' : 'rgba(255,51,102,.2)'}` }}>
@@ -337,7 +338,7 @@ export default function SystemPanel(_props: SystemPanelProps = {}) {
         <div className="panel-header">
           <span className="panel-title">LIVE LOG</span>
           <button onClick={clearLogs} style={{
-            fontFamily:'var(--font-hud)', fontSize:8, letterSpacing:'.1em',
+            fontFamily:'IBM Plex Mono, monospace', fontSize:8, letterSpacing:'.1em',
             color:'var(--text2)', background:'none', border:'none', cursor:'pointer',
           }}>CLEAR</button>
         </div>
@@ -351,7 +352,7 @@ export default function SystemPanel(_props: SystemPanelProps = {}) {
             )
           })}
           {logs.length === 0 && (
-            <div style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text2)', opacity:.5 }}>
+            <div style={{ fontFamily:'IBM Plex Mono, monospace', fontSize:10, color:'var(--text2)', opacity:.5 }}>
               awaiting data...
             </div>
           )}

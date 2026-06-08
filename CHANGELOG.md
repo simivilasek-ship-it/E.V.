@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [5.15.0] - 2026-06-08
+
+### Changed — Unified Design System
+- **Single design system** — eliminated two competing visual languages (glass/indigo + retro HUD)
+- **`globals.css`** — added `.panel`, `.panel-header`, `.panel-title`, `.arc-label`, `.arc-row`, `.btn-hud`, `.metric-badge`, `.skeleton`; CSS vars `--bg-hud`, `--text2`, `--border-hud`, `--metric-*`
+- **`tailwind.config.ts`** — aligned with globals.css (matching colors, IBM Plex Mono as `hud` font)
+- **DashboardPanel** — fully ported to CSS vars, `.panel` classes, skeleton loader, error states
+- **SystemPanel** — fixed all undefined CSS classes; 24 `var(--font-hud)` refs → real font stack
+- **HeroPanel** — status bar colors unified to CSS vars
+- **WorkflowEditor** — node colors, toolbar, canvas, config panel all use CSS vars; SVG fills via `style={}`
+- **AgentTimeline** — `color-mix()` for opacity tints; IBM Plex Mono throughout
+- **MemoryGraph** — container/toolbar on CSS vars; graph SVG untouched
+- **PluginMarketplace + SkillGenerator** — `S` style objects replaced with CSS vars
+- Light theme now works across all panels
+
+
 ## [5.14.0] - 2026-06-08
 
 ### Added

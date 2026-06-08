@@ -5,14 +5,14 @@ import { useJarvis } from '@/store/jarvis'
 import { apiUrl } from '@/lib/api'
 
 const STEP_COLORS: Record<string, string> = {
-  plan:    '#8b5cf6',
-  route:   '#00d4ff',
-  execute: '#10b981',
-  critic:  '#f59e0b',
-  react:   '#3b82f6',
-  done:    '#10b981',
-  error:   '#ef4444',
-  answer:  '#00d4ff',
+  plan:    'var(--purple)',
+  route:   'var(--cyan)',
+  execute: 'var(--green)',
+  critic:  'var(--amber)',
+  react:   'var(--blue)',
+  done:    'var(--green)',
+  error:   'var(--red)',
+  answer:  'var(--cyan)',
 }
 
 const STEP_ICONS: Record<string, string> = {
@@ -47,7 +47,7 @@ interface StepNodeProps {
 
 function StepNode({ step, index, total }: StepNodeProps) {
   const [expanded, setExpanded] = useState(false)
-  const col = STEP_COLORS[step.type] || '#4a6a8a'
+  const col = STEP_COLORS[step.type] || 'var(--muted)'
   const durationMs = step.duration_ms ? `${Math.round(step.duration_ms)}ms` : ''
 
   return (
@@ -56,11 +56,11 @@ function StepNode({ step, index, total }: StepNodeProps) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 32, flexShrink: 0 }}>
         <div style={{
           width: 12, height: 12, borderRadius: '50%', background: col, flexShrink: 0,
-          boxShadow: `0 0 8px ${col}88`, marginTop: 10,
+          boxShadow: `0 0 8px color-mix(in srgb, ${col} 53%, transparent)`, marginTop: 10,
           border: step.status === 'running' ? `2px solid white` : 'none',
         }} />
         {index < total - 1 && (
-          <div style={{ width: 2, flex: 1, background: `${col}44`, minHeight: 20 }} />
+          <div style={{ width: 2, flex: 1, background: `color-mix(in srgb, ${col} 27%, transparent)`, minHeight: 20 }} />
         )}
       </div>
 
@@ -68,15 +68,15 @@ function StepNode({ step, index, total }: StepNodeProps) {
       <div
         onClick={() => step.detail && setExpanded(!expanded)}
         style={{
-          flex: 1, background: '#0b1220', border: `1px solid ${col}33`,
+          flex: 1, background: 'var(--bg-hud)', border: `1px solid color-mix(in srgb, ${col} 20%, transparent)`,
           borderRadius: 6, padding: '8px 12px', marginLeft: 8, marginBottom: 6,
           cursor: step.detail ? 'pointer' : 'default',
           transition: 'border-color .2s',
         }}
         onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) =>
-          step.detail && (e.currentTarget.style.borderColor = col + '88')}
+          step.detail && (e.currentTarget.style.borderColor = `color-mix(in srgb, ${col} 53%, transparent)`)}
         onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) =>
-          (e.currentTarget.style.borderColor = col + '33')}
+          (e.currentTarget.style.borderColor = `color-mix(in srgb, ${col} 20%, transparent)`)}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -85,20 +85,20 @@ function StepNode({ step, index, total }: StepNodeProps) {
               {step.type}
             </span>
             {step.tool && (
-              <span style={{ fontSize: 10, color: '#475569', background: '#1a3050', borderRadius: 3, padding: '1px 6px' }}>
+              <span style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--bg-elevated)', borderRadius: 3, padding: '1px 6px' }}>
                 {step.tool}
               </span>
             )}
           </div>
-          <span style={{ fontSize: 10, color: '#2d3748' }}>{durationMs}</span>
+          <span style={{ fontSize: 10, color: 'var(--muted)' }}>{durationMs}</span>
         </div>
-        <div style={{ fontSize: 12, color: '#e2f0ff', marginTop: 4, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 4, lineHeight: 1.5 }}>
           {step.message}
         </div>
         {expanded && step.detail && (
           <div style={{
-            marginTop: 6, padding: '6px 8px', background: '#050a15', borderRadius: 4,
-            fontSize: 11, color: '#7ea8d4', whiteSpace: 'pre-wrap', fontFamily: 'monospace',
+            marginTop: 6, padding: '6px 8px', background: 'var(--bg)', borderRadius: 4,
+            fontSize: 11, color: 'var(--text2)', whiteSpace: 'pre-wrap', fontFamily: 'IBM Plex Mono, monospace',
           }}>
             {typeof step.detail === 'string' ? step.detail : JSON.stringify(step.detail, null, 2)}
           </div>
@@ -114,22 +114,22 @@ interface RunCardProps {
 
 function RunCard({ run }: RunCardProps) {
   const dur = run.duration_ms ? `${(run.duration_ms / 1000).toFixed(1)}s` : '—'
-  const statusColor = run.status === 'done' ? '#10b981' : run.status === 'error' ? '#ef4444' : '#fbbf24'
+  const statusColor = run.status === 'done' ? 'var(--green)' : run.status === 'error' ? 'var(--red)' : 'var(--amber)'
 
   return (
-    <div style={{ background: '#0b1220', border: '1px solid #1a3050', borderRadius: 8, padding: '14px 16px', marginBottom: 14 }}>
+    <div style={{ background: 'var(--bg-hud)', border: '1px solid var(--border-hud)', borderRadius: 8, padding: '14px 16px', marginBottom: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 13, color: '#e2f0ff', fontWeight: 500, marginBottom: 2 }}>
+          <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, marginBottom: 2 }}>
             {run.task}
           </div>
-          <div style={{ fontSize: 10, color: '#475569' }}>
+          <div style={{ fontSize: 10, color: 'var(--muted)' }}>
             {run.agent_type} · {new Date(run.started_at).toLocaleTimeString()} · {dur}
           </div>
         </div>
         <span style={{
           padding: '2px 8px', borderRadius: 3, fontSize: 10,
-          background: statusColor + '22', color: statusColor,
+          background: `color-mix(in srgb, ${statusColor} 13%, transparent)`, color: statusColor,
         }}>
           {run.status?.toUpperCase()}
         </span>
@@ -139,8 +139,8 @@ function RunCard({ run }: RunCardProps) {
       ))}
       {run.answer && (
         <div style={{
-          marginTop: 8, padding: '8px 10px', background: '#050a15', borderRadius: 6,
-          fontSize: 12, color: '#10b981', borderLeft: '2px solid #10b981',
+          marginTop: 8, padding: '8px 10px', background: 'var(--bg)', borderRadius: 6,
+          fontSize: 12, color: 'var(--green)', borderLeft: '2px solid var(--green)',
         }}>
           {run.answer}
         </div>
@@ -193,13 +193,13 @@ export default function AgentTimeline() {
   ]
 
   return (
-    <div style={{ fontFamily: 'var(--font-mono,monospace)', color: '#e2f0ff' }}>
+    <div style={{ fontFamily: 'IBM Plex Mono, monospace', color: 'var(--text)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <div style={{ color: '#475569', fontSize: 9, letterSpacing: '.15em' }}>
+        <div style={{ color: 'var(--muted)', fontSize: 9, letterSpacing: '.15em' }}>
           AGENT TIMELINE — plán · kroky · akce · výsledky · kritika
         </div>
         {live && (
-          <span style={{ fontSize: 10, color: '#fbbf24', animation: 'pulse 1s infinite' }}>
+          <span style={{ fontSize: 10, color: 'var(--amber)', animation: 'pulse 1s infinite' }}>
             ● LIVE
           </span>
         )}
@@ -207,8 +207,8 @@ export default function AgentTimeline() {
 
       {allRuns.length === 0 ? (
         <div style={{
-          background: '#0b1220', border: '1px solid #1a3050', borderRadius: 8,
-          padding: '40px 20px', textAlign: 'center', color: '#2d3748', fontSize: 12,
+          background: 'var(--bg-hud)', border: '1px solid var(--border-hud)', borderRadius: 8,
+          padding: '40px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 12,
         }}>
           Žádné agentní úlohy zatím.<br />
           <span style={{ fontSize: 11, marginTop: 6, display: 'block' }}>

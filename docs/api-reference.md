@@ -15,7 +15,7 @@ Rychlý status check backendu.
 {
   "status": "ok",
   "uptime_s": 3621.4,
-  "version": "5.14.0",
+  "version": "5.15.0",
   "ws": "running",
   "ollama": "online",
   "model": "qwen2.5:3b"

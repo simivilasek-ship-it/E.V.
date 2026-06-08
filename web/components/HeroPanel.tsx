@@ -30,11 +30,11 @@ export function JarvisStatusBar() {
 
   const okPlugins = plugins.filter(p => p.status === 'ok').length
   const items: StatusItem[] = [
-    { label: 'Model',   value: currentModel || 'qwen2.5:3b',                        color: '#00c8ff' },
-    { label: 'Memory',  value: 'Active',                                             color: '#22d3a5' },
-    { label: 'Plugins', value: `${okPlugins}/${plugins.length} OK`,                  color: '#a855f7' },
-    { label: 'MCP',     value: mcpCount,                                             color: '#f59e0b' },
-    { label: 'Agents',  value: agentStatus,                                          color: '#f59e0b' },
+    { label: 'Model',   value: currentModel || 'qwen2.5:3b',                        color: 'var(--cyan)' },
+    { label: 'Memory',  value: 'Active',                                             color: 'var(--green)' },
+    { label: 'Plugins', value: `${okPlugins}/${plugins.length} OK`,                  color: 'var(--purple)' },
+    { label: 'MCP',     value: mcpCount,                                             color: 'var(--amber)' },
+    { label: 'Agents',  value: agentStatus,                                          color: 'var(--amber)' },
   ]
 
   return (

@@ -52,8 +52,8 @@ function TagBadge({ tag }: { tag: string }) {
   return (
     <span style={{
       fontSize: 9, padding: '1px 6px', borderRadius: 3,
-      background: colors[tag] || '#1a2a3a',
-      color: '#7ea8d4', letterSpacing: '0.1em',
+      background: colors[tag] || 'var(--bg-elevated)',
+      color: 'var(--text2)', letterSpacing: '0.1em',
       fontFamily: "'Courier New', monospace",
     }}>
       {tag}
@@ -170,7 +170,7 @@ export default function PluginMarketplace() {
   const mono: React.CSSProperties = { fontFamily: "'Courier New', monospace" }
 
   const panel: React.CSSProperties = {
-    background: '#070b12', border: '1px solid #1a3050',
+    background: 'var(--bg-hud)', border: '1px solid var(--border-hud)',
     borderRadius: 8, ...mono,
   }
 
@@ -194,20 +194,20 @@ export default function PluginMarketplace() {
             placeholder="Hledat plugin..."
             style={{
               flex: 1, minWidth: 140, padding: '5px 10px', fontSize: 11,
-              background: '#0b1220', border: '1px solid #1a3050', borderRadius: 4,
-              color: '#7ea8d4', ...mono, outline: 'none',
+              background: 'var(--bg-elevated)', border: '1px solid var(--border-hud)', borderRadius: 4,
+              color: 'var(--text2)', ...mono, outline: 'none',
             }}
           />
           {(['all', 'installed', 'builtin', 'updates'] as FilterTag[]).map(f => (
             <button key={f} onClick={() => setFilter(f)}
               style={{
-                ...btn(filter === f ? '#00d4ff' : '#4a6a8a'),
-                background: filter === f ? '#00d4ff22' : 'transparent',
+                ...btn(filter === f ? 'var(--metric-cpu)' : 'var(--muted)'),
+                background: filter === f ? 'rgba(0,212,255,.13)' : 'transparent',
               }}>
               {f === 'updates' && updates > 0 ? `updates (${updates})` : f}
             </button>
           ))}
-          <button onClick={fetchCatalog} style={btn('#7ea8d4')}>↻</button>
+          <button onClick={fetchCatalog} style={btn('var(--text2)')}>↻</button>
         </div>
 
         {/* Seznam pluginů */}
@@ -229,26 +229,26 @@ export default function PluginMarketplace() {
                 ...panel,
                 padding: '10px 14px',
                 cursor: 'pointer',
-                borderColor: selected?.id === p.id ? '#00d4ff44' : '#1a3050',
-                background: selected?.id === p.id ? '#00d4ff08' : '#070b12',
+                borderColor: selected?.id === p.id ? 'rgba(0,212,255,.27)' : 'var(--border-hud)',
+                background: selected?.id === p.id ? 'rgba(0,212,255,.03)' : 'var(--bg-hud)',
                 transition: 'all 0.2s',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: '#e2e8f0', fontWeight: 600 }}>{p.name}</span>
-                <span style={{ fontSize: 9, color: '#4a6a8a' }}>v{p.version}</span>
+                <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>{p.name}</span>
+                <span style={{ fontSize: 9, color: 'var(--muted)' }}>v{p.version}</span>
                 {p.installed && <span style={{ fontSize: 9, color: '#00e5a0' }}>✓ nainstalován</span>}
                 {p.has_update && (
                   <span style={{ fontSize: 9, color: '#ffb300' }}>⬆ {p.new_version}</span>
                 )}
               </div>
-              <div style={{ fontSize: 10, color: '#7ea8d4', marginBottom: 6 }}>{p.description}</div>
+              <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 6 }}>{p.description}</div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ color: '#f59e0b', fontSize: 11 }}>
                   <Stars rating={p.rating} />
                 </span>
-                <span style={{ fontSize: 9, color: '#4a6a8a' }}>{p.rating} ({p.reviews})</span>
-                <span style={{ fontSize: 9, color: '#4a6a8a' }}>↓ {p.downloads}</span>
+                <span style={{ fontSize: 9, color: 'var(--muted)' }}>{p.rating} ({p.reviews})</span>
+                <span style={{ fontSize: 9, color: 'var(--muted)' }}>↓ {p.downloads}</span>
                 {p.tags.slice(0, 3).map(t => <TagBadge key={t} tag={t} />)}
               </div>
             </div>
@@ -262,11 +262,11 @@ export default function PluginMarketplace() {
 
           {/* Header */}
           <div style={{ ...panel, padding: 16 }}>
-            <div style={{ fontSize: 14, color: '#e2e8f0', marginBottom: 4 }}>{selected.name}</div>
-            <div style={{ fontSize: 10, color: '#4a6a8a', marginBottom: 8 }}>
+            <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>{selected.name}</div>
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 8 }}>
               by {selected.author} · v{selected.version}
             </div>
-            <div style={{ fontSize: 10, color: '#7ea8d4', marginBottom: 12, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 12, lineHeight: 1.6 }}>
               {selected.description}
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -307,7 +307,7 @@ export default function PluginMarketplace() {
 
           {/* Hodnocení */}
           <div style={{ ...panel, padding: 14 }}>
-            <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a', marginBottom: 10 }}>
+            <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--muted)', marginBottom: 10 }}>
               HODNOCENÍ · <span style={{ color: '#f59e0b' }}><Stars rating={reviewAvg} /></span> {reviewAvg} ({reviews.length})
             </div>
 
@@ -318,7 +318,7 @@ export default function PluginMarketplace() {
                   <button key={n} onClick={() => setRating(n)}
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
-                      fontSize: 16, color: n <= ratingInput ? '#f59e0b' : '#1a3050',
+                      fontSize: 16, color: n <= ratingInput ? 'var(--amber)' : 'var(--border-hud)',
                     }}>★</button>
                 ))}
               </div>
@@ -327,8 +327,8 @@ export default function PluginMarketplace() {
                 onChange={e => setComment(e.target.value)}
                 placeholder="Váš komentář (nepovinné)"
                 style={{
-                  padding: '4px 8px', fontSize: 10, background: '#0b1220',
-                  border: '1px solid #1a3050', borderRadius: 4, color: '#7ea8d4',
+                  padding: '4px 8px', fontSize: 10, background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-hud)', borderRadius: 4, color: 'var(--text2)',
                   ...mono, outline: 'none',
                 }}
               />
@@ -341,20 +341,20 @@ export default function PluginMarketplace() {
             {/* Seznam hodnocení */}
             <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
               {reviews.length === 0 && (
-                <div style={{ fontSize: 10, color: '#2a4060' }}>Zatím žádná hodnocení.</div>
+                <div style={{ fontSize: 10, color: 'var(--muted)' }}>Zatím žádná hodnocení.</div>
               )}
               {reviews.slice().reverse().map((r, i) => (
                 <div key={i} style={{
-                  padding: '6px 8px', background: '#0b1220',
-                  borderRadius: 4, border: '1px solid #1a3050',
+                  padding: '6px 8px', background: 'var(--bg-elevated)',
+                  borderRadius: 4, border: '1px solid var(--border-hud)',
                 }}>
                   <div style={{ color: '#f59e0b', fontSize: 11, marginBottom: 2 }}>
                     <Stars rating={r.rating} size={10} /> {r.rating}★
                   </div>
                   {r.comment && (
-                    <div style={{ fontSize: 10, color: '#7ea8d4', lineHeight: 1.5 }}>{r.comment}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text2)', lineHeight: 1.5 }}>{r.comment}</div>
                   )}
-                  <div style={{ fontSize: 9, color: '#2a4060', marginTop: 2 }}>
+                  <div style={{ fontSize: 9, color: 'var(--muted)', marginTop: 2 }}>
                     {new Date(r.ts * 1000).toLocaleDateString('cs-CZ')}
                   </div>
                 </div>

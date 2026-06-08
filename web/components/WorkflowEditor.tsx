@@ -31,11 +31,11 @@ const NODE_W = 110
 const NODE_H = 40
 
 const NODE_COLORS: Record<NodeType, string> = {
-  trigger:   '#0066ff',
-  condition: '#f59e0b',
-  action:    '#00e5a0',
-  delay:     '#8b5cf6',
-  notify:    '#f97316',
+  trigger:   'var(--accent)',
+  condition: 'var(--amber)',
+  action:    'var(--green)',
+  delay:     'var(--purple)',
+  notify:    'var(--cyan)',
 }
 
 const NODE_LABELS: Record<NodeType, string> = {
@@ -393,42 +393,42 @@ export default function WorkflowEditor() {
   const mono: React.CSSProperties = { fontFamily: "'Courier New', monospace" }
 
   const btnStyle: React.CSSProperties = {
-    background: '#0b1220', border: '1px solid #1a3050', borderRadius: 4,
-    color: '#7ea8d4', padding: '4px 10px', fontSize: 11, cursor: 'pointer', ...mono,
+    background: 'var(--bg-hud)', border: '1px solid var(--border-hud)', borderRadius: 4,
+    color: 'var(--text2)', padding: '4px 10px', fontSize: 11, cursor: 'pointer', ...mono,
   }
 
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%', minHeight: 500,
-      background: '#070b12', color: '#7ea8d4', ...mono,
+      background: 'var(--bg)', color: 'var(--text2)', ...mono,
       userSelect: drag ? 'none' : 'auto',
     }}>
       {/* Toolbar */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        padding: '8px 12px', borderBottom: '1px solid #1a3050', flexWrap: 'wrap',
+        padding: '8px 12px', borderBottom: '1px solid var(--border-hud)', flexWrap: 'wrap',
       }}>
         <input
           value={workflow.name}
           onChange={e => setWorkflow(w => ({ ...w, name: e.target.value }))}
           style={{
-            background: '#0b1220', border: '1px solid #1a3050', borderRadius: 4,
-            color: '#00d4ff', padding: '4px 8px', fontSize: 12, ...mono, width: 180,
+            background: 'var(--bg-hud)', border: '1px solid var(--border-hud)', borderRadius: 4,
+            color: 'var(--cyan)', padding: '4px 8px', fontSize: 12, ...mono, width: 180,
           }}
         />
         <button style={btnStyle} onClick={handleSave}>Save</button>
         <button style={btnStyle} onClick={handleLoad}>Load</button>
         <button style={btnStyle} onClick={handleExport}>Export JSON</button>
         <button style={btnStyle} onClick={handleImport}>Import JSON</button>
-        <button style={{ ...btnStyle, color: '#f97316', borderColor: '#3a2010' }} onClick={handleClear}>Clear</button>
-        <button style={{ ...btnStyle, color: '#00e5a0', borderColor: '#0a4030' }} onClick={handleTestRun}>▶ Test</button>
+        <button style={{ ...btnStyle, color: 'var(--amber)', borderColor: 'var(--border-hud)' }} onClick={handleClear}>Clear</button>
+        <button style={{ ...btnStyle, color: 'var(--green)', borderColor: 'var(--border-hud)' }} onClick={handleTestRun}>▶ Test</button>
         <button style={btnStyle} onClick={undo} title="Ctrl+Z">Undo</button>
         <button style={btnStyle} onClick={() => setSnapGrid(s => !s)}>{snapGrid ? 'Snap ✓' : 'Snap'}</button>
         <button style={btnStyle} onClick={() => setZoom(z => Math.min(2, +(z + 0.1).toFixed(1)))}>+</button>
         <button style={btnStyle} onClick={() => setZoom(z => Math.max(0.5, +(z - 0.1).toFixed(1)))}>−</button>
-        <span style={{ fontSize: 10, color: '#4a6a8a' }}>{Math.round(zoom * 100)}%</span>
+        <span style={{ fontSize: 10, color: 'var(--muted)' }}>{Math.round(zoom * 100)}%</span>
         {saveStatus && (
-          <span style={{ fontSize: 11, color: saveStatus.includes('✓') ? '#00e5a0' : '#f97316' }}>
+          <span style={{ fontSize: 11, color: saveStatus.includes('✓') ? 'var(--green)' : 'var(--amber)' }}>
             {saveStatus}
           </span>
         )}
@@ -437,11 +437,11 @@ export default function WorkflowEditor() {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Left Panel */}
         <div style={{
-          width: 120, borderRight: '1px solid #1a3050',
+          width: 120, borderRight: '1px solid var(--border-hud)',
           padding: 10, display: 'flex', flexDirection: 'column', gap: 6,
-          background: '#050a15',
+          background: 'var(--bg)',
         }}>
-          <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a', marginBottom: 4 }}>
+          <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--muted)', marginBottom: 4 }}>
             ADD NODE
           </div>
           {(Object.keys(NODE_COLORS) as NodeType[]).map(type => (
@@ -450,8 +450,8 @@ export default function WorkflowEditor() {
               onClick={() => addNode(type)}
               title={NODE_HINTS[type]}
               style={{
-                background: `${NODE_COLORS[type]}15`,
-                border: `1px solid ${NODE_COLORS[type]}44`,
+                background: `color-mix(in srgb, ${NODE_COLORS[type]} 8%, transparent)`,
+                border: `1px solid color-mix(in srgb, ${NODE_COLORS[type]} 27%, transparent)`,
                 borderRadius: 5, color: NODE_COLORS[type],
                 padding: '7px 4px', fontSize: 10, cursor: 'pointer',
                 letterSpacing: '0.1em', ...mono, textAlign: 'left',
@@ -461,7 +461,7 @@ export default function WorkflowEditor() {
               <div style={{ fontSize: 7, opacity: 0.7, marginTop: 2, letterSpacing: 0 }}>{NODE_HINTS[type]}</div>
             </button>
           ))}
-          <div style={{ marginTop: 'auto', fontSize: 8, color: '#2a4060', lineHeight: 1.5 }}>
+          <div style={{ marginTop: 'auto', fontSize: 8, color: 'var(--muted)', opacity: 0.5, lineHeight: 1.5 }}>
             Ctrl+Z undo · Ctrl+D duplikát · Ctrl+S uložit
           </div>
         </div>
@@ -471,7 +471,7 @@ export default function WorkflowEditor() {
           ref={svgRef}
           style={{
             flex: 1, display: 'block',
-            background: '#070b12',
+            background: 'var(--bg)',
             cursor: drag ? 'grabbing' : connecting ? 'crosshair' : 'default',
           }}
           onMouseMove={handleSvgMouseMove}
@@ -486,7 +486,7 @@ export default function WorkflowEditor() {
           <defs>
             <pattern id="wf-hex" x="0" y="0" width="30" height="26" patternUnits="userSpaceOnUse">
               <path d="M15 0 L30 8 L30 18 L15 26 L0 18 L0 8 Z"
-                fill="none" stroke="#0d1a2a" strokeWidth="0.5" />
+                fill="none" stroke="rgba(148,163,184,0.08)" strokeWidth="0.5" />
             </pattern>
             {workflow.nodes.map(n => (
               <marker
@@ -582,11 +582,11 @@ export default function WorkflowEditor() {
                   x={node.x - NODE_W / 2} y={node.y - NODE_H / 2}
                   width={NODE_W} height={NODE_H}
                   rx="7"
-                  fill={isSel ? `${color}20` : '#0b1220'}
-                  stroke={isSel ? color : '#1a3050'}
-                  strokeWidth={isSel ? 2 : 1}
                   style={{
-                    filter: isSel ? `drop-shadow(0 0 8px ${color}77)` : 'none',
+                    fill: isSel ? `color-mix(in srgb, ${color} 12%, transparent)` : 'var(--bg-hud)',
+                    stroke: isSel ? color : 'var(--border-hud)',
+                    strokeWidth: isSel ? 2 : 1,
+                    filter: isSel ? `drop-shadow(0 0 8px ${color})` : 'none',
                     transition: 'all 0.3s',
                   }}
                 />
@@ -594,8 +594,7 @@ export default function WorkflowEditor() {
                   x={node.x} y={node.y - 5}
                   textAnchor="middle" dominantBaseline="middle"
                   fontSize="9" fontFamily="'Courier New', monospace" letterSpacing="1.5"
-                  fill={isSel ? color : '#7ea8d4'}
-                  style={{ transition: 'fill 0.3s', pointerEvents: 'none' }}
+                  style={{ fill: isSel ? color : 'var(--text2)', transition: 'fill 0.3s', pointerEvents: 'none' }}
                 >
                   {node.label}
                 </text>
@@ -603,7 +602,7 @@ export default function WorkflowEditor() {
                   x={node.x} y={node.y + 9}
                   textAnchor="middle" dominantBaseline="middle"
                   fontSize="7" fontFamily="'Courier New', monospace"
-                  fill={`${color}88`}
+                  fill={color} fillOpacity={0.53}
                   style={{ pointerEvents: 'none' }}
                 >
                   {node.type}
@@ -611,8 +610,7 @@ export default function WorkflowEditor() {
                 {/* Input dot */}
                 <circle
                   cx={node.x - NODE_W / 2} cy={node.y} r={5}
-                  fill="#0b1220" stroke={color} strokeWidth={1.5}
-                  style={{ cursor: 'crosshair' }}
+                  style={{ fill: 'var(--bg-hud)', stroke: color, strokeWidth: 1.5, cursor: 'crosshair' }}
                   onMouseUp={e => handleInputDotMouseUp(e, node.id)}
                 />
                 {/* Output dot */}
@@ -631,7 +629,7 @@ export default function WorkflowEditor() {
               x="50%" y="50%"
               textAnchor="middle" dominantBaseline="middle"
               fontSize="11" fontFamily="'Courier New', monospace"
-              fill="#1a3050" letterSpacing="3"
+              style={{ fill: 'var(--muted)' }} fillOpacity={0.35} letterSpacing="3"
             >
               KLIKNI NA TYP UZLU VLEVO PRO PŘIDÁNÍ
             </text>
@@ -641,22 +639,22 @@ export default function WorkflowEditor() {
 
         {/* Right Panel */}
         <div style={{
-          width: 210, borderLeft: '1px solid #1a3050',
+          width: 210, borderLeft: '1px solid var(--border-hud)',
           padding: 12, display: 'flex', flexDirection: 'column', gap: 10,
-          overflowY: 'auto', background: '#050a15',
+          overflowY: 'auto', background: 'var(--bg)',
         }}>
-          <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a' }}>
+          <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--muted)' }}>
             NODE EDITOR
           </div>
           {selectedNode ? (
             <>
               <div>
-                <div style={{ fontSize: 9, color: '#4a6a8a', marginBottom: 4 }}>LABEL</div>
+                <div style={{ fontSize: 9, color: 'var(--muted)', marginBottom: 4 }}>LABEL</div>
                 <input
                   value={selectedNode.label}
                   onChange={e => updateSelectedLabel(e.target.value)}
                   style={{
-                    background: '#0b1220', border: '1px solid #1a3050', borderRadius: 4,
+                    background: 'var(--bg-hud)', border: '1px solid var(--border-hud)', borderRadius: 4,
                     color: NODE_COLORS[selectedNode.type], padding: '4px 8px',
                     fontSize: 11, width: '100%', ...mono, boxSizing: 'border-box',
                   }}
@@ -664,7 +662,7 @@ export default function WorkflowEditor() {
               </div>
               {NODE_CONFIG_FIELDS[selectedNode.type].map(field => (
                 <div key={field.key}>
-                  <div style={{ fontSize: 9, color: '#4a6a8a', marginBottom: 4 }}>
+                  <div style={{ fontSize: 9, color: 'var(--muted)', marginBottom: 4 }}>
                     {field.label.toUpperCase()}
                   </div>
                   <input
@@ -672,8 +670,8 @@ export default function WorkflowEditor() {
                     onChange={e => updateSelectedConfig(field.key, e.target.value)}
                     placeholder={field.label}
                     style={{
-                      background: '#0b1220', border: '1px solid #1a3050', borderRadius: 4,
-                      color: '#7ea8d4', padding: '4px 8px',
+                      background: 'var(--bg-hud)', border: '1px solid var(--border-hud)', borderRadius: 4,
+                      color: 'var(--text2)', padding: '4px 8px',
                       fontSize: 11, width: '100%', ...mono, boxSizing: 'border-box',
                     }}
                   />
@@ -681,8 +679,8 @@ export default function WorkflowEditor() {
               ))}
               <div style={{
                 padding: '4px 8px',
-                background: `${NODE_COLORS[selectedNode.type]}11`,
-                border: `1px solid ${NODE_COLORS[selectedNode.type]}33`,
+                background: `color-mix(in srgb, ${NODE_COLORS[selectedNode.type]} 7%, transparent)`,
+                border: `1px solid color-mix(in srgb, ${NODE_COLORS[selectedNode.type]} 20%, transparent)`,
                 borderRadius: 4, fontSize: 9,
                 color: NODE_COLORS[selectedNode.type], letterSpacing: '0.1em',
               }}>
@@ -691,8 +689,8 @@ export default function WorkflowEditor() {
               <button
                 onClick={deleteSelected}
                 style={{
-                  background: '#140808', border: '1px solid #3a1010', borderRadius: 4,
-                  color: '#f97316', padding: '5px 8px', fontSize: 10,
+                  background: 'var(--bg-hud)', border: '1px solid var(--red)', borderRadius: 4,
+                  color: 'var(--red)', padding: '5px 8px', fontSize: 10,
                   cursor: 'pointer', ...mono,
                 }}
               >
@@ -700,35 +698,35 @@ export default function WorkflowEditor() {
               </button>
             </>
           ) : (
-            <div style={{ fontSize: 10, color: '#2a4060' }}>
+            <div style={{ fontSize: 10, color: 'var(--muted)' }}>
               Vyber uzel pro editaci.{'\n'}Klikni na output dot (pravý kroužek) a přetáhni na input dot (levý kroužek) jiného uzlu pro propojení.
             </div>
           )}
 
-          <div style={{ height: 1, background: '#1a3050', margin: '4px 0' }} />
-          <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a', marginBottom: 2 }}>
+          <div style={{ height: 1, background: 'var(--border-hud)', margin: '4px 0' }} />
+          <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--muted)', marginBottom: 2 }}>
             EXEC ORDER ({execOrder.length})
           </div>
           {execOrder.map((n, i) => (
             <div key={n.id} style={{ fontSize: 9, color: NODE_COLORS[n.type], opacity: 0.9 }}>
-              {i + 1}. {n.label} <span style={{ color: '#4a6a8a' }}>({n.type})</span>
+              {i + 1}. {n.label} <span style={{ color: 'var(--muted)' }}>({n.type})</span>
             </div>
           ))}
 
           {testLog.length > 0 && (
             <>
-              <div style={{ height: 1, background: '#1a3050', margin: '4px 0' }} />
-              <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a' }}>TEST LOG</div>
+              <div style={{ height: 1, background: 'var(--border-hud)', margin: '4px 0' }} />
+              <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--muted)' }}>TEST LOG</div>
               {testLog.map((line, i) => (
-                <div key={i} style={{ fontSize: 8, color: '#5a7a9a', lineHeight: 1.4 }}>{line}</div>
+                <div key={i} style={{ fontSize: 8, color: 'var(--text2)', lineHeight: 1.4 }}>{line}</div>
               ))}
             </>
           )}
 
           {workflow.edges.length > 0 && (
             <>
-              <div style={{ height: 1, background: '#1a3050', margin: '4px 0' }} />
-              <div style={{ fontSize: 9, letterSpacing: '0.2em', color: '#4a6a8a', marginBottom: 2 }}>
+              <div style={{ height: 1, background: 'var(--border-hud)', margin: '4px 0' }} />
+              <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--muted)', marginBottom: 2 }}>
                 CONNECTIONS ({workflow.edges.length})
               </div>
               {workflow.edges.map(edge => {
@@ -738,7 +736,7 @@ export default function WorkflowEditor() {
                 return (
                   <div key={edge.id} style={{
                     display: 'flex', alignItems: 'center', gap: 4,
-                    fontSize: 9, color: '#4a6a8a',
+                    fontSize: 9, color: 'var(--muted)',
                   }}>
                     <span style={{ color: NODE_COLORS[fn.type], maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {fn.label}
@@ -751,7 +749,7 @@ export default function WorkflowEditor() {
                       onClick={() => setWorkflow(w => ({ ...w, edges: w.edges.filter(e => e.id !== edge.id) }))}
                       style={{
                         marginLeft: 'auto', background: 'none', border: 'none',
-                        color: '#4a3030', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1,
+                        color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1,
                       }}
                       title="Remove connection"
                     >

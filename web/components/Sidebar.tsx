@@ -98,7 +98,7 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
             JARVIS
           </div>
           <div className="text-[11px] font-mono" style={{ color: 'var(--muted)' }}>
-            v5.14 · Work OS
+            v5.15 · Work OS
           </div>
         </div>
       </div>

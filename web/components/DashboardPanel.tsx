@@ -2,283 +2,262 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useJarvis } from '@/store/jarvis'
 import { apiUrl } from '@/lib/api'
-import ActivityFeed from './ActivityFeed'
 
-const S = {
-  card:  { background:'#0b1220', border:'1px solid #1a3050', borderRadius:8, padding:'14px 16px', marginBottom:12 },
-  title: { color:'#475569', fontSize:9, letterSpacing:'0.15em', textTransform:'uppercase' as const, marginBottom:10 },
-  badge: (ok: boolean) => ({
-    display:'inline-block', padding:'2px 8px', borderRadius:3, fontSize:10,
-    background: ok ? '#064e3b' : '#7f1d1d',
-    color:      ok ? '#10b981' : '#ef4444',
-  }),
-  bar: (v: number) => {
-    const color = v > 90 ? '#ef4444' : v > 70 ? '#fbbf24' : '#00d4ff'
-    return { width:`${v}%`, height:'100%', background:color, borderRadius:2, transition:'width .5s' }
-  },
-  row: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 0', borderBottom:'1px solid #0b1220', fontSize:12 },
+// ── Types ──────────────────────────────────────────────────────────────────
+interface BackgroundJob {
+  name: string
+  next_run: string
+  last_run?: string
+  runs: number
+  errors?: number
 }
 
-function MetricCard({ label, value, color='#00d4ff' }: { label: string; value: number; color?: string }) {
+interface AuditEntry {
+  ts: string
+  action: string
+  approved?: boolean
+  permission?: string
+  result?: string
+}
+
+interface DashData {
+  jobs?: BackgroundJob[]
+  audit?: AuditEntry[]
+  summary?: string
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────
+function StatCard({ label, value, unit, color, max = 100 }: {
+  label: string; value: number; unit?: string; color: string; max?: number
+}) {
+  const pct = Math.min((value / max) * 100, 100)
+  const displayColor = value > 85 ? 'var(--red)' : value > 65 ? 'var(--amber)' : color
+
   return (
-    <div style={{ background:'#0b1220', border:'1px solid #1a3050', borderRadius:8, padding:'12px 14px', flex:1 }}>
-      <div style={S.title}>{label}</div>
-      <div style={{ fontSize:26, fontWeight:700, color, fontFamily:'var(--font-hud,monospace)' }}>{value}%</div>
-      <div style={{ height:3, background:'#1a3050', borderRadius:2, marginTop:6 }}>
-        <div style={S.bar(Number(value))} />
+    <div className="panel" style={{ padding: '16px 20px', flex: 1, minWidth: 130 }}>
+      <div className="panel-title" style={{ marginBottom: 12 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+        <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 28, fontWeight: 600, color: displayColor, lineHeight: 1 }}>
+          {value.toFixed(1)}
+        </span>
+        {unit && <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, color: 'var(--muted)' }}>{unit}</span>}
+      </div>
+      <div style={{ marginTop: 10, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.06)' }}>
+        <div style={{
+          height: '100%', borderRadius: 2,
+          width: `${pct}%`,
+          background: displayColor,
+          boxShadow: `0 0 6px ${displayColor}`,
+          transition: 'width 0.6s ease, background 0.3s',
+        }} />
       </div>
     </div>
   )
 }
 
-interface SystemData {
-  cpu?: number
-  ram?: number
-  disk?: number
+// ── Agent badge ───────────────────────────────────────────────────────────
+function AgentBadge({ name, status }: { name: string; status: string }) {
+  const statusColor = status === 'ok' || status === 'running' ? 'var(--green)'
+    : status === 'error' ? 'var(--red)' : 'var(--amber)'
+  return (
+    <span className="metric-badge" style={{ color: statusColor, borderColor: `${statusColor}33` }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
+      {name}
+    </span>
+  )
 }
 
-interface LogEntry {
-  text?: string
-}
-
-interface AgentEntry {
-  name?: string
-  running?: boolean
-  [key: string]: unknown
-}
-
-interface SchedulerEntry {
-  name: string
-  fire_at: string
-  repeat: string
-  run_count: number
-}
-
-interface AuditEntry {
-  timestamp?: number
-  action?: string
-  allowed?: boolean
-  reason?: string
-}
-
-interface WorkSummary {
-  summary?: string[]
-}
-
+// ── Main ──────────────────────────────────────────────────────────────────
 export default function DashboardPanel() {
-  const system  = useJarvis(s => s.system) as SystemData
-  const logs    = useJarvis(s => s.logs) as LogEntry[]
-  const agents  = useJarvis(s => s.agents) as unknown as AgentEntry[]
-  const workSummary = useJarvis(s => s.workSummary) as WorkSummary | null
-  const suggestions = useJarvis(s => s.proactiveSuggestions)
+  const system  = useJarvis(s => s.system)
+  const agents  = useJarvis(s => s.agents)
 
-  const [audit,     setAudit]     = useState<AuditEntry[]>([])
-  const [scheduler, setScheduler] = useState<SchedulerEntry[]>([])
-  const [ollama,    setOllama]    = useState({ ok: false, model: '—' })
-  const [uptime,    setUptime]    = useState('—')
+  const [data, setData]       = useState<DashData>({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
 
-  const refresh = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const [st, au, sc] = await Promise.all([
-        fetch(apiUrl('/api/status')).then(r => r.json()).catch(() => ({})),
-        fetch(apiUrl('/api/audit')).then(r => r.json()).catch(() => []),
-        fetch(apiUrl('/api/scheduler')).then(r => r.json()).catch(() => []),
+      const [jobsRes, auditRes] = await Promise.allSettled([
+        fetch(apiUrl('/api/scheduler/jobs')),
+        fetch(apiUrl('/api/audit?limit=20')),
       ])
-      setOllama({ ok: st.ollama, model: st.model || '—' })
-      setAudit(Array.isArray(au) ? au.slice(-20).reverse() : [])
-      setScheduler(Array.isArray(sc) ? sc : [])
-    } catch {}
+      const jobs  = jobsRes.status  === 'fulfilled' && jobsRes.value.ok  ? await jobsRes.value.json()  : []
+      const audit = auditRes.status === 'fulfilled' && auditRes.value.ok ? await auditRes.value.json() : []
+      setData({ jobs: Array.isArray(jobs) ? jobs : jobs.jobs ?? [], audit: Array.isArray(audit) ? audit : audit.entries ?? [] })
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Backend offline')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
-    refresh()
-    const iv = setInterval(refresh, 6000)
-    return () => clearInterval(iv)
-  }, [refresh])
+    fetchData()
+    const t = setInterval(fetchData, 30_000)
+    return () => clearInterval(t)
+  }, [fetchData])
 
-  // Uptime počítadlo
-  useEffect(() => {
-    const start = Date.now()
-    const iv = setInterval(() => {
-      const s = Math.floor((Date.now() - start) / 1000)
-      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
-      setUptime(`${h > 0 ? h + 'h ' : ''}${m}m ${sec}s`)
-    }, 1000)
-    return () => clearInterval(iv)
-  }, [])
+  const fetchSummary = async () => {
+    setSummaryLoading(true)
+    try {
+      const r = await fetch(apiUrl('/api/activity/report?format=md'))
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const d = await r.json()
+      setData(prev => ({ ...prev, summary: d.markdown || d.summary_text || 'Žádná aktivita dnes.' }))
+    } catch (e) {
+      setData(prev => ({ ...prev, summary: `⚠ ${e instanceof Error ? e.message : 'error'}` }))
+    } finally {
+      setSummaryLoading(false)
+    }
+  }
+
+  const cpu  = system?.cpu  ?? 0
+  const ram  = system?.ram  ?? 0
+  const disk = system?.disk ?? 0
+  const load = system?.load ?? 0
+
+  const SectionHead = ({ title, action }: { title: string; action?: React.ReactNode }) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+      <span className="panel-title">{title}</span>
+      {action}
+    </div>
+  )
 
   return (
-    <div style={{ height:'100%', overflowY:'auto', padding:14, fontFamily:'var(--font-mono,monospace)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* ── System metrics ─────────────────────────────────── */}
+      <div>
+        <SectionHead title="System Metrics" />
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <StatCard label="CPU"  value={cpu}  unit="%" color="var(--metric-cpu)"  />
+          <StatCard label="RAM"  value={ram}  unit="%" color="var(--metric-ram)"  />
+          <StatCard label="DISK" value={disk} unit="%" color="var(--metric-disk)" />
+          <StatCard label="LOAD" value={load} unit=""  color="var(--metric-load)" max={8} />
+        </div>
+      </div>
 
-      {/* Metriky */}
-      <div style={S.title}>SYSTÉMOVÉ METRIKY</div>
-      <div style={{ display:'flex', gap:10, marginBottom:14 }}>
-        <MetricCard label="CPU" value={system.cpu || 0} />
-        <MetricCard label="RAM" value={system.ram || 0} color="#a78bfa" />
-        <MetricCard label="DISK" value={system.disk || 0} color="#34d399" />
-        <div style={{ background:'#0b1220', border:'1px solid #1a3050', borderRadius:8, padding:'12px 14px', flex:1 }}>
-          <div style={S.title}>OLLAMA</div>
-          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-            <span style={{ width:7, height:7, borderRadius:'50%', background: ollama.ok ? '#10b981':'#ef4444', display:'inline-block', flexShrink:0 }} />
-            <span style={{ fontSize:12, color: ollama.ok ? '#10b981':'#ef4444' }}>{ollama.ok ? 'Online' : 'Offline'}</span>
+      {/* ── Monitoring agents ──────────────────────────────── */}
+      {agents && Object.keys(agents).length > 0 && (
+        <div>
+          <SectionHead title="Monitoring Agents" />
+          <div className="panel" style={{ padding: '10px 14px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {Object.entries(agents).map(([name, st]: [string, unknown]) => (
+              <AgentBadge key={name} name={name} status={String((st as {status?: string})?.status ?? 'ok')} />
+            ))}
+            {Object.keys(agents).length === 0 && (
+              <span style={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic' }}>No agents running</span>
+            )}
           </div>
-          <div style={{ fontSize:10, color:'#475569', marginTop:4 }}>{ollama.model}</div>
-          <div style={{ fontSize:10, color:'#1a3050', marginTop:2 }}>uptime {uptime}</div>
-        </div>
-      </div>
-
-      <div style={S.card}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={S.title}>DNES — WORK TIMELINE</div>
-          <button
-            type="button"
-            disabled={summaryLoading}
-            onClick={async () => {
-              setSummaryLoading(true)
-              try {
-                const res = await fetch(apiUrl('/api/activity/report?format=md'))
-                if (!res.ok) throw new Error(`HTTP ${res.status}`)
-                const d = await res.json()
-                useJarvis.getState().addMessage(d.markdown || d.summary_text || 'Žádná aktivita.', 'jarvis')
-                useJarvis.getState().addToast('Denní shrnutí vloženo do chatu', 'success', 3000)
-              } catch {
-                useJarvis.getState().addToast('Shrnutí dne selhalo — backend offline', 'error', 3000)
-              } finally {
-                setSummaryLoading(false)
-              }
-            }}
-            style={{ fontSize: 10, padding: '4px 10px', borderRadius: 4, border: '1px solid #1a3050', background: '#0f1a2e', color: summaryLoading ? '#475569' : '#7dd3fc', cursor: summaryLoading ? 'not-allowed' : 'pointer', opacity: summaryLoading ? 0.6 : 1 }}
-          >
-            {summaryLoading ? 'Načítám…' : 'Shrnutí dne (Alt+D)'}
-          </button>
-        </div>
-        {workSummary?.summary && workSummary.summary.length > 0 ? (
-          workSummary.summary.map((line, i) => (
-            <div key={i} style={{ fontSize: 13, color: '#e2f0ff', padding: '4px 0' }}>{line}</div>
-          ))
-        ) : (
-          <div style={{ fontSize: 12, color: '#475569' }}>Zatím žádná aktivita — pracuj v IDE/terminálu, JARVIS to zaznamená.</div>
-        )}
-      </div>
-
-      {suggestions.length > 0 && (
-        <div style={S.card}>
-          <div style={S.title}>PROAKTIVNÍ AI</div>
-          {suggestions.slice(-3).map(s => (
-            <div key={s.id} style={{ padding: '6px 0', borderBottom: '1px solid #0b1220' }}>
-              <div style={{ fontSize: 12, color: s.severity === 'error' ? '#ef4444' : '#fbbf24' }}>{s.title}</div>
-              {s.detail && <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>{s.detail}</div>}
-            </div>
-          ))}
         </div>
       )}
 
-      <div style={S.card}>
-        <div style={S.title}>AGENT ACTIVITY FEED</div>
-        <ActivityFeed compact />
-      </div>
-
-      {/* Agenti */}
-      <div style={S.card}>
-        <div style={S.title}>BACKGROUND AGENTI</div>
-        {Array.isArray(agents) && agents.length > 0 ? (
-          agents.map((ag, i) => (
-            <div key={i} style={S.row}>
-              <span style={{ color:'#e2f0ff' }}>{ag.name || String(ag)}</span>
-              <span style={S.badge(ag.running !== false)}>
-                {ag.running !== false ? 'běží' : 'zastaven'}
-              </span>
-            </div>
-          ))
+      {/* ── Work summary ───────────────────────────────────── */}
+      <div>
+        <SectionHead
+          title="Work Timeline (Dnes)"
+          action={
+            <button
+              className="btn-hud"
+              onClick={fetchSummary}
+              disabled={summaryLoading}
+            >
+              {summaryLoading ? '⏳' : '↻'} {summaryLoading ? 'Načítám…' : 'Shrnutí (Alt+D)'}
+            </button>
+          }
+        />
+        {data.summary ? (
+          <div className="panel" style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text2)', whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+            {data.summary}
+          </div>
         ) : (
-          <div style={{ display:'flex', gap:16 }}>
-            {['cpu_monitor','ram_monitor','disk_monitor'].map(n => (
-              <div key={n} style={S.row}>
-                <span style={{ color:'#7ea8d4', fontSize:11 }}>{n}</span>
-                <span style={{ ...S.badge(true), marginLeft:8 }}>běží</span>
-              </div>
-            ))}
+          <div className="panel" style={{ padding: '12px 14px', fontSize: 12, color: 'var(--muted)', fontStyle: 'italic' }}>
+            Klikni na „Shrnutí" nebo stiskni Alt+D
           </div>
         )}
       </div>
 
-      {/* Scheduler */}
-      <div style={S.card}>
-        <div style={S.title}>NAPLÁNOVANÉ ÚLOHY</div>
-        {scheduler.length > 0 ? (
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
-            <thead>
-              <tr style={{ color:'#475569', fontSize:9, letterSpacing:'.1em' }}>
-                <th style={{ textAlign:'left', padding:'4px 6px', borderBottom:'1px solid #1a3050' }}>NÁZEV</th>
-                <th style={{ textAlign:'left', padding:'4px 6px', borderBottom:'1px solid #1a3050' }}>SPUŠTĚNÍ</th>
-                <th style={{ textAlign:'left', padding:'4px 6px', borderBottom:'1px solid #1a3050' }}>OPAKOVÁNÍ</th>
-                <th style={{ textAlign:'right', padding:'4px 6px', borderBottom:'1px solid #1a3050' }}>POČET</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scheduler.map((t, i) => (
-                <tr key={i}>
-                  <td style={{ padding:'5px 6px', color:'#e2f0ff', borderBottom:'1px solid #0b1220' }}>{t.name}</td>
-                  <td style={{ padding:'5px 6px', color:'#7ea8d4', borderBottom:'1px solid #0b1220' }}>{t.fire_at}</td>
-                  <td style={{ padding:'5px 6px', color:'#475569', borderBottom:'1px solid #0b1220' }}>{t.repeat}</td>
-                  <td style={{ padding:'5px 6px', color:'#475569', textAlign:'right', borderBottom:'1px solid #0b1220' }}>{t.run_count}</td>
+      {/* ── Background jobs ────────────────────────────────── */}
+      <div>
+        <SectionHead title="Background Jobs" />
+        <div className="panel" style={{ overflow: 'hidden' }}>
+          {loading ? (
+            <div style={{ padding: 24, textAlign: 'center' }}>
+              <div className="skeleton" style={{ height: 12, margin: '0 auto', maxWidth: 200 }} />
+            </div>
+          ) : error ? (
+            <div style={{ padding: 16, fontSize: 12, color: 'var(--amber)' }}>⚠ {error}</div>
+          ) : (data.jobs ?? []).length === 0 ? (
+            <div style={{ padding: 16, fontSize: 12, color: 'var(--muted)', fontStyle: 'italic' }}>No scheduled jobs</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-hud)' }}>
+                  {['JOB', 'NEXT RUN', 'LAST RUN', 'RUNS', 'ERRORS'].map(h => (
+                    <th key={h} className="panel-title" style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 400 }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div style={{ color:'#2d3748', fontSize:11 }}>Žádné naplánované úlohy</div>
-        )}
-      </div>
-
-      {/* Audit log */}
-      <div style={S.card}>
-        <div style={S.title}>AUDIT LOG (posledních 20)</div>
-        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
-          <thead>
-            <tr style={{ color:'#475569', fontSize:9, letterSpacing:'.1em' }}>
-              <th style={{ textAlign:'left', padding:'4px 6px', borderBottom:'1px solid #1a3050' }}>ČAS</th>
-              <th style={{ textAlign:'left', padding:'4px 6px', borderBottom:'1px solid #1a3050' }}>AKCE</th>
-              <th style={{ textAlign:'left', padding:'4px 6px', borderBottom:'1px solid #1a3050' }}>POVOLENO</th>
-              <th style={{ textAlign:'left', padding:'4px 6px', borderBottom:'1px solid #1a3050' }}>DŮVOD</th>
-            </tr>
-          </thead>
-          <tbody>
-            {audit.length > 0 ? audit.map((e, i) => {
-              const t = e.timestamp ? new Date(e.timestamp * 1000).toLocaleTimeString() : '—'
-              return (
-                <tr key={i}>
-                  <td style={{ padding:'4px 6px', color:'#475569', borderBottom:'1px solid #0b1220', whiteSpace:'nowrap' }}>{t}</td>
-                  <td style={{ padding:'4px 6px', color:'#e2f0ff', borderBottom:'1px solid #0b1220' }}>{e.action}</td>
-                  <td style={{ padding:'4px 6px', borderBottom:'1px solid #0b1220' }}>
-                    <span style={S.badge(!!e.allowed)}>{e.allowed ? 'ANO' : 'NE'}</span>
-                  </td>
-                  <td style={{ padding:'4px 6px', color:'#475569', borderBottom:'1px solid #0b1220', fontSize:10 }}>{e.reason}</td>
-                </tr>
-              )
-            }) : (
-              <tr><td colSpan={4} style={{ padding:'8px 6px', color:'#2d3748' }}>Prázdný audit log</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* System logy */}
-      <div style={S.card}>
-        <div style={S.title}>SYSTEM LOGY (posledních 100)</div>
-        <div style={{ background:'#050a15', borderRadius:4, padding:'8px 10px', height:200, overflowY:'auto', fontSize:10, lineHeight:1.7 }}>
-          {logs.length === 0
-            ? <span style={{ color:'#1a3050' }}>Připojuji se na WebSocket…</span>
-            : logs.slice(-100).reverse().map((l, i) => (
-                <div key={i} style={{ color: l.text?.includes('ERROR') ? '#ef4444' : l.text?.includes('WARN') ? '#fbbf24' : '#7ea8d4', borderBottom:'1px solid #0b1220', paddingBottom:1 }}>
-                  {l.text}
-                </div>
-              ))
-          }
+              </thead>
+              <tbody>
+                {(data.jobs ?? []).map((job, i) => (
+                  <tr key={job.name} style={{ borderBottom: i < (data.jobs!.length - 1) ? '1px solid var(--border)' : 'none' }}>
+                    <td style={{ padding: '7px 12px', fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: 'var(--text)' }}>{job.name}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: 'var(--cyan)' }}>{job.next_run}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: 'var(--text2)' }}>{job.last_run ?? '—'}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: 'var(--text2)', textAlign: 'right' }}>{job.runs}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: (job.errors ?? 0) > 0 ? 'var(--red)' : 'var(--muted)', textAlign: 'right' }}>
+                      {job.errors ?? 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
+      {/* ── Audit log ──────────────────────────────────────── */}
+      <div>
+        <SectionHead title="Audit Log (Poslední akce)" />
+        <div className="panel" style={{ overflow: 'hidden', maxHeight: 280 }}>
+          {(data.audit ?? []).length === 0 ? (
+            <div style={{ padding: 16, fontSize: 12, color: 'var(--muted)', fontStyle: 'italic' }}>No audit entries</div>
+          ) : (
+            <div style={{ overflowY: 'auto', maxHeight: 280 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-hud)', zIndex: 1 }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-hud)' }}>
+                    {['TIME', 'ACTION', 'STATUS', 'PERMISSION', 'RESULT'].map(h => (
+                      <th key={h} className="panel-title" style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 400 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.audit ?? []).map((entry, i) => {
+                    const approved = entry.approved
+                    const statusColor = approved === true ? 'var(--green)' : approved === false ? 'var(--red)' : 'var(--muted)'
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '6px 12px', fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{entry.ts}</td>
+                        <td style={{ padding: '6px 12px', fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: 'var(--text)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.action}</td>
+                        <td style={{ padding: '6px 12px' }}>
+                          <span className="metric-badge" style={{ color: statusColor, borderColor: `${statusColor}33` }}>
+                            {approved === true ? 'OK' : approved === false ? 'DENIED' : '—'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '6px 12px', fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: 'var(--text2)' }}>{entry.permission ?? '—'}</td>
+                        <td style={{ padding: '6px 12px', fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: 'var(--text2)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.result ?? ''}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
