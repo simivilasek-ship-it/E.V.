@@ -86,7 +86,7 @@ def register(app):
                 from context_orchestrator import get_context_orchestrator
                 orch = get_context_orchestrator()
                 raw = orch.get_context_data()
-                return {
+                extra_ctx: dict = {
                     "formatted": orch.get_context(),
                     "active_window": raw.get("active", ""),
                     "windows": raw.get("windows", []),
@@ -94,6 +94,15 @@ def register(app):
                     "system": raw.get("system", {}),
                     "time": raw.get("time", ""),
                 }
+                try:
+                    from activity_store import get_activity_store
+                    ws = get_activity_store().daily_summary()
+                    extra_ctx["work_today"] = ws.get("summary_text", "")
+                    extra_ctx["work_commits"] = ws.get("commits", 0)
+                    extra_ctx["work_builds_failed"] = ws.get("builds_failed", 0)
+                except Exception:
+                    pass
+                return extra_ctx
             except Exception as e:
                 return {"error": str(e), "formatted": ""}
 
@@ -280,5 +289,14 @@ def register(app):
             return get_security_manager().get_audit_log(n)
         except Exception:
             return []
+
+    @app.get("/api/project")
+    async def current_project():
+        """Auto-detected current project profile."""
+        try:
+            from project_profiles import get_project_profile
+            return get_project_profile()
+        except Exception as e:
+            return {"error": str(e), "name": "", "languages": []}
 
 

@@ -43,6 +43,29 @@ class ContextOrchestrator:
         ctx["workspace"] = self._get_workspace()
         ctx["activity"]  = self._get_recent_activity()
 
+        # Work Timeline — inject today's activity summary
+        try:
+            from activity_store import get_activity_store
+            _ws = get_activity_store().daily_summary()
+            if _ws.get("summary"):
+                ctx["work_today"] = _ws["summary_text"]
+                ctx["work_projects"] = list(_ws.get("projects", {}).keys())[:3]
+                ctx["work_commits"] = _ws.get("commits", 0)
+                ctx["work_builds_failed"] = _ws.get("builds_failed", 0)
+        except Exception:
+            pass
+
+        # Project profile
+        try:
+            from project_profiles import get_project_profile
+            _prof = get_project_profile()
+            if _prof.get("name"):
+                ctx["project_name"] = _prof["name"]
+                ctx["project_description"] = _prof.get("description", "")
+                ctx["project_languages"] = _prof.get("languages", [])
+        except Exception:
+            pass
+
         # Emit event if active window changed
         try:
             from event_bus import get_event_bus, EventType
@@ -356,10 +379,23 @@ class ContextOrchestrator:
             branch = f" ({ws['branch']})" if ws.get("branch") else ""
             dirty = " [necommitovano]" if ws.get("dirty") else ""
             parts.append(f"Repo: {ws['repo']}{branch}{dirty}")
+        proj_desc = ctx.get("project_description", "")
+        if proj_desc:
+            parts.append(proj_desc)
         if ws.get("docker"):
             parts.append("Docker: " + ", ".join(ws["docker"]))
         if ctx.get("activity"):
             parts.append(f"Nedavna aktivita: {ctx['activity']}")
+
+        work = ctx.get("work_today", "")
+        if work:
+            parts.append(f"Dnešní práce: {work}")
+        commits = ctx.get("work_commits", 0)
+        fails = ctx.get("work_builds_failed", 0)
+        if commits:
+            parts.append(f"Git commity dnes: {commits}")
+        if fails:
+            parts.append(f"Selhané buildy dnes: {fails}")
 
         if ctx.get("clipboard"):
             clip = ctx["clipboard"][:120]

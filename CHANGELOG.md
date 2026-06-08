@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [5.12.0] - 2026-06-08
+
+### Added
+- **Work Timeline → LLM context injection** — dnešní aktivita (commity, selhané buildy, projekty) se automaticky přidá do systém promptu
+- **Project profiles** — auto-detekce git repo + jazyka; `/api/project` endpoint; injekce do kontextu
+- **`jarvis release` CLI** — bumping verze, changelog draft, release checklist (`--bump patch/minor/major --dry-run`)
+- **`scripts/make_deb.sh`** — Debian `.deb` packaging script
+- **`gui_legacy/`** — Tkinter GUI přesunuto do legacy; `gui/` odstraněna
+- **install.sh** — auto-instalace `mcp` SDK pokud chybí
+- **`mcp>=1.0.0`** přidáno do hlavních závislostí v `pyproject.toml`
+
+
 ## [5.11.0] - 2026-06-08
 
 ### Added

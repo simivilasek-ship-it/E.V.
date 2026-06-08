@@ -30,6 +30,10 @@ def main():
         from jarvis_cli import cmd_log
         raise SystemExit(cmd_log(sys.argv[2:]))
 
+    if len(sys.argv) > 1 and sys.argv[1] == "release":
+        from jarvis_cli import cmd_release
+        raise SystemExit(cmd_release(sys.argv[2:]))
+
     import argparse
     parser = argparse.ArgumentParser(
         prog="jarvis",

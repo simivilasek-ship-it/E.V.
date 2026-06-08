@@ -64,7 +64,12 @@ echo "[4/6] Python závislosti..."
 pip install -r requirements.txt --quiet
 ok "requirements.txt nainstalováno"
 
-python3 -c "import mcp" 2>/dev/null && ok "mcp SDK (MCP servery)" || warn "mcp balíček chybí — MCP nástroje nebudou fungovat"
+if python3 -c "import mcp" 2>/dev/null; then
+    ok "mcp SDK (MCP servery)"
+else
+    echo "  Instaluji mcp SDK..."
+    pip install mcp --quiet 2>/dev/null && ok "mcp nainstalován" || warn "mcp se nepodařilo nainstalovat — zkus ručně: pip install mcp"
+fi
 
 # Volitelné — doporučené
 echo "  Instaluji doporučené balíčky (rapidfuzz, sentence-transformers)..."

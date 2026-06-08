@@ -46,3 +46,6 @@ web/node_modules/
 
 web/node_modules/
 web/.next/
+
+# Legacy GUI (Tkinter — deprecated, not maintained)
+gui_legacy/

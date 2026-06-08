@@ -833,32 +833,32 @@ class TestGUIHeadless(unittest.TestCase):
 
     def test_blend_function(self):
         """blend() musí vrátit validní hex barvu."""
-        from gui import blend
+        from gui_legacy import blend
         result = blend("#00d4ff", "#070b12", 0.5)
         self.assertRegex(result, r"^#[0-9a-f]{6}$")
 
     def test_blend_alpha_zero(self):
         """blend() s alpha=0 musí vrátit barvu pozadí."""
-        from gui import blend
+        from gui_legacy import blend
         result = blend("#ffffff", "#000000", 0.0)
         self.assertEqual(result, "#000000")
 
     def test_blend_alpha_one(self):
         """blend() s alpha=1 musí vrátit barvu popředí."""
-        from gui import blend
+        from gui_legacy import blend
         result = blend("#ffffff", "#000000", 1.0)
         self.assertEqual(result, "#ffffff")
 
     def test_orb_colors_defined(self):
         """Všechny stavy mají definované barvy a ikony."""
-        from gui import ORB_COLORS, STATE_ICON
+        from gui_legacy import ORB_COLORS, STATE_ICON
         for state in ("idle", "listening", "thinking", "speaking"):
             self.assertIn(state, ORB_COLORS)
             self.assertIn(state, STATE_ICON)
 
     def test_particle_pos_returns_tuple(self):
         """Particle.pos() musí vrátit tuple čísel (x, y) nebo (x, y, depth)."""
-        from gui import Particle
+        from gui_legacy import Particle
         p = Particle(120, 120)
         result = p.pos(frame=10, speed_mult=1.0, orbit_mult=1.0)
         self.assertIsInstance(result, tuple)
@@ -868,7 +868,7 @@ class TestGUIHeadless(unittest.TestCase):
 
     def test_particle_orbit_radius_range(self):
         """Particle orbit radius musí být v platném rozsahu."""
-        from gui import Particle
+        from gui_legacy import Particle
         for _ in range(20):
             p = Particle(0, 0)
             self.assertGreater(p.orbit_r, 0)
