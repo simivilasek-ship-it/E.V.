@@ -374,3 +374,7 @@ body::before {
   animation: shimmer 1.4s infinite;
   border-radius: 6px;
 }
+
+/* Chat list items for ordered lists — hide the flex bullet for ol > li */
+ol > li { list-style: decimal; display: list-item; }
+ol > li > span:first-child { display: none; }

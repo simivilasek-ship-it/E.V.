@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useJarvis, type Message, type MessageMode } from '@/store/jarvis'
 import { Icons } from './Icons'
 import HeroPanel from './HeroPanel'
@@ -34,42 +35,173 @@ function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString('cs', { hour: '2-digit', minute: '2-digit' })
 }
 
-/** Jednořádkové výstupy z backendu → markdown odstavce (ReactMarkdown ignoruje samotné \n). */
 function prepareMarkdown(text: string): string {
   if (!text) return text
-  if (/^#{1,3}\s|^\*\*[^*]+\*\*/m.test(text)) return text
-  return text.split('\n').map(l => l.trimEnd()).join('\n\n')
+  // Already has markdown structure — don't double-process
+  if (/^#{1,3}\s|^\*\*[^*]+\*\*|^\|.+\|/.test(text)) return text
+  // Convert single newlines to double (paragraph breaks) but preserve double newlines
+  return text
+    .split('\n\n')
+    .map(block => block.replace(/([^\n])\n([^\n])/g, '$1  \n$2'))
+    .join('\n\n')
 }
 
 function renderContent(text: string) {
   if (!text) return null
   return (
     <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
       components={{
-        p: ({ children }) => <p className="mb-2.5 last:mb-0 leading-relaxed">{children}</p>,
-        ul: ({ children }) => <ul className="list-none ml-0 mb-3 flex flex-col gap-1.5">{children}</ul>,
-        ol: ({ children }) => <ol className="list-decimal ml-5 mb-3 space-y-1">{children}</ol>,
-        li: ({ children }) => (
-          <li className="leading-relaxed pl-3 border-l-2" style={{ borderColor: 'var(--border-accent)' }}>
+        // Paragraphs
+        p: ({ children }) => (
+          <p className="mb-3 last:mb-0 leading-relaxed text-sm" style={{ color: 'var(--text)' }}>
             {children}
+          </p>
+        ),
+
+        // Headings — Copilot-style
+        h1: ({ children }) => (
+          <h1 className="text-base font-semibold mt-5 mb-2 pb-2"
+            style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>
+            {children}
+          </h1>
+        ),
+        h2: ({ children }) => (
+          <h2 className="text-sm font-semibold mt-4 mb-2"
+            style={{ color: 'var(--text)' }}>
+            {children}
+          </h2>
+        ),
+        h3: ({ children }) => (
+          <h3 className="text-sm font-medium mt-3 mb-1.5"
+            style={{ color: 'var(--text-secondary)' }}>
+            {children}
+          </h3>
+        ),
+
+        // Lists
+        ul: ({ children }) => (
+          <ul className="my-2 ml-1 flex flex-col gap-1">
+            {children}
+          </ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="my-2 ml-4 list-decimal flex flex-col gap-1">
+            {children}
+          </ol>
+        ),
+        li: ({ children }) => (
+          <li className="flex gap-2 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
+            <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ background: 'var(--accent-light)', flexShrink: 0 }} />
+            <span>{children}</span>
           </li>
         ),
-        h1: ({ children }) => <h1 className="text-base font-semibold mb-2 mt-3" style={{ color: 'var(--accent-light)' }}>{children}</h1>,
-        h2: ({ children }) => <h2 className="text-sm font-semibold mb-1.5 mt-3" style={{ color: 'var(--accent-light)' }}>{children}</h2>,
-        h3: ({ children }) => <h3 className="text-base font-semibold mb-3 mt-1 pb-2" style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>{children}</h3>,
+
+        // Bold — normal weight, accent color
         strong: ({ children }) => (
-          <strong className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--accent-light)' }}>
+          <strong className="font-semibold" style={{ color: 'var(--text)' }}>
             {children}
           </strong>
         ),
+
+        // Italic
+        em: ({ children }) => (
+          <em style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+            {children}
+          </em>
+        ),
+
+        // Code
         code: ({ children, className }) => {
           const isBlock = className?.startsWith('language-')
-          if (isBlock) return <code className="prose-j block">{children}</code>
-          return <code className="prose-j">{children}</code>
+          if (isBlock) {
+            return (
+              <code className="block font-mono text-xs leading-relaxed" style={{ color: 'var(--cyan)' }}>
+                {children}
+              </code>
+            )
+          }
+          return (
+            <code className="font-mono text-xs px-1.5 py-0.5 rounded"
+              style={{
+                background: 'rgba(99,102,241,.1)',
+                color: 'var(--accent-light)',
+                border: '1px solid var(--border-accent)',
+              }}>
+              {children}
+            </code>
+          )
         },
-        pre: ({ children }) => <pre className="prose-j mb-2">{children}</pre>,
-        a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" className="underline" style={{ color: 'var(--accent-light)' }}>{children}</a>,
-        blockquote: ({ children }) => <blockquote className="border-l-2 pl-3 my-2 italic" style={{ borderColor: 'var(--accent)', color: 'var(--muted)' }}>{children}</blockquote>,
+        pre: ({ children }) => (
+          <pre className="my-3 p-3 rounded-xl overflow-x-auto text-xs leading-relaxed"
+            style={{
+              background: 'rgba(0,0,0,.3)',
+              border: '1px solid var(--border)',
+              fontFamily: 'IBM Plex Mono, monospace',
+            }}>
+            {children}
+          </pre>
+        ),
+
+        // Links
+        a: ({ href, children }) => (
+          <a href={href} target="_blank" rel="noreferrer"
+            className="underline underline-offset-2 hover:no-underline transition-all"
+            style={{ color: 'var(--accent-light)' }}>
+            {children}
+          </a>
+        ),
+
+        // Blockquote — info card style
+        blockquote: ({ children }) => (
+          <blockquote className="my-3 pl-3 py-2 rounded-r-lg text-sm"
+            style={{
+              borderLeft: '3px solid var(--accent)',
+              background: 'rgba(99,102,241,.06)',
+              color: 'var(--text-secondary)',
+            }}>
+            {children}
+          </blockquote>
+        ),
+
+        // Horizontal rule — section divider
+        hr: () => (
+          <hr className="my-4" style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
+        ),
+
+        // Tables — Gemini-style
+        table: ({ children }) => (
+          <div className="my-3 overflow-x-auto rounded-xl"
+            style={{ border: '1px solid var(--border)' }}>
+            <table className="w-full text-sm border-collapse">
+              {children}
+            </table>
+          </div>
+        ),
+        thead: ({ children }) => (
+          <thead style={{ background: 'rgba(99,102,241,.08)', borderBottom: '1px solid var(--border)' }}>
+            {children}
+          </thead>
+        ),
+        tbody: ({ children }) => <tbody>{children}</tbody>,
+        tr: ({ children }) => (
+          <tr style={{ borderBottom: '1px solid var(--border)' }}>
+            {children}
+          </tr>
+        ),
+        th: ({ children }) => (
+          <th className="px-3 py-2 text-left font-medium text-xs uppercase tracking-wide"
+            style={{ color: 'var(--muted)' }}>
+            {children}
+          </th>
+        ),
+        td: ({ children }) => (
+          <td className="px-3 py-2 text-sm"
+            style={{ color: 'var(--text)' }}>
+            {children}
+          </td>
+        ),
       }}
     >
       {prepareMarkdown(text)}
@@ -118,7 +250,7 @@ function MessageBubble({ msg }: { msg: Message }) {
       >
         J
       </div>
-      <div className="flex-1 min-w-0 max-w-[min(640px,90%)]">
+      <div className="flex-1 min-w-0 max-w-[min(740px,95%)]">
         <div className="flex items-center gap-2 mb-1.5">
           <span className="font-medium text-xs" style={{ color: 'var(--text-secondary)' }}>JARVIS</span>
           {badge && (
@@ -129,7 +261,7 @@ function MessageBubble({ msg }: { msg: Message }) {
           )}
           <span className="font-mono text-[10px]" style={{ color: 'var(--muted)' }}>{formatTime(msg.ts)}</span>
         </div>
-        <div className="group relative msg-assistant px-4 py-3 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
+        <div className="group relative msg-assistant px-4 py-3.5 text-sm" style={{ color: 'var(--text)' }}>
           {renderContent(msg.text)}
           {msg.streaming && !msg.text && <TypingDots />}
           {msg.streaming && msg.text && (
