@@ -1,7 +1,7 @@
 """
-JARVIS v4.4 ? Neural Memory System + Daily Summarizer
+JARVIS v4.4 — Neural Memory System + Daily Summarizer
 Integrovaný brain-inspired memory layer pro JARVIS.
-DailySummarizer extrahuje fakta z dne?ních konverzací a ukládá do UserProfile.
+DailySummarizer extrahuje fakta z dnešních konverzací a ukládá do UserProfile.
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ logger = logging.getLogger(__name__)
 
 
 # ??????????????????????????????????????????????????????
-#  EMBEDDING ENGINE (opt-in ? sentence-transformers)
+#  EMBEDDING ENGINE (opt-in — sentence-transformers)
 # ??????????????????????????????????????????????????????
 
 class EmbeddingEngine:
-    """Lokální embeddingy p?es sentence-transformers. Fallback: TF-IDF keyword overlap."""
+    """Lokální embeddingy přes sentence-transformers. Fallback: TF-IDF keyword overlap."""
 
     MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
@@ -44,8 +44,8 @@ class EmbeddingEngine:
             logger.info("EmbeddingEngine: sentence-transformers OK")
         except ImportError:
             logger.warning(
-                "EmbeddingEngine: sentence-transformers není nainstalováno ? "
-                "pam?? pou?ívá keyword fallback (hor?í recall). "
+                "EmbeddingEngine: sentence-transformers není nainstalováno — "
+                "paměť používá keyword fallback (horší recall). "
                 "Pro sémantické vyhledávání: pip install sentence-transformers"
             )
 
@@ -81,7 +81,7 @@ def get_embedding_engine() -> EmbeddingEngine:
 
 
 # ??????????????????????????????????????????????????????
-#  VESTAV?NÁ JSON PAM?? (fallback ? bez závislostí)
+#  VESTAVĚNÁ JSON PAMĚŤ (fallback — bez závislostí)
 # ??????????????????????????????????????????????????????
 
 import sqlite3
@@ -91,10 +91,10 @@ import math as _math
 
 class _SQLiteMemoryStore:
     """
-    Persistentní pam?? v SQLite.
-    Drop-in náhrada za p?vodní JSON store ? stejné API.
-    SQLite je výrazn? rychlej?í pro velké pam?ti a nepot?ebuje
-    na?ítat v?e do RAM p?i ka?dém spu?t?ní.
+    Persistentní paměť v SQLite.
+    Drop-in náhrada za původní JSON store — stejné API.
+    SQLite je výrazně rychlejší pro velké paměti a nepotřebuje
+    načítat vše do RAM při každém spuštění.
     """
 
     _SCHEMA = """
@@ -126,14 +126,14 @@ class _SQLiteMemoryStore:
         self._lock = threading.Lock()
         self._migrate_json(path)
         with self._connect() as con:
-            # Nejd?ív p?idej nové sloupce do existující DB (idempotentní)
+            # Nejdříve přidej nové sloupce do existující DB (idempotentní)
             self._add_columns(con)
-            # Pak spus? schema (vytvo?í tabulku pokud neexistuje)
+            # Pak spusť schema (vytvoří tabulku pokud neexistuje)
             con.executescript(self._SCHEMA)
 
     @staticmethod
     def _add_columns(con) -> None:
-        """P?idá TTL/priority/access_score sloupce do existující DB (idempotentní)."""
+        """Přidá TTL/priority/access_score sloupce do existující DB (idempotentní)."""
         for col, typedef in [
             ("priority",     "INTEGER NOT NULL DEFAULT 0"),
             ("ttl_seconds",  "INTEGER NOT NULL DEFAULT 0"),
@@ -143,7 +143,7 @@ class _SQLiteMemoryStore:
             try:
                 con.execute(f"ALTER TABLE memories ADD COLUMN {col} {typedef}")
             except Exception:
-                pass  # sloupec ji? existuje
+                pass  # sloupec již existuje
         con.commit()
 
     def _connect(self) -> sqlite3.Connection:
@@ -152,7 +152,7 @@ class _SQLiteMemoryStore:
         return con
 
     def _migrate_json(self, path: Path) -> None:
-        """P?enese data ze starého memories.json do SQLite (jednorázov?)."""
+        """Přenese data ze starého memories.json do SQLite (jednorázově)."""
         json_file = path / "memories.json"
         if not json_file.exists():
             return
@@ -176,7 +176,7 @@ class _SQLiteMemoryStore:
             json_file.rename(path / "memories.json.migrated")
             logger.info(f"Migrováno {len(data)} vzpomínek z JSON do SQLite")
         except Exception as e:
-            logger.warning(f"JSON?SQLite migrace selhala: {e}")
+            logger.warning(f"JSON→SQLite migrace selhala: {e}")
 
     def store(self, content: str, importance: float, tags: List[str],
               metadata: dict, ttl_seconds: int = 0, priority: int = 0) -> str:
@@ -286,7 +286,7 @@ class _SQLiteMemoryStore:
                                 (new_imp, row["id"]))
             remaining = con.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
         removed = len(rows) - remaining
-        logger.info(f"Memory maintenance: odstran?no {removed} vzpomínek")
+        logger.info(f"Memory maintenance: odstraněno {removed} vzpomínek")
         return {"removed": removed, "remaining": remaining}
 
     def stats(self) -> dict:
@@ -301,7 +301,7 @@ class _SQLiteMemoryStore:
         }
 
     def run_maintenance(self) -> dict:
-        """Sma?e expirované záznamy. Vrátí statistiku."""
+        """Smaže expirované záznamy. Vrátí statistiku."""
         now = time.time()
         with self._lock, self._connect() as con:
             total_before = con.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
@@ -311,12 +311,12 @@ class _SQLiteMemoryStore:
             con.commit()
             total_after = total_before - deleted
         if deleted:
-            logger.info(f"Memory maintenance: smazáno {deleted} expirovaných záznam?")
+            logger.info(f"Memory maintenance: smazáno {deleted} expirovaných záznamů")
         return {"deleted_expired": deleted, "total": total_after}
 
 
     def get_long_term(self, top_k: int = 20) -> list:
-        """Vrátí vzpomínky s nejvy??ím access_score ? ty jsou 'permanentní'."""
+        """Vrátí vzpomínky s nejvyšším access_score — ty jsou 'permanentní'."""
         with self._lock, self._connect() as con:
             rows = con.execute(
                 "SELECT * FROM memories WHERE access_score >= 2.0 "
@@ -325,18 +325,18 @@ class _SQLiteMemoryStore:
         return [dict(r) for r in rows]
 
     def promote_to_long_term(self, memory_id: str) -> None:
-        """Explicitn? pový?í vzpomínku na long-term (score = 10.0)."""
+        """Explicitně povýší vzpomínku na long-term (score = 10.0)."""
         with self._lock, self._connect() as con:
             con.execute("UPDATE memories SET access_score = 10.0 WHERE id = ?", (memory_id,))
             con.commit()
 
 
-# Alias pro zp?tnou kompatibilitu
+# Alias pro zpětnou kompatibilitu
 _JSONMemoryStore = _SQLiteMemoryStore
 
 
 def _similarity_score(a: str, b: str) -> float:
-    """Jednoduchá word-overlap podobnost 0?1. Bez závislostí."""
+    """Jednoduchá word-overlap podobnost 0–1. Bez závislostí."""
     wa = set(a.lower().split())
     wb = set(b.lower().split())
     if not wa or not wb:
@@ -356,9 +356,9 @@ except ImportError:
 
 class EpisodicMemory:
     """
-    Epizodická pam?? (Krátkodobá):
-    Udr?uje kontext aktuální konverzace a d?ní na obrazovce za posledních 5 minut (300 sekund).
-    Automaticky ?istí staré záznamy.
+    Epizodická paměť (Krátkodobá):
+    Udržuje kontext aktuální konverzace a dění na obrazovce za posledních 5 minut (300 sekund).
+    Automaticky čistí staré záznamy.
     """
     def __init__(self, ttl_seconds: float = 300.0):
         self.ttl_seconds = ttl_seconds
@@ -366,7 +366,7 @@ class EpisodicMemory:
         self._lock = threading.Lock()
 
     def add_event(self, content: str, type_: str = "conversation", metadata: dict = None) -> None:
-        """P?idá novou epizodickou událost s ?asovým razítkem."""
+        """Přidá novou epizodickou událost s časovým razítkem."""
         with self._lock:
             self.events.append({
                 "timestamp": time.time(),
@@ -377,7 +377,7 @@ class EpisodicMemory:
             self._prune()
 
     def _prune(self) -> None:
-        """Odstraní události star?í ne? 5 minut."""
+        """Odstraní události starší než 5 minut."""
         now = time.time()
         self.events = [e for e in self.events if now - e["timestamp"] <= self.ttl_seconds]
 
@@ -385,7 +385,7 @@ class EpisodicMemory:
         """Vrátí naformátovaný kontext za posledních 5 minut."""
         self._prune()
         if not self.events:
-            return "?ádné nedávné události za posledních 5 minut."
+            return "Žádné nedávné události za posledních 5 minut."
         
         parts = []
         for e in self.events:
@@ -397,9 +397,9 @@ class EpisodicMemory:
 
 class ProceduralMemory:
     """
-    Procedurální pam?? (Dlouhodobá):
-    Grafová databáze vyu?ívající networkx (s fallbackem na prostý slovník).
-    Uchovává entity a vztahy (nap?. projekt X -> uses -> Python 3.11).
+    Procedurální paměť (Dlouhodobá):
+    Grafová databáze využívající networkx (s fallbackem na prostý slovník).
+    Uchovává entity a vztahy (např. projekt X -> uses -> Python 3.11).
     Perzistuje do JSON souboru.
     """
     def __init__(self, persist_path: Path):
@@ -422,15 +422,15 @@ class ProceduralMemory:
                     with open(self.persist_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     self.graph = nx.node_link_graph(data)
-                    logger.info(f"Procedurální pam?? na?tena: {self.graph.number_of_nodes()} uzl?, {self.graph.number_of_edges()} hran")
+                    logger.info(f"Procedurální paměť načtena: {self.graph.number_of_nodes()} uzlů, {self.graph.number_of_edges()} hran")
                 else:
                     with open(self.persist_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     self._nodes = {n["id"]: n for n in data.get("nodes", [])}
                     self._edges = data.get("edges", [])
-                    logger.info(f"Procedurální pam?? (fallback) na?tena: {len(self._nodes)} uzl?, {len(self._edges)} hran")
+                    logger.info(f"Procedurální paměť (fallback) načtena: {len(self._nodes)} uzlů, {len(self._edges)} hran")
             except Exception as e:
-                logger.warning(f"Chyba p?i na?ítání procedurální pam?ti: {e}")
+                logger.warning(f"Chyba při načítání procedurální paměti: {e}")
 
     def _save(self):
         try:
@@ -447,10 +447,10 @@ class ProceduralMemory:
             with open(self.persist_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            logger.error(f"Chyba p?i ukládání procedurální pam?ti: {e}")
+            logger.error(f"Chyba při ukládání procedurální paměti: {e}")
 
     def add_relation(self, source: str, relation: str, target: str, metadata: dict = None) -> None:
-        """P?idá hranu (vztah) mezi dva uzly."""
+        """Přidá hranu (vztah) mezi dva uzly."""
         with self._lock:
             source = source.strip()
             target = target.strip()
@@ -481,7 +481,7 @@ class ProceduralMemory:
                         "metadata": metadata or {}
                     })
             self._save()
-            logger.info(f"P?idán vztah: [{source}] --({relation})--> [{target}]")
+            logger.info(f"Přidán vztah: [{source}] --({relation})--> [{target}]")
 
     def remove_relation(self, source: str, target: str) -> bool:
         """Odstraní hranu mezi uzly."""
@@ -503,7 +503,7 @@ class ProceduralMemory:
     def query_relations(self, query_text: str) -> str:
         """
         Vyhledá v textu dotazu známé entity (uzly) a vrátí jejich vztahy.
-        Tím se LLM prompt obohatí o p?esné okolní vztahy z grafu.
+        Tím se LLM prompt obohatí o přesné okolní vztahy z grafu.
         """
         with self._lock:
             query_lower = query_text.lower()
@@ -519,7 +519,7 @@ class ProceduralMemory:
                 return ""
             
             relations_text = []
-            # Pro ka?dý odpovídající uzel najdi jeho p?ímé vztahy (odchozí i p?íchozí)
+            # Pro každý odpovídající uzel najdi jeho přímé vztahy (odchozí i příchozí)
             for node in matching_nodes:
                 if self.graph is not None:
                     # Odchozí vztahy
@@ -527,7 +527,7 @@ class ProceduralMemory:
                         edge_data = self.graph.get_edge_data(node, successor)
                         relation = edge_data.get("relation", "souvisí s")
                         relations_text.append(f"- '{node}' {relation} '{successor}'")
-                    # P?íchozí vztahy
+                    # Příchozí vztahy
                     for predecessor in self.graph.predecessors(node):
                         edge_data = self.graph.get_edge_data(predecessor, node)
                         relation = edge_data.get("relation", "souvisí s")
@@ -539,7 +539,7 @@ class ProceduralMemory:
                         elif edge["target"] == node:
                             relations_text.append(f"- '{edge['source']}' {edge['relation']} '{node}'")
             
-            # Odstra? duplicity a se?a?
+            # Odstraň duplicity a seřaď
             unique_relations = sorted(list(set(relations_text)))
             if unique_relations:
                 return "\n".join(unique_relations)
@@ -597,9 +597,9 @@ def _extract_entities_simple(text: str) -> list[tuple[str, str, str]]:
 
 class JarvisMemory:
     """
-    Pam??ová fasáda pro JARVIS.
+    Paměťová fasáda pro JARVIS.
     Preferuje neural-ai-memory pokud je nainstalovaná,
-    jinak pou?ívá vestav?ný JSON store (v?dy funk?ní).
+    jinak používá vestavěný JSON store (vždy funkční).
     """
 
     def __init__(self, config: dict):
@@ -607,7 +607,7 @@ class JarvisMemory:
         mem_dir = Path(os.path.dirname(os.path.abspath(__file__))) / "memory_data"
         mem_dir.mkdir(parents=True, exist_ok=True)
 
-        # Inicializace Epizodické a Procedurální pam?ti
+        # Inicializace Epizodické a Procedurální paměti
         self.episodic = EpisodicMemory()
         self.procedural = ProceduralMemory(mem_dir / "procedural_memory.json")
 
@@ -639,18 +639,18 @@ class JarvisMemory:
                 logger.info(f"Neural memory inicializován v: {mem_dir}")
                 return
             except Exception as e:
-                logger.warning(f"Neural memory init selhal: {e}, pou?ívám JSON fallback")
+                logger.warning(f"Neural memory init selhal: {e}, používám JSON fallback")
 
         self.system = None
         self._store = _SQLiteMemoryStore(mem_dir)
         logger.info(f"SQLite memory inicializován v: {mem_dir}")
 
-        # Background auto-pruning p?es scheduler (ka?dou hodinu, ne blokující)
+        # Background auto-pruning přes scheduler (každou hodinu, ne blokující)
         self._schedule_background_pruning()
 
     def _schedule_background_pruning(self) -> None:
         """Registruje hodinový background pruning do Scheduleru.
-        Nikdy neblokuje u?ivatelský dotaz ? b??í jako samostatná úloha.
+        Nikdy neblokuje uživatelský dotaz — běží jako samostatná úloha.
         """
         try:
             from scheduler import get_scheduler
@@ -671,18 +671,18 @@ class JarvisMemory:
                 repeat=3600.0,
                 name="memory_auto_prune",
             )
-            logger.info("Memory background pruning naplánován (ka?dou hodinu)")
+            logger.info("Memory background pruning naplánován (každou hodinu)")
         except Exception as e:
             logger.debug(f"Memory pruning scheduling selhal (nevadí): {e}")
 
-    # ?? Conflict resolution ????????????????????????????
+    # ── Conflict resolution ──────────────────────────
 
-    # Vzory nazna?ující fakta, která se mohou m?nit (jméno, preferovaný jazyk?)
+    # Vzory naznačující fakta, která se mohou měnit (jméno, preferovaný jazyk…)
     _CONFLICT_PATTERNS = [
         (r"\bjmenuji\s+se\b|\bjmeno\s+je\b|\bjsem\s+\w+\b", "jméno"),
         (r"\bpracuji\s+(s|v|na)\b|\bprogramuji\s+v\b|\bpouzivaml?\b", "technologie"),
         (r"\bbydlim\s+v\b|\bmestu\b|\badresa\b",              "lokalita"),
-        (r"\bpracuji\s+pro\b|\bzamestnani\b|\bfirma\b",       "zam?stnání"),
+        (r"\bpracuji\s+pro\b|\bzamestnani\b|\bfirma\b",       "zaměstnání"),
     ]
 
     def _extract_graph_relations(self, content: str) -> None:
@@ -718,8 +718,8 @@ class JarvisMemory:
         """Zjistí, zda nový záznam odporuje existujícím vzpomínkám.
 
         Vrátí {"old": str, "new": str, "topic": str} nebo None.
-        Algoritmus: pro ka?dý vzor kategorie zkontroluj, zda staré vzpomínky
-        obsahují stejné klí?ové slovo ale jiný kontext.
+        Algoritmus: pro každý vzor kategorie zkontroluj, zda staré vzpomínky
+        obsahují stejné klíčové slovo ale jiný kontext.
         """
         import re
         for pattern, topic in self._CONFLICT_PATTERNS:
@@ -732,7 +732,7 @@ class JarvisMemory:
                     continue
                 # Jednoduchá heuristika: oba záznamy matchují stejný vzor
                 if re.search(pattern, old, re.I):
-                    # Pokud jsou r?zné ? konflikt
+                    # Pokud jsou různé — konflikt
                     if _similarity_score(old, new_content) < 0.85:
                         return {"old": old, "new": new_content, "topic": topic}
         return None
@@ -744,11 +744,11 @@ class JarvisMemory:
         on_conflict=None,
         **kwargs,
     ) -> Optional[str]:
-        """Ulo?í vzpomínku, ale nejd?íve zkontroluje konflikty.
+        """Uloží vzpomínku, ale nejdříve zkontroluje konflikty.
 
-        on_conflict(old, new, topic) ? pokud vrátí False, ulo?ení se p?esko?í.
-        Pokud on_conflict není zadán, stará vzpomínka se ozna?í jako neaktivní
-        (importance ? 0.05) a nová se ulo?í.
+        on_conflict(old, new, topic) — pokud vrátí False, uložení se přeskočí.
+        Pokud on_conflict není zadán, stará vzpomínka se označí jako neaktivní
+        (importance → 0.05) a nová se uloží.
         """
         conflict = self.check_conflict(content)
         if conflict:
@@ -760,22 +760,22 @@ class JarvisMemory:
                 # Automaticky: degraduj starou vzpomínku
                 logger.info(
                     f"Memory conflict [{conflict['topic']}]: "
-                    f"'{conflict['old'][:60]}' ? '{conflict['new'][:60]}'"
+                    f"'{conflict['old'][:60]}' → '{conflict['new'][:60]}'"
                 )
                 old_results = self.recall(conflict["old"][:40], top_k=3)
                 for r in old_results:
                     mid = r.get("id") or r.get("memory_id")
                     if mid:
                         try:
-                            self._store._conn().execute(
-                                "UPDATE memories SET importance=0.05 WHERE id=?", (mid,))
-                            self._store._conn().commit()
+                            with self._store._connect() as con:
+                                con.execute(
+                                    "UPDATE memories SET importance=0.05 WHERE id=?", (mid,))
                         except Exception:
                             pass
 
         return self.store(content, importance=importance, **kwargs)
 
-    # ?? Store ??????????????????????????????????????????
+    # ── Store ───────────────────────────────────────
 
     def store(self, content: str, importance: float = 0.5, context: str = None,
               tags: List[str] = None, metadata: dict = None,
@@ -810,7 +810,7 @@ class JarvisMemory:
                 pass
         return mid
 
-    # ?? Recall ?????????????????????????????????????????
+    # ── Recall ──────────────────────────────────────
 
     def recall(self, query: str, top_k: int = 5,
                min_importance: float = 0.0) -> List[dict]:
@@ -831,7 +831,7 @@ class JarvisMemory:
                 return []
         return self._store.recall(query, top_k, min_importance)
 
-    # ?? Forget ?????????????????????????????????????????
+    # ── Forget ──────────────────────────────────────
 
     def forget(self, memory_id: str) -> bool:
         if self.system:
@@ -843,7 +843,7 @@ class JarvisMemory:
                 return False
         return self._store.forget(memory_id)
 
-    # ?? Maintenance ????????????????????????????????????
+    # ── Maintenance ─────────────────────────────────
 
     def run_maintenance(self) -> dict:
         if self.system:
@@ -853,7 +853,7 @@ class JarvisMemory:
                 return {"error": str(e)}
         return self._store.maintenance()
 
-    # ?? Stats ??????????????????????????????????????????
+    # ── Stats ───────────────────────────────────────
 
     def stats(self) -> dict:
         if self.system:
@@ -869,7 +869,7 @@ class JarvisMemory:
         return self._store.stats()
 
     def store_conversation(self, user_message: str, ai_response: str, importance: float = 0.3):
-        """Ulo?í konverza?ní pár"""
+        """Uloží konverzační pár"""
         content = f"User: {user_message}\nAI: {ai_response}"
         self.store(
             content=content,
@@ -879,7 +879,7 @@ class JarvisMemory:
         )
 
     def recall_context(self, current_query: str, top_k: int = 3) -> str:
-        """Získá kontext z pam?ti pro aktuální dotaz."""
+        """Získá kontext z paměti pro aktuální dotaz."""
         memories = self.recall(current_query, top_k=top_k, min_importance=0.2)
         parts = []
         for mem in memories or []:
@@ -910,18 +910,18 @@ class JarvisMemory:
 
         context = "\n".join(parts)
         if context:
-            logger.info(f"Kontext z pam?ti: {len(context)} znak?")
+            logger.info(f"Kontext z paměti: {len(context)} znaků")
         return context
 
     def compress_old_memories(self, days_old: int = 7, max_to_compress: int = 20) -> str:
         """Zkomprimuje staré vzpomínky do jedné souhrnné.
 
-        Vzpomínky star?í ne? days_old ? slou?í je do jednoho textu p?es LLM
-        ? ulo?í jako novou vzpomínku s vysokou d?le?itostí
-        ? sma?e originály
+        Vzpomínky starší než days_old → sloučí je do jednoho textu přes LLM
+        → uloží jako novou vzpomínku s vysokou důležitostí
+        → smaže originály
         """
         if not self._store:
-            return "Pam?? není inicializována."
+            return "Paměť není inicializována."
 
         cutoff = time.time() - (days_old * 86400)
 
@@ -946,7 +946,7 @@ class JarvisMemory:
             r = requests.post(CONFIG.get("ollama_url", "http://localhost:11434/api/chat"),
                 json={"model": CONFIG.get("ollama_model", "qwen2.5:3b"),
                       "messages": [{"role": "user", "content":
-                          f"Zkomprimuj tyto záznamy do 2-3 klí?ových fakt?:\n{combined}"}],
+                          f"Zkomprimuj tyto záznamy do 2-3 klíčových faktů:\n{combined}"}],
                       "stream": False, "options": {"num_predict": 200}},
                 timeout=15)
             if r.ok:
@@ -954,24 +954,24 @@ class JarvisMemory:
         except Exception:
             pass
 
-        # Ulo? komprimovanou verzi
+        # Ulož komprimovanou verzi
         new_id = self.store(f"[KOMPRIMOVÁNO] {compressed}", importance=0.8,
                             tags=["compressed"], metadata={"source_count": len(old_rows)})
 
-        # Sma? originály
+        # Smaž originály
         ids = [r["id"] for r in old_rows]
         with self._store._lock, self._store._connect() as con:
             con.execute(f"DELETE FROM memories WHERE id IN ({','.join('?'*len(ids))})", ids)
             con.commit()
 
-        return f"Slou?eno {len(old_rows)} vzpomínek ? nová ID: {new_id}"
+        return f"Sloučeno {len(old_rows)} vzpomínek — nová ID: {new_id}"
 
     def export_memories(self, path: str) -> str:
-        """Exportuje pam?? do JSON souboru."""
+        """Exportuje paměť do JSON souboru."""
         import json as _json
         from pathlib import Path as _Path
         if not self._store:
-            return "Pam?? není inicializována."
+            return "Paměť není inicializována."
         with self._store._lock, self._store._connect() as con:
             rows = con.execute(
                 "SELECT content, importance, tags, metadata FROM memories "
@@ -990,7 +990,7 @@ class JarvisMemory:
         return f"Exportováno {len(memories)} vzpomínek do {path}"
 
     def import_memories(self, path: str) -> str:
-        """Importuje pam?? z JSON souboru."""
+        """Importuje paměť z JSON souboru."""
         import json as _json
         from pathlib import Path as _Path
         data = _json.loads(_Path(path).read_text(encoding="utf-8"))
@@ -1011,9 +1011,9 @@ class JarvisMemory:
 
 class DailySummarizer:
     """
-    Ka?dou p?lnoc (nebo on-demand) vezme dne?ní konverzace,
-    po?le je do Ollama, extrahuje fakta o u?ivateli a ulo?í do UserProfile.
-    Výsledek shrnutí se ulo?í do memory s tag "daily_summary".
+    Každou půlnoc (nebo on-demand) vezme dnešní konverzace,
+    pošle je do Ollama, extrahuje fakta o uživateli a uloží do UserProfile.
+    Výsledek shrnutí se uloží do memory s tag "daily_summary".
     """
 
     def __init__(self, config: dict, memory: JarvisMemory):
@@ -1039,16 +1039,16 @@ class DailySummarizer:
             pass
 
     def should_run(self) -> bool:
-        """True pokud dnes je?t? neprob?hlo shrnutí."""
+        """True pokud dnes ještě neproběhlo shrnutí."""
         last = self._last_summary_date()
         return last is None or last < date.today()
 
     def run(self, force: bool = False) -> str:
-        """Spustí denní shrnutí. Vrátí text shrnutí nebo '' pokud nespu?t?no."""
+        """Spustí denní shrnutí. Vrátí text shrnutí nebo '' pokud nespuštěno."""
         if not force and not self.should_run():
             return ""
 
-        # Memory pruning ? kondenzuj staré konverzace p?ed extrakcí fakt?
+        # Memory pruning — kondenzuj staré konverzace před extrakcí faktů
         try:
             from memory import get_conversation_summarizer
             from user_profile import get_user_profile
@@ -1064,7 +1064,7 @@ class DailySummarizer:
             logger.warning(f"Memory pruning selhal: {e}")
 
         with self._lock:
-            # Retry a? 3× s exponential backoff (Ollama m??e být do?asn? zahlcena)
+            # Retry až 3× s exponential backoff (Ollama může být dočasně zahlcena)
             import time as _time
             for attempt in range(3):
                 try:
@@ -1075,7 +1075,7 @@ class DailySummarizer:
                 except Exception as e:
                     if attempt < 2:
                         wait = 2 ** attempt  # 1s, 2s
-                        logger.warning(f"DailySummarizer pokus {attempt+1}/3 selhal: {e} ? retry za {wait}s")
+                        logger.warning(f"DailySummarizer pokus {attempt+1}/3 selhal: {e} — retry za {wait}s")
                         _time.sleep(wait)
                     else:
                         logger.error(f"DailySummarizer selhalo po 3 pokusech: {e}")
@@ -1096,12 +1096,12 @@ class DailySummarizer:
             pass
 
         today_mems = self.memory.recall(
-            "dne?ní konverzace rozhovor",
+            "dnešní konverzace rozhovor",
             top_k=20,
             min_importance=0.0,
         )
         if not today_mems and not activity_summary:
-            logger.info("DailySummarizer: ?ádné konverzace ani aktivita ke shrnutí")
+            logger.info("DailySummarizer: Žádné konverzace ani aktivita ke shrnutí")
             self._save_last_date(date.today())
             return ""
 
@@ -1109,16 +1109,16 @@ class DailySummarizer:
         if activity_summary:
             conv_text = activity_summary + "\n\n" + conv_text
 
-        prompt = f"""Analyzuj ní?e uvedené konverzace s AI asistentem a extrahuj:
-1. Fakta o u?ivateli (jméno, m?sto, profese, zájmy, preference)
+        prompt = f"""Analyzuj níže uvedené konverzace s AI asistentem a extrahuj:
+1. Fakta o uživateli (jméno, město, profese, zájmy, preference)
 2. Témata, o která se zajímá
-3. Problémy které ?e?í
+3. Problémy které řeší
 
-Odpov?z ve formátu JSON:
+Odpověz ve formátu JSON:
 {{
-  "fakta": {{"jméno": "...", "m?sto": "...", "zájmy": [...]}},
+  "fakta": {{"jméno": "...", "město": "...", "zájmy": [...]}},
   "témata": ["...", "..."],
-  "shrnutí": "Krátké shrnutí dne v 1-2 v?tách."
+  "shrnutí": "Krátké shrnutí dne v 1-2 větách."
 }}
 
 Konverzace:
@@ -1138,14 +1138,14 @@ Konverzace:
             r.raise_for_status()
             content = r.json().get("message", {}).get("content", "").strip()
 
-            # Parsuj JSON z odpov?di
+            # Parsuj JSON z odpovědi
             import re
             json_match = re.search(r"\{.*\}", content, re.DOTALL)
             if json_match:
                 data = json.loads(json_match.group())
                 profile = get_user_profile()
 
-                # Ulo? fakta do UserProfile
+                # Ulož fakta do UserProfile
                 for key, value in data.get("fakta", {}).items():
                     if value:
                         profile.set(key, value, confidence=0.7, source="daily_summary")
@@ -1161,7 +1161,7 @@ Konverzace:
             else:
                 summary_text = content[:200]
 
-            # Ulo? shrnutí do memory s vysokou d?le?itostí
+            # Ulož shrnutí do memory s vysokou důležitostí
             if summary_text:
                 self.memory.store(
                     content=f"Denní shrnutí {date.today()}: {summary_text}",
@@ -1170,7 +1170,7 @@ Konverzace:
                 )
 
             self._save_last_date(date.today())
-            logger.info(f"DailySummarizer: hotovo ? {summary_text[:80]}")
+            logger.info(f"DailySummarizer: hotovo — {summary_text[:80]}")
             return summary_text
 
         except Exception as e:
@@ -1179,7 +1179,7 @@ Konverzace:
             return ""
 
     def schedule_midnight(self, scheduler) -> None:
-        """Naplánuje spu?t?ní denního shrnutí ka?dou p?lnoc."""
+        """Naplánuje spuštění denního shrnutí každou půlnoc."""
         scheduler.every_day_at(0, 5, lambda: self.run())
         logger.info("DailySummarizer naplánován na 00:05")
 
@@ -1189,13 +1189,13 @@ Konverzace:
 # ??????????????????????????????????????????????????????
 
 class ConversationSummarizer:
-    """Automaticky kondenzuje staré konverza?ní vlákna do fakt? o u?ivateli.
+    """Automaticky kondenzuje staré konverzační vlákna do faktů o uživateli.
 
     Logika:
-    - Spustí se kdy? je po?et zpráv v historii > max_history
-    - Vezme nejstar?í blok zpráv (první third) a po?ádá LLM o sumarizaci
-    - Výsledek ulo?í do user_profile jako kondenzovaná fakta
-    - Staré zprávy sma?e z pam?ti
+    - Spustí se když je počet zpráv v historii > max_history
+    - Vezme nejstarší blok zpráv (první third) a požádá LLM o sumarizaci
+    - Výsledek uloží do user_profile jako kondenzovaná fakta
+    - Staré zprávy smaže z paměti
     """
 
     def __init__(self, config: dict, max_history: int = 40):
@@ -1203,19 +1203,19 @@ class ConversationSummarizer:
         self.max_history = max_history
 
     def should_prune(self, conversation_count: int) -> bool:
-        """True pokud je ?as na pruning."""
+        """True pokud je čas na pruning."""
         return conversation_count >= self.max_history
 
     def summarize_and_prune(self, memories: list, ollama_url: str, model: str):
         """Vezme seznam vzpomínek, zkondenzuje staré, vrátí (pruned_list, summary).
 
-        memories ? seznam dict {"content": str, "created_at": float, ...}
-        Vrátí (nový_krat?í_seznam, textový_souhrn)
+        memories — seznam dict {"content": str, "created_at": float, ...}
+        Vrátí (nový_kratší_seznam, textový_souhrn)
         """
         if len(memories) < self.max_history:
             return memories, ""
 
-        # Vezmi první t?etinu jako "staré"
+        # Vezmi první třetinu jako "staré"
         split = len(memories) // 3
         old_memories = memories[:split]
         recent_memories = memories[split:]
@@ -1223,12 +1223,12 @@ class ConversationSummarizer:
         # Sestav kontext pro sumarizaci
         context = "\n".join(m.get("content", "")[:200] for m in old_memories)
 
-        prompt = f"""Toto jsou star?í konverzace s u?ivatelem JARVIS asistenta.
-Vytvo? stru?ný souhrn klí?ových fakt? o u?ivateli (max 5 v?t):
+        prompt = f"""Toto jsou starší konverzace s uživatelem JARVIS asistenta.
+Vytvoř stručný souhrn klíčových faktů o uživateli (max 5 vět):
 
 {context}
 
-Souhrn (jen fakta o u?ivateli, jeho preferencích a zvyklostech):"""
+Souhrn (jen fakta o uživateli, jeho preferencích a zvyklostech):"""
 
         summary = ""
         try:
@@ -1244,28 +1244,28 @@ Souhrn (jen fakta o u?ivateli, jeho preferencích a zvyklostech):"""
         except Exception as e:
             logger.warning(f"ConversationSummarizer LLM chyba: {e}")
             # Fallback: simple concatenation
-            summary = f"Souhrn {len(old_memories)} star?ích konverzací: " + context[:500]
+            summary = f"Souhrn {len(old_memories)} starších konverzací: " + context[:500]
 
         return recent_memories, summary
 
     def prune_and_save(self, memory_store, user_profile, ollama_url: str, model: str) -> str:
-        """Hlavní metoda ? pruneuje pam?? a ukládá souhrn do user_profile."""
+        """Hlavní metoda — pruneuje paměť a ukládá souhrn do user_profile."""
         try:
-            # Získej v?echny konverza?ní vzpomínky
+            # Získej všechny konverzační vzpomínky
             memories = memory_store.recall("", top_k=200, min_importance=0.0)
             conv_memories = [m for m in memories if "conversation" in str(m.get("tags", []))]
 
             if not self.should_prune(len(conv_memories)):
-                return f"Pruning nepot?ebný ({len(conv_memories)} zpráv < {self.max_history})"
+                return f"Pruning nepotřebný ({len(conv_memories)} zpráv < {self.max_history})"
 
             pruned, summary = self.summarize_and_prune(conv_memories, ollama_url, model)
 
             if summary:
-                # Ulo? souhrn jako poznámku do user_profile
-                # set() volá _save() intern?, tak?e explicitní save() není pot?eba
+                # Ulož souhrn jako poznámku do user_profile
+                # set() volá _save() interně, takže explicitní save() není potřeba
                 user_profile.set("conversation_summary", summary, confidence=0.9)
 
-            return f"Zkondenzováno {len(conv_memories) - len(pruned)} starých konverzací. Souhrn ulo?en do profilu."
+            return f"Zkondenzováno {len(conv_memories) - len(pruned)} starých konverzací. Souhrn uložen do profilu."
         except Exception as e:
             return f"Pruning selhal: {e}"
 

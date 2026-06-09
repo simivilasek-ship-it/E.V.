@@ -34,6 +34,10 @@ def main():
         from jarvis_cli import cmd_release
         raise SystemExit(cmd_release(sys.argv[2:]))
 
+    if len(sys.argv) > 1 and sys.argv[1] == "config":
+        from jarvis_cli import cmd_config_validate
+        raise SystemExit(cmd_config_validate(sys.argv[2:]))
+
     import argparse
     parser = argparse.ArgumentParser(
         prog="jarvis",

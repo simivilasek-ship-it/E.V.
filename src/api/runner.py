@@ -231,6 +231,24 @@ def main(argv: list[str] | None = None) -> None:
 
     from src.api.app import mount_web_app, run_dashboard
 
+    # Security check — warn if auth disabled on non-localhost binding
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(ROOT))
+        from config import load_config
+        _cfg = load_config()
+        _host = _cfg.get("api_bind_host", "127.0.0.1")
+        _auth = _cfg.get("api_auth_required", False)
+        if not _auth and _host not in ("127.0.0.1", "localhost"):
+            print("\n" + "=" * 60)
+            print("  ⚠  BEZPEČNOSTNÍ VAROVÁNÍ")
+            print(f"  API běží na {_host}:{args.port} bez autentizace!")
+            print("  Nastav api_auth_required: true v config.json")
+            print("  nebo spusť: python scripts/generate_token.py --write")
+            print("=" * 60 + "\n")
+    except Exception:
+        pass
+
     mount_web_app()
 
     url = f"http://localhost:{args.port}/app"

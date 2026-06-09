@@ -10,7 +10,7 @@ export default defineConfig({
   timeout: 30_000,
 
   use: {
-    baseURL: process.env.JARVIS_BASE_URL || 'http://localhost:3000',
+    baseURL: process.env.JARVIS_BASE_URL || 'http://localhost:8002',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -21,4 +21,17 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
+
+  webServer: {
+    command: 'python3 dashboard.py',
+    url: 'http://localhost:8002/api/health',
+    timeout: 120_000,
+    reuseExistingServer: !process.env.CI,
+    cwd: '..',
+    env: {
+      JARVIS_TEST_MODE: '1',
+      JARVIS_BIND_HOST: '0.0.0.0',
+      JARVIS_API_AUTH_REQUIRED: '0',
+    },
+  },
 });

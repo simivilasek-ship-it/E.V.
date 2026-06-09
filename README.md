@@ -11,11 +11,11 @@
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.12-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.16.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![Linux-first](https://img.shields.io/badge/Linux--first-22c55e?style=flat-square&logo=linux&logoColor=white)](#linux-out-of-the-box)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-718%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Tests](https://img.shields.io/badge/tests-730%2B%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 
 </div>
 
@@ -24,10 +24,12 @@
 ## Quickstart
 
 ```bash
-git clone https://github.com/simivilasek-ship-it/Jarvis.git && cd Jarvis && ./install.sh && python3 dashboard.py
+git clone https://github.com/simivilasek-ship-it/Jarvis.git && cd Jarvis && ./install.sh && python3 jarvis.py
 ```
 
 Open **http://localhost:8002/app** — chat, live PC context, and Work Timeline work immediately.
+
+> `python3 dashboard.py` also works and is equivalent — `jarvis.py` is the preferred entry point.
 
 ```bash
 python jarvis.py log --today          # CLI — co jsi dělal dnes
@@ -41,7 +43,8 @@ systemctl --user enable jarvis.service  # autostart (po ./install.sh)
 ```bash
 git clone https://github.com/simivilasek-ship-it/Jarvis.git
 cd Jarvis && ./install.sh
-python3 dashboard.py              # backend + UI → http://localhost:8002/app
+python3 jarvis.py                 # backend + UI → http://localhost:8002/app  (preferred)
+python3 dashboard.py              # equivalent alias
 python3 dashboard.py --restart    # kill old process on :8002, reload code
 ```
 
@@ -64,6 +67,32 @@ docker compose up -d    # http://localhost:8002/app — set JARVIS_API_TOKEN in 
 ```
 
 </details>
+
+---
+
+## Demo
+
+> **Chat + Work Timeline + System Commands in action**
+>
+> ![Demo](docs/demo.gif)
+>
+> *No demo.gif yet? Run `jarvis` and try: "jaký je čas", "info o systému", "shrnutí dne"*
+
+---
+
+## Features at a Glance
+
+| Feature | Status | How to use |
+|---------|--------|-----------|
+| 💬 Local chat (Ollama) | ✅ | Type in web UI or `jarvis chat` |
+| 🖥 Desktop context (X11) | ✅ | Automatic — active window injected |
+| 📋 Work timeline | ✅ | Web → Work tab or `jarvis log --today` |
+| 🎙 Voice (Vosk/Whisper) | ⚙ opt-in | Enable in Settings → Voice panel |
+| 🤖 Agents | ✅ | Web → Agents tab |
+| 🔌 MCP servers | ✅ | Web → Settings → MCP |
+| 🌅 Morning briefing | ✅ | `jarvis briefing` or auto at 8:00 |
+| 🔒 API auth token | ✅ | `python scripts/generate_token.py --write` |
+| 🐳 Docker | ✅ | `docker compose up` |
 
 ---
 
@@ -264,7 +293,7 @@ RAM: **~34 MB** idle backend · **~650 MB+** with Ollama loaded · runs on any m
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    JARVIS v5.15                      │
+│                    JARVIS v5.16                      │
 │                                                     │
 │  ┌──────────┐    ┌─────────────┐    ┌───────────┐  │
 │  │ Next.js  │◄──►│  FastAPI    │◄──►│  Ollama   │  │
@@ -290,7 +319,7 @@ web/           Next.js 16 — Chat, Dnes, Feed, Checklist (Alt+W/F/C/D)
 
 Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · CLI: **`jarvis log`**
 
-**Web dashboard (v5.15):** Work Timeline, Activity Feed, daily summary (Alt+D), proactive AI + desktop notify, unified runtime, onboarding, install UX, missions + checklist, live PC context, voice in chat.
+**Web dashboard (v5.16):** Work Timeline, Activity Feed, daily summary (Alt+D), proactive AI + desktop notify, unified runtime, onboarding, install UX, missions + checklist, live PC context, voice in chat.
 
 → **[docs/index.md](docs/index.md)** · **[docs/mcp-servers.md](docs/mcp-servers.md)** · **[docs/CANONICAL.md](docs/CANONICAL.md)** · **[docs/api-reference.md](docs/api-reference.md)** · **[web/README.md](web/README.md)**
 
@@ -344,6 +373,18 @@ python jarvis.py release --dry-run        # preview release changes
 python scripts/generate_token.py --write  # create API token in .env
 bash scripts/make_deb.sh                  # build .deb package
 ```
+
+---
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+K` | Open command palette |
+| `Alt+Space` | Spotlight search |
+| `Alt+D` | Daily summary |
+| `Alt+1`–`Alt+9` | Switch panels |
+| `Escape` | Close modal / panel |
 
 ---
 

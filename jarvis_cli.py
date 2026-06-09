@@ -7,6 +7,44 @@ import sys
 from datetime import date
 
 
+_COMMANDS: dict[str, str] = {
+    "log":      "cmd_log",
+    "release":  "cmd_release",
+    "briefing": "cmd_briefing",
+}
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Entry point: `jarvis <command> [args…]`"""
+    if argv is None:
+        argv = sys.argv[1:]
+
+    if not argv or argv[0] in ("-h", "--help"):
+        print("Použití: jarvis <příkaz> [volby]")
+        print()
+        print("Příkazy:")
+        print("  log        Dnešní pracovní přehled z Work Timeline")
+        print("  release    Asistent pro vydání nové verze")
+        print("  briefing   Odeslat ranní přehled ihned (nebo naplánovat)")
+        return 0
+
+    cmd = argv[0]
+    rest = argv[1:]
+
+    fn_name = _COMMANDS.get(cmd)
+    if fn_name is None:
+        print(f"Neznámý příkaz: {cmd!r}")
+        print(f"Dostupné příkazy: {', '.join(_COMMANDS)}")
+        return 1
+
+    fn = globals()[fn_name]
+    return fn(rest)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+
 def _format_summary_markdown(data: dict) -> str:
     lines = [f"# JARVIS — přehled {data.get('date', date.today().isoformat())}", ""]
     for item in data.get("summary") or []:
@@ -54,6 +92,36 @@ def cmd_log(argv: list[str] | None = None) -> int:
             print("\nProjekty:")
             for name, hours in sorted(data["projects"].items(), key=lambda x: -x[1]):
                 print(f"  {name}: {hours} h")
+    return 0
+
+
+def cmd_briefing(argv: list[str] | None = None) -> int:
+    """Send the JARVIS morning briefing immediately."""
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="jarvis briefing", description="JARVIS ranní přehled")
+    parser.add_argument(
+        "--schedule",
+        metavar="HH:MM",
+        default=None,
+        help="Naplánovat denní briefing na daný čas (např. 08:00)",
+    )
+    args = parser.parse_args(argv)
+
+    if args.schedule:
+        try:
+            hour, minute = (int(x) for x in args.schedule.split(":"))
+        except ValueError:
+            print(f"Chybný formát času: {args.schedule!r} (očekáváno HH:MM)")
+            return 1
+        from morning_briefing import schedule_briefing
+        schedule_briefing(hour=hour, minute=minute)
+        print(f"Briefing naplánován na {hour:02d}:{minute:02d}.")
+    else:
+        from morning_briefing import send_briefing
+        text = send_briefing()
+        print(text)
+
     return 0
 
 
@@ -254,4 +322,73 @@ def cmd_release(argv: list[str] | None = None) -> int:
         print(f"  ✓ Pushed v{nv}")
 
     print(f"\n✓ Release v{nv} prepared. Run tests, then: git tag -a v{nv} -m 'JARVIS v{nv}' && git push origin main v{nv}")
+    return 0
+
+
+def cmd_config_validate(argv: list[str] | None = None) -> int:
+    """Validate JARVIS config.json with the Pydantic schema."""
+    import argparse
+    import json
+    import os
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(
+        prog="jarvis config validate",
+        description="Validate JARVIS config.json against the Pydantic schema.",
+    )
+    parser.add_argument(
+        "--path", type=str, default="",
+        help="Path to config.json (default: ~/.config/jarvis/config.json or ./config.json)",
+    )
+    parser.add_argument("--json", action="store_true", help="Output results as JSON")
+    args = parser.parse_args(argv)
+
+    # Resolve config path
+    if args.path:
+        config_path = Path(args.path)
+    else:
+        xdg = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+        candidates = [xdg / "jarvis" / "config.json", Path("config.json")]
+        config_path = next((p for p in candidates if p.exists()), Path("config.json"))
+
+    if not config_path.exists():
+        msg = f"Config file not found: {config_path}"
+        if args.json:
+            print(json.dumps({"ok": False, "error": msg}, ensure_ascii=False))
+        else:
+            print(f"ERROR: {msg}")
+        return 1
+
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            cfg = json.load(f)
+    except json.JSONDecodeError as e:
+        msg = f"Invalid JSON: {e}"
+        if args.json:
+            print(json.dumps({"ok": False, "error": msg}, ensure_ascii=False))
+        else:
+            print(f"ERROR: {msg}")
+        return 1
+
+    from config_schema import validate_config
+    settings, warns = validate_config(cfg)
+
+    if args.json:
+        print(json.dumps({
+            "ok": True,
+            "config_path": str(config_path),
+            "warnings": warns,
+            "ollama_model": settings.ollama_model,
+            "history_size": settings.history_size,
+        }, ensure_ascii=False, indent=2))
+        return 0
+
+    print(f"Config: {config_path}")
+    if warns:
+        print(f"WARNINGS ({len(warns)}):")
+        for w in warns:
+            print(f"  ⚠  {w}")
+        return 0
+
+    print(f"OK — model={settings.ollama_model}, history={settings.history_size}")
     return 0

@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [5.16.0] - 2026-06-09
+
+### Fixed
+- **Memory conflict bug** — `store_with_conflict_check()` called `_conn()` which didn't exist on `_SQLiteMemoryStore`; fixed to use `_connect()` context manager — conflict resolution now works correctly
+- **UTF-8 mojibake** — fixed corrupted Czech strings in `context_orchestrator.py` (`Schránka`, `Systém`) that were rendering garbled in LLM context
+
+### Added
+- **Daily morning briefing** (`morning_briefing.py`) — proactive `notify-send` briefing with yesterday's work summary, git dirty state, and day overview; `jarvis briefing` CLI command
+- **Voice panel** (`web/components/VoicePanel.tsx`) — first-class voice UI: mic visualizer, STT/TTS status, duplex toggle, test phrase, graceful offline fallback; added to sidebar
+- **Pydantic config schema** (`config_schema.py`) — `JarvisSettings` with grouped `VoiceSettings`, `SecuritySettings`, `AgentSettings`; `jarvis config validate` CLI
+- **Router domain modules** (`router/`) — split 1034-line `local_router.py` into `constants.py`, `apps.py`, `media.py`, `system.py`, `memory_routes.py`; `moodle` site moved to user-overridable `custom_sites` config key
+- **Vitest + RTL** — `web/vitest.config.ts`, `web/vitest.setup.ts`, `web/__tests__/SettingsPanel.test.tsx`, `web/__tests__/ChatPanel.test.tsx`; added to CI web job
+- **Full-stack E2E** — Playwright now starts Python backend on `:8002` with `JARVIS_TEST_MODE=1`; tests cover API health, chat, confirm modal, settings; `data-testid` attrs on key components
+- **Security startup warning** — `runner.py` prints visible banner when `api_auth_required=False` and host is not localhost
+- **Memory conflict regression test** (`tests/test_memory_conflict.py`)
+- **Keyboard shortcuts section** in README
+- **Features at a Glance table** in README
+- **Demo section** placeholder in README
+
+### Changed
+- Version bumped to `5.16.0` in `config.py`, `pyproject.toml`, README badge
+- README test count badge updated to `730+`
+- `custom_sites` config key: add your own site shortcuts in `config.json`
+
 ## [5.15.2] - 2026-06-08
 
 ### Changed — Complete design system unification

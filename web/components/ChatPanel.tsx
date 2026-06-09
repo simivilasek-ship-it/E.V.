@@ -462,6 +462,7 @@ export default function ChatPanel() {
             placeholder={pl.text}
             rows={1}
             disabled={busy}
+            data-testid="chat-input"
             className="flex-1 bg-transparent border-none resize-none outline-none text-sm py-2"
             style={{ color: 'var(--text)', minHeight: 36, maxHeight: 140 }}
           />

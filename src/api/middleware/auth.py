@@ -1,12 +1,30 @@
 """Optional LAN API token authentication middleware."""
 from __future__ import annotations
 
+import logging
+
 from config import CONFIG
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+_logger = logging.getLogger(__name__)
 _LOCALHOST_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def _warn_if_insecure() -> None:
+    """Log a startup warning when auth is disabled and binding is not localhost."""
+    bind_host = CONFIG.get("api_bind_host", "127.0.0.1")
+    if not CONFIG.get("api_auth_required") and bind_host not in _LOCALHOST_HOSTS:
+        _logger.warning(
+            "BEZPEČNOST: api_auth_required=False a api_bind_host=%s — "
+            "API je dostupné v síti bez autentizace! "
+            "Nastav api_auth_required: true v config.json.",
+            bind_host,
+        )
+
+
+_warn_if_insecure()
 
 
 def _is_exempt_path(path: str) -> bool:

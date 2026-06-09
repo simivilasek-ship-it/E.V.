@@ -27,12 +27,13 @@ const VisionSandboxPanel = dynamic(() => import('./VisionSandboxPanel'), { ssr: 
 const WorkTimeline   = dynamic(() => import('./WorkTimeline'), { ssr: false })
 const ActivityFeed   = dynamic(() => import('./ActivityFeed'), { ssr: false })
 const MissionChecklist = dynamic(() => import('./MissionChecklist'), { ssr: false })
+const VoicePanel       = dynamic(() => import('./VoicePanel'),       { ssr: false })
 
 const NAV_KEYS: Record<string, Tab> = {
   '1': 'CHAT', '2': 'SYSTEM', '3': 'PLUGINS', '4': 'SKILL',
   '5': 'AGENT', '6': 'TIMELINE', '7': 'MEMORY', '8': 'DASHBOARD',
   '9': 'SETTINGS', '0': 'WORKFLOW', 'm': 'MISSIONS', 'v': 'VISION',
-  'w': 'WORK', 'f': 'FEED', 'c': 'CHECKLIST',
+  'w': 'WORK', 'f': 'FEED', 'c': 'CHECKLIST', 'h': 'VOICE',
 }
 
 function useTheme() {
@@ -102,7 +103,7 @@ export default function JarvisApp() {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen overflow-hidden relative z-10">
+      <div data-testid="jarvis-app" className="flex h-screen overflow-hidden relative z-10">
         <Sidebar
           tab={tab} setTab={setTab}
           setPaletteOpen={setPaletteOpen}
@@ -167,6 +168,11 @@ export default function JarvisApp() {
             )}
             {tab === 'VISION' && (
               <PageWrapper><ErrorBoundary><VisionSandboxPanel /></ErrorBoundary></PageWrapper>
+            )}
+            {tab === 'VOICE' && (
+              <PageWrapper>
+                <ErrorBoundary><VoicePanel /></ErrorBoundary>
+              </PageWrapper>
             )}
             {tab === 'WORKFLOW' && (
               <PageWrapper>

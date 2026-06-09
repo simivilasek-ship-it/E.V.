@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
     "e2e:report": "playwright show-report"
@@ -23,13 +25,20 @@
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@testing-library/user-event": "latest",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "latest",
+    "@vitest/ui": "latest",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "jsdom": "latest",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vitest": "latest",
     "wait-on": "^7.2.0"
   }
 }

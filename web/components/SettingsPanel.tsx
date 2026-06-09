@@ -676,6 +676,19 @@ export default function SettingsPanel() {
             <div className="text-[11px]" style={{ color: 'var(--muted)' }}>
               Checks: {health.checks_ok}/{health.checks_total} · MCP: {health.mcp.ready_total}/{health.mcp.enabled_total} ready
             </div>
+            {health.checks['api_auth'] && !health.checks['api_auth'].ok && (
+              <div
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-mono"
+                style={{
+                  background: 'rgba(244,63,94,.1)',
+                  border: '1px solid rgba(244,63,94,.4)',
+                  color: '#f43f5e',
+                }}
+              >
+                <span>⚠</span>
+                <span>API bez autentizace — zapni <strong>api_auth_required</strong> v config.json</span>
+              </div>
+            )}
             {health.mcp.ready_total < health.mcp.enabled_total && (
               <div className="text-[10px] px-2 py-1.5 rounded" style={{ background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', color: 'var(--amber)' }}>
                 ⚠ {health.mcp.enabled_total - health.mcp.ready_total} MCP server(y) nejsou připraveny — zkontroluj chybějící balíčky v sekci MCP Servery

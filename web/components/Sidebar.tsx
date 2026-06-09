@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useJarvis } from '@/store/jarvis'
 import { Icons } from './Icons'
 
-export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'WORK' | 'FEED' | 'CHECKLIST' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW' | 'MISSIONS' | 'VISION'
+export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'WORK' | 'FEED' | 'CHECKLIST' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW' | 'MISSIONS' | 'VISION' | 'VOICE'
 
 interface NavItem { id: Tab; label: string; icon: React.ReactNode; key: string }
 
@@ -22,6 +22,7 @@ const ADVANCED_NAV: NavItem[] = [
   { id: 'AGENT', label: 'Agent', icon: Icons.agent, key: '5' },
   { id: 'MISSIONS', label: 'Agent mise', icon: Icons.mission, key: 'm' },
   { id: 'VISION', label: 'Vision', icon: Icons.eye, key: 'v' },
+  { id: 'VOICE', label: 'Hlas', icon: Icons.mic, key: 'h' },
   { id: 'TIMELINE', label: 'Timeline', icon: Icons.timeline, key: '6' },
   { id: 'MEMORY', label: 'Paměť', icon: Icons.memory, key: '7' },
   { id: 'DASHBOARD', label: 'Dashboard', icon: Icons.dash, key: '8' },
@@ -33,6 +34,7 @@ function NavButton({ item, tab, setTab }: { item: NavItem; tab: Tab; setTab: (t:
     <button
       onClick={() => setTab(item.id)}
       title={`Alt+${item.key}`}
+      data-testid={`nav-item-${item.id.toLowerCase()}`}
       className={`nav-item ${tab === item.id ? 'active' : ''}`}
     >
       <span className="w-4 h-4 shrink-0 flex items-center justify-center opacity-80">
@@ -79,6 +81,7 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
 
   return (
     <aside
+      data-testid="sidebar"
       className="flex flex-col h-full relative z-20 glass-panel shrink-0"
       style={{ width: 'var(--sidebar-w)', borderRight: '1px solid var(--border)', borderRadius: 0 }}
     >

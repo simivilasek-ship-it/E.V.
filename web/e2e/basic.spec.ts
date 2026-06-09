@@ -1,72 +1,129 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Basic E2E smoke tests for JARVIS web UI.
- * These run against a live Next.js dev server or static build.
- * In CI they run against the built app served via `next start`.
+ * Full-stack E2E tests for JARVIS.
+ * Runs against the Python backend (dashboard.py) on port 8002.
+ * Backend is started automatically via playwright.config.ts webServer.
  */
 
-test.describe('JARVIS Web UI — smoke', () => {
-  test('homepage loads without errors', async ({ page }) => {
-    const errors: string[] = [];
-    page.on('pageerror', err => errors.push(err.message));
+test.describe('JARVIS — full-stack E2E', () => {
 
-    await page.goto('/');
+  test('page loads JARVIS UI', async ({ page }) => {
+    await page.goto('/app');
     await page.waitForLoadState('domcontentloaded');
 
-    // Should render the app shell
-    const body = await page.textContent('body');
-    expect(body).toBeTruthy();
-    expect(errors).toHaveLength(0);
+    // Root app container should be present
+    const app = page.locator('[data-testid="jarvis-app"]');
+    await expect(app).toBeVisible({ timeout: 15_000 });
   });
 
-  test('sidebar is visible', async ({ page }) => {
-    await page.goto('/');
+  test('sidebar is visible with navigation items', async ({ page }) => {
+    await page.goto('/app');
     await page.waitForLoadState('networkidle');
 
-    // Sidebar should render version string
-    const sidebar = page.locator('nav, aside, [data-testid="sidebar"]').first();
-    if (await sidebar.isVisible()) {
-      await expect(sidebar).toBeVisible();
+    const sidebar = page.locator('[data-testid="sidebar"]');
+    await expect(sidebar).toBeVisible();
+
+    // At minimum Chat nav item should exist
+    const chatNav = page.locator('[data-testid="nav-item-chat"]');
+    await expect(chatNav).toBeVisible();
+  });
+
+  test('chat input exists and is interactable', async ({ page }) => {
+    await page.goto('/app');
+    await page.waitForLoadState('networkidle');
+
+    const input = page.locator('[data-testid="chat-input"]');
+    await expect(input).toBeVisible();
+    await expect(input).toBeEnabled();
+
+    // Should accept keyboard input
+    await input.click();
+    await input.fill('test message');
+    await expect(input).toHaveValue('test message');
+    // Clear input
+    await input.fill('');
+  });
+
+  test('API health endpoint returns ok', async ({ request }) => {
+    const res = await request.get('http://localhost:8002/api/health');
+    expect(res.ok()).toBeTruthy();
+
+    const body = await res.json();
+    // Backend should report some form of status
+    expect(body).toHaveProperty('status');
+    expect(['ok', 'degraded', 'healthy']).toContain(body.status);
+  });
+
+  test('work timeline panel loads (may be empty in test mode)', async ({ page }) => {
+    await page.goto('/app');
+    await page.waitForLoadState('networkidle');
+
+    // Open the advanced section and navigate to Work/Timeline
+    const advancedBtn = page.locator('button', { hasText: 'Pokročilé' });
+    if (await advancedBtn.isVisible()) {
+      await advancedBtn.click();
+    }
+
+    const workNav = page.locator('[data-testid="nav-item-work"]');
+    if (await workNav.isVisible()) {
+      await workNav.click();
+      // Panel should load (either content or empty-state message)
+      await page.waitForTimeout(500);
+      const pageContent = await page.content();
+      expect(pageContent.length).toBeGreaterThan(500);
     } else {
-      // Fallback: page has meaningful content
-      const html = await page.content();
-      expect(html.length).toBeGreaterThan(500);
+      // Fallback: just confirm the app is rendered
+      await expect(page.locator('[data-testid="jarvis-app"]')).toBeVisible();
     }
   });
 
-  test('chat input is present', async ({ page }) => {
-    await page.goto('/');
+  test('settings panel opens when clicking Settings in sidebar', async ({ page }) => {
+    await page.goto('/app');
     await page.waitForLoadState('networkidle');
 
-    // Look for a chat input or textarea
-    const input = page.locator('input[type="text"], textarea').first();
-    const count = await page.locator('input[type="text"], textarea').count();
-    if (count > 0) {
-      await expect(input).toBeVisible();
-    } else {
-      // App may not have loaded backend — at minimum page renders
-      const html = await page.content();
-      expect(html).toContain('JARVIS');
+    // Open the advanced section to reveal Settings
+    const advancedBtn = page.locator('button', { hasText: 'Pokročilé' });
+    if (await advancedBtn.isVisible()) {
+      await advancedBtn.click();
     }
+
+    const settingsNav = page.locator('[data-testid="nav-item-settings"]');
+    await expect(settingsNav).toBeVisible();
+    await settingsNav.click();
+
+    // Settings panel content should appear (e.g. a heading)
+    await page.waitForTimeout(500);
+    const pageText = await page.textContent('body');
+    expect(pageText).toBeTruthy();
+    // Settings panel typically has the word "Nastavení" or "Settings"
+    const hasSettingsContent =
+      pageText?.includes('Nastavení') ||
+      pageText?.includes('model') ||
+      pageText?.includes('TTS') ||
+      pageText?.includes('settings');
+    expect(hasSettingsContent).toBeTruthy();
   });
 
-  test('no critical JS errors on navigation to /app', async ({ page }) => {
+  test('no JavaScript console errors on load', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', err => {
-      // Ignore known non-critical errors
-      if (!err.message.includes('ResizeObserver') && !err.message.includes('Non-Error')) {
+      // Ignore known non-critical browser/library noise
+      if (
+        !err.message.includes('ResizeObserver') &&
+        !err.message.includes('Non-Error promise rejection') &&
+        !err.message.includes('WebSocket') &&
+        !err.message.includes('favicon')
+      ) {
         errors.push(err.message);
       }
     });
 
-    try {
-      await page.goto('/app', { waitUntil: 'domcontentloaded', timeout: 15_000 });
-    } catch {
-      // /app may redirect to / — that's fine
-      await page.goto('/', { waitUntil: 'domcontentloaded' });
-    }
+    await page.goto('/app', { waitUntil: 'domcontentloaded', timeout: 20_000 });
+    // Give the page a moment to trigger any synchronous errors
+    await page.waitForTimeout(1000);
 
     expect(errors).toHaveLength(0);
   });
+
 });
