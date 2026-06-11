@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "jarvis-assistant"
-version = "5.16.0"
+version = "5.17.0"
 description = "Lokální AI asistent — ovládej celý PC hlasem nebo textem, 100 % offline"
 readme = "README.md"
 license = { text = "MIT" }
@@ -58,6 +58,10 @@ vision = [
 ]
 mcp = [
     "mcp>=1.0.0",
+]
+docs = [
+    "pypdf>=4.0.0",
+    "python-docx>=1.1.0",
 ]
 full = [
     "jarvis-assistant[desktop,web,memory,voice,vision,mcp]",

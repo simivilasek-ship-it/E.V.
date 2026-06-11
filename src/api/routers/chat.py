@@ -48,6 +48,31 @@ def register(app):
         except Exception as e:
             return {"response": f"Chyba: {e}"}
 
+    @app.post("/api/chat/message")
+    async def chat_message(body: dict):
+        """Odešle zprávu přes LocalRouter (local first), fallback na Ollama."""
+        text = (body.get("text") or "").strip()
+        if not text:
+            return {"response": "Prázdná zpráva", "source": "local"}
+        try:
+            from local_router import LocalRouter
+            from config import CONFIG
+            lr = LocalRouter(CONFIG)
+            match = lr.route(text)
+            if match:
+                response, _meta = match
+                return {"response": response, "source": "local"}
+        except Exception:
+            pass
+        try:
+            from src.api.runtime import process_chat
+            response = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: process_chat(text),
+            )
+            return {"response": response, "source": "llm"}
+        except Exception as e:
+            return {"response": f"Chyba: {e}", "source": "llm"}
+
     @app.websocket("/ws/chat")
     async def ws_chat(ws: WebSocket):
         """WebSocket chat — streaming přes unified runtime."""

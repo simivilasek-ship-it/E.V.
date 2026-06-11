@@ -126,6 +126,13 @@ def register(app):
             if manifest:
                 (dest / "manifest.json").write_text(
                     _json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            try:
+                from plugin_system import get_plugin_system
+                ps = get_plugin_system()
+                if ps:
+                    ps.reload_plugin(name)
+            except Exception:
+                pass
             return {"saved": str(dest), "name": name}
         except Exception as e:
             return {"error": str(e)}

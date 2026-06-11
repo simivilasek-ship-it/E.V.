@@ -881,6 +881,16 @@ class SystemPlugin(PluginBase):
         return "Žádné poznámky."
 
 
+# ── Singleton accessor ────────────────────────────────
+
+_PLUGIN_SYSTEM_INSTANCE: "Optional[PluginManager]" = None
+
+
+def get_plugin_system() -> "Optional[PluginManager]":
+    """Vrátí aktuální singleton instanci PluginManageru (nebo None)."""
+    return _PLUGIN_SYSTEM_INSTANCE
+
+
 # ── Factory ───────────────────────────────────────────
 
 def create_plugin_manager(config: Dict[str, Any] = None) -> PluginManager:
@@ -900,4 +910,6 @@ def create_plugin_manager(config: Dict[str, Any] = None) -> PluginManager:
     # Načti custom skills ze složek
     manager.load_all_plugins()
 
+    global _PLUGIN_SYSTEM_INSTANCE
+    _PLUGIN_SYSTEM_INSTANCE = manager
     return manager

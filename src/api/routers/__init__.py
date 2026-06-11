@@ -6,6 +6,7 @@ from src.api.routers import (
     chat,
     commands,
     config,
+    docs,
     graph,
     marketplace,
     memory,
@@ -41,6 +42,7 @@ ROUTERS = (
     graph,
     ws_agents,
     broadcast,
+    docs,
 )
 
 

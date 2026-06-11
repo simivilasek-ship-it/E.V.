@@ -179,7 +179,7 @@ export default function HeroPanel({ onSend }: { onSend: (cmd: string) => void })
   }
 
   return (
-    <div className="flex flex-col items-center justify-center flex-1 gap-8 px-8 py-6 w-full max-w-205 mx-auto">
+    <div className="flex flex-col items-center justify-center flex-1 gap-8 px-4 sm:px-8 py-6 w-full max-w-205 mx-auto">
 
       {/* Hodiny */}
       <LiveClock />
@@ -195,7 +195,7 @@ export default function HeroPanel({ onSend }: { onSend: (cmd: string) => void })
       </div>
 
       {/* Live metriky */}
-      <div className="grid grid-cols-4 gap-3 w-full">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
         <MetricPill label="CPU" value={system.cpu} color="var(--cyan)" />
         <MetricPill label="RAM" value={system.ram} color="var(--purple)" />
         <MetricPill label="DISK" value={system.disk} color="var(--green)" />
@@ -207,7 +207,7 @@ export default function HeroPanel({ onSend }: { onSend: (cmd: string) => void })
         <div className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>
           Rychlé akce
         </div>
-        <div className="grid grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
           {QUICK_ACTIONS.map(a => (
             <ActionBtn key={a.cmd} {...a} onSend={onSend} />
           ))}

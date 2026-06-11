@@ -65,9 +65,11 @@ interface SidebarProps {
   clearMessages: () => void
   theme: string
   toggleTheme: () => void
+  isOpen?: boolean
+  onClose?: () => void
 }
 
-export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen, clearMessages, theme, toggleTheme }: SidebarProps) {
+export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen, clearMessages, theme, toggleTheme, isOpen = false, onClose }: SidebarProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const connStatus = useJarvis(s => s.connStatus)
   const retry      = useJarvis(s => s.retry)
@@ -79,10 +81,15 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
   const orb = ORB_CFG[orbState] ?? ORB_CFG.idle
   const hasAdvancedActive = tab !== 'CHAT'
 
+  const handleSetTab = (t: Tab) => {
+    setTab(t)
+    onClose?.()
+  }
+
   return (
     <aside
       data-testid="sidebar"
-      className="flex flex-col h-full relative z-20 glass-panel shrink-0"
+      className={`flex flex-col h-full relative z-20 glass-panel shrink-0 sidebar-mobile-hidden${isOpen ? ' sidebar-mobile-open' : ''}`}
       style={{ width: 'var(--sidebar-w)', borderRight: '1px solid var(--border)', borderRadius: 0 }}
     >
       {/* Brand */}
@@ -96,7 +103,7 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
         >
           <span className="font-display text-lg font-bold text-white">J</span>
         </div>
-        <div>
+        <div className="flex-1">
           <div className="font-display text-base font-bold tracking-tight" style={{ color: 'var(--text)' }}>
             JARVIS
           </div>
@@ -104,6 +111,14 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
             v5.15 · Work OS
           </div>
         </div>
+        <button
+          onClick={onClose}
+          className="md:hidden btn-ghost w-7 h-7 flex items-center justify-center text-base shrink-0"
+          aria-label="Zavřít menu"
+          style={{ color: 'var(--muted)' }}
+        >
+          ×
+        </button>
       </div>
 
       {/* Status */}
@@ -150,7 +165,7 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
       {/* New chat */}
       <div className="px-3 pt-3 pb-1 shrink-0">
         <button
-          onClick={() => { setTab('CHAT'); clearMessages() }}
+          onClick={() => { setTab('CHAT'); clearMessages(); onClose?.() }}
           className="btn-primary flex items-center justify-center gap-2 w-full py-2.5 text-sm"
         >
           {Icons.plus}
@@ -161,7 +176,7 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2.5 py-2 flex flex-col gap-0.5">
         {PRIMARY_NAV.map(item => (
-          <NavButton key={item.id} item={item} tab={tab} setTab={setTab} />
+          <NavButton key={item.id} item={item} tab={tab} setTab={handleSetTab} />
         ))}
 
         <div className="mt-1">
@@ -186,7 +201,7 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
           {advancedOpen && (
             <div className="flex flex-col gap-0.5 mt-0.5">
               {ADVANCED_NAV.map(item => (
-                <NavButton key={item.id} item={item} tab={tab} setTab={setTab} />
+                <NavButton key={item.id} item={item} tab={tab} setTab={handleSetTab} />
               ))}
             </div>
           )}

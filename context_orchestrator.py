@@ -55,6 +55,15 @@ class ContextOrchestrator:
         except Exception:
             pass
 
+        # RAG: inject relevant doc passages if query is available
+        try:
+            from doc_ingestion import query_docs, list_docs
+            if list_docs():  # only if docs are ingested
+                ctx["has_docs"] = True
+                ctx["doc_names"] = [d["name"] for d in list_docs()[:5]]
+        except Exception:
+            pass
+
         # Project profile
         try:
             from project_profiles import get_project_profile
@@ -396,6 +405,10 @@ class ContextOrchestrator:
             parts.append(f"Git commity dnes: {commits}")
         if fails:
             parts.append(f"Selhané buildy dnes: {fails}")
+
+        if ctx.get("has_docs"):
+            names = ", ".join(ctx.get("doc_names", []))
+            parts.append(f"Dostupné dokumenty: {names}")
 
         if ctx.get("clipboard"):
             clip = ctx["clipboard"][:120]

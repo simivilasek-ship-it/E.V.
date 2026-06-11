@@ -378,3 +378,30 @@ body::before {
 /* Chat list items for ordered lists — hide the flex bullet for ol > li */
 ol > li { list-style: decimal; display: list-item; }
 ol > li > span:first-child { display: none; }
+
+/* ── Mobile responsive ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-w: 0px;
+  }
+
+  .sidebar-mobile-hidden {
+    transform: translateX(-100%);
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 50;
+    height: 100dvh;
+    width: 240px;
+    transition: transform 0.25s ease;
+  }
+
+  .sidebar-mobile-open {
+    transform: translateX(0);
+  }
+
+  .main-content-full {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+}

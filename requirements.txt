@@ -76,3 +76,8 @@ webrtcvad>=2.0.10
 
 # ── Global Hotkey (volitelné) ──────────────────────────
 # pynput>=1.7.6  # volitelné — Global hotkey Alt+Space (pip install pynput)
+
+# ── Document ingestion (volitelné) ────────────────────
+# pip install jarvis-assistant[docs]
+pypdf>=4.0.0
+python-docx>=1.1.0

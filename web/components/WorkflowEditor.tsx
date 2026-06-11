@@ -325,8 +325,14 @@ export default function WorkflowEditor() {
     try {
       const res = await fetch('/api/workflows')
       if (res.ok) {
-        const data = await res.json() as Workflow[]
-        if (data.length > 0) setWorkflow(data[0])
+        const data = await res.json() as { workflows?: Workflow[] }
+        const list = data.workflows ?? (Array.isArray(data) ? data as unknown as Workflow[] : [])
+        if (list.length > 0) {
+          setWorkflow(list[0])
+          setSaveStatus('Loaded ✓')
+        } else {
+          setSaveStatus('No workflows')
+        }
       } else {
         setSaveStatus('Load error ✗')
       }

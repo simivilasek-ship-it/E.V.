@@ -62,6 +62,39 @@ async def lifespan(application):
     except Exception as e:
         logger.warning(f"Dashboard: install notify init failed: {e}")
 
+    try:
+        import morning_briefing as _mb
+        _mb.schedule_briefing(hour=8, minute=0)
+        logger.info("Dashboard: ranní briefing naplánován na 08:00")
+    except Exception as e:
+        logger.warning(f"Dashboard: ranní briefing init selhal: {e}")
+
+    try:
+        from workflow_engine import get_workflow_engine
+        from config import CONFIG
+        from commands import CommandExecutor
+
+        _executor = CommandExecutor(CONFIG)
+        _engine = get_workflow_engine()
+
+        def _workflow_action_handler(action_str: str) -> None:
+            try:
+                from llm import LocalRouter
+                msg, action = LocalRouter().route(action_str)
+                if action and action.get("action") not in ("answer", None):
+                    result = _executor.execute(action["action"], action.get("params", {}))
+                    logger.info(f"Workflow action {action_str!r} → {result}")
+                else:
+                    logger.info(f"Workflow action {action_str!r} → {msg or '(LLM)'}")
+            except Exception as e:
+                logger.error(f"Workflow action error: {e}")
+
+        _engine.set_action_callback(_workflow_action_handler)
+        _engine.start()
+        logger.info("WorkflowEngine spuštěn a napojen na CommandExecutor")
+    except Exception as e:
+        logger.warning(f"WorkflowEngine not started: {e}")
+
     if os.environ.get("JARVIS_TEST_MODE"):
         logger.debug("JARVIS_TEST_MODE: přeskočena activity/runtime init")
         yield

@@ -11,7 +11,7 @@
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.16.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.17.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![Linux-first](https://img.shields.io/badge/Linux--first-22c55e?style=flat-square&logo=linux&logoColor=white)](#linux-out-of-the-box)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
@@ -24,46 +24,30 @@
 ## Quickstart
 
 ```bash
-git clone https://github.com/simivilasek-ship-it/Jarvis.git && cd Jarvis && ./install.sh && python3 jarvis.py
+git clone https://github.com/simivilasek-ship-it/Jarvis.git
+cd Jarvis
+./start.sh
 ```
 
-Open **http://localhost:8002/app** — chat, live PC context, and Work Timeline work immediately.
+Otevři **http://localhost:8002/app** — hotovo. `start.sh` automaticky nainstaluje vše co chybí a spustí server.
 
-> `python3 dashboard.py` also works and is equivalent — `jarvis.py` is the preferred entry point.
-
-```bash
-python jarvis.py log --today          # CLI — co jsi dělal dnes
-python jarvis.py log --markdown       # markdown report
-systemctl --user enable jarvis.service  # autostart (po ./install.sh)
-```
+> **Docker (alternativa):** `docker compose up -d` → http://localhost:8002/app
 
 <details>
-<summary><strong>Full setup (Ollama, API keys, Docker, restart)</strong></summary>
+<summary>Více možností spuštění</summary>
 
 ```bash
-git clone https://github.com/simivilasek-ship-it/Jarvis.git
-cd Jarvis && ./install.sh
-python3 jarvis.py                 # backend + UI → http://localhost:8002/app  (preferred)
-python3 dashboard.py              # equivalent alias
-python3 dashboard.py --restart    # kill old process on :8002, reload code
+./start.sh                              # doporučeno — vše automaticky
+make start                              # přes Makefile
+python3 dashboard.py                    # přímo (vyžaduje aktivní venv)
+python3 dashboard.py --restart          # restart běžícího serveru
+docker compose up -d                    # Docker
+systemctl --user enable jarvis.service  # autostart při přihlášení
 ```
 
-Alternativa s nativním oknem: `bash scripts/start.sh` · Makefile: `just start`
-
-**Cloud speed (optional)** — free key at [console.groq.com](https://console.groq.com):
+**Přidat cloud LLM (rychlejší odpovědi)** — bezplatný klíč na [console.groq.com](https://console.groq.com):
 ```bash
 echo "GROQ_API_KEY=gsk_..." >> .env
-```
-
-**Local LLM (offline chat):**
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull qwen2.5:3b
-```
-
-**Docker:**
-```bash
-docker compose up -d    # http://localhost:8002/app — set JARVIS_API_TOKEN in .env
 ```
 
 </details>

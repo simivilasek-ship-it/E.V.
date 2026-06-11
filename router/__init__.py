@@ -1,10 +1,12 @@
 """
-JARVIS router package.
-Re-exports LocalRouter (defined in local_router) and all domain routing
-functions for direct use.
-"""
-from local_router import LocalRouter  # noqa: F401
+JARVIS router package — domain routing modules.
 
+NOTE: LocalRouter is defined in local_router.py (root level) for backward
+compatibility. Do NOT import local_router here — it imports from this package
+and would create a circular dependency.
+
+Import LocalRouter directly:  from local_router import LocalRouter
+"""
 from .apps import route_apps, route_sites, _extract_app_name, _extract_install_name  # noqa: F401
 from .media import route_music, route_vision  # noqa: F401
 from .system import route_system, route_files  # noqa: F401
@@ -16,7 +18,6 @@ from .constants import (  # noqa: F401
 )
 
 __all__ = [
-    "LocalRouter",
     "route_apps", "route_sites",
     "route_music", "route_vision",
     "route_system", "route_files",

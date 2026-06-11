@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [5.17.0] - 2026-06-09
+
+### Fixed — UI↔API contract bugs
+- **VoicePanel** — added `PATCH /api/settings`, `POST /api/chat/message`; health check now returns `voice` object (STT/TTS/duplex status)
+- **WorkflowEditor** — fixed save/load schema mismatch; UI graph format now accepted and persisted by backend; `WorkflowEngine` callback wired to `CommandExecutor` in lifespan
+- **PluginMarketplace** — fixed `NameError: Request not imported` crash on review submit
+- **SkillGenerator** — now calls `reload_plugin()` after save; no restart needed
+- **AgentGraph** — fixed node name mismatch (`planning/executing/routing` vs `planner/executor/router`)
+
+### Added
+- **Document ingestion + RAG** (`doc_ingestion.py`) — PDF, DOCX, TXT/MD ingestion; keyword RAG; context injection into LLM; `/api/docs/upload`, `/api/docs`, `/api/docs/query`, `/api/docs/{id}` endpoints
+- **File upload in ChatPanel** — paperclip button to upload docs directly from chat; doc count badge
+- **Responsive/mobile UI** — collapsible sidebar, hamburger menu, backdrop overlay, touch-friendly chat bubbles; `@media` breakpoints in `globals.css`
+- **Morning briefing in web** — `schedule_briefing()` called in lifespan startup; `GET /api/briefing/today`; ChatPanel injects briefing on first open
+
+### Changed
+- `pypdf` + `python-docx` added as optional `[docs]` dependency group
+- Bumped to `5.17.0`
+
 ## [5.16.0] - 2026-06-09
 
 ### Fixed

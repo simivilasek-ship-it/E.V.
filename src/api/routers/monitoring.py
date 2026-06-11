@@ -299,4 +299,14 @@ def register(app):
         except Exception as e:
             return {"error": str(e), "name": "", "languages": []}
 
+    @app.get("/api/briefing/today")
+    async def briefing_today():
+        """Vrátí ranní briefing pro aktuální den."""
+        try:
+            from morning_briefing import MorningBriefing
+            text = MorningBriefing().generate()
+            return {"briefing": text, "ok": True}
+        except Exception as e:
+            return {"briefing": "", "ok": False, "error": str(e)}
+
 

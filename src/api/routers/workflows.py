@@ -6,6 +6,7 @@ import json
 import time
 
 import psutil
+from pydantic import BaseModel
 
 from src.api.deps import (
     HAS_LOGURU,
@@ -35,26 +36,76 @@ else:
         raise RuntimeError("security unavailable")
 
 
+# ── Workflow Graph Pydantic models ────────────────────────────────────────────
+# Edges keep the UI's field names (from/to) stored verbatim; "source"/"target"
+# are the canonical names used internally when edges are created via the API.
+
+class WorkflowNode(BaseModel):
+    id: str
+    type: str   # "trigger" | "action" | "condition" | "delay" | "notify"
+    label: str
+    x: float = 0
+    y: float = 0
+    data: dict = {}
+
+
+class WorkflowEdge(BaseModel):
+    id: str = ""
+    source: str = ""
+    target: str = ""
+
+
+class WorkflowGraph(BaseModel):
+    id: str = ""
+    name: str
+    nodes: list[WorkflowNode] = []
+    edges: list[WorkflowEdge] = []
+    enabled: bool = True
+
+
 def register(app):
 
     # ── Workflow Builder ──────────────────────────────
     @app.get("/api/workflows")
     async def list_workflows():
         from workflow_engine import get_workflow_engine
-        return {"workflows": get_workflow_engine().list_all()}
+        result = []
+        for wf in get_workflow_engine().list_all():
+            if wf.get("trigger_type") == "graph" and isinstance(wf.get("trigger_config"), dict):
+                graph = wf["trigger_config"].get("_graph")
+                if graph:
+                    # Return the stored graph with the persisted id and enabled state
+                    result.append({**graph, "id": wf["id"], "enabled": wf.get("enabled", True)})
+                    continue
+            result.append(wf)
+        return {"workflows": result}
 
     @app.post("/api/workflows")
     async def create_workflow(body: dict):
         import uuid
         from workflow_engine import get_workflow_engine, Workflow
-        wf = Workflow(
-            id=str(uuid.uuid4())[:8],
-            name=body.get("name", "Nový workflow"),
-            trigger_type=body.get("trigger_type", "manual"),
-            trigger_config=body.get("trigger_config", {}),
-            action=body.get("action", ""),
-            cooldown_seconds=body.get("cooldown_seconds", 300),
-        )
+
+        if "nodes" in body:
+            # Graph format sent by WorkflowEditor
+            graph_id = body.get("id") or str(uuid.uuid4())[:8]
+            wf = Workflow(
+                id=graph_id,
+                name=body.get("name", "Nový workflow"),
+                trigger_type="graph",
+                trigger_config={"_graph": body},
+                action="",
+                enabled=body.get("enabled", True),
+            )
+        else:
+            # Legacy plain-action format
+            wf = Workflow(
+                id=str(uuid.uuid4())[:8],
+                name=body.get("name", "Nový workflow"),
+                trigger_type=body.get("trigger_type", "manual"),
+                trigger_config=body.get("trigger_config", {}),
+                action=body.get("action", ""),
+                cooldown_seconds=body.get("cooldown_seconds", 300),
+            )
         get_workflow_engine().add(wf)
         return {"id": wf.id, "ok": True}
 
@@ -67,7 +118,6 @@ def register(app):
     @app.post("/api/workflows/graph/test")
     async def test_workflow_graph(body: dict):
         """Projde graf workflow a spustí action uzly jako příkazy (test run)."""
-        import asyncio
         nodes = body.get("nodes") or []
         edges = body.get("edges") or []
         if not nodes:
@@ -79,7 +129,9 @@ def register(app):
         for e in edges:
             if not isinstance(e, dict):
                 continue
-            f, t = e.get("from"), e.get("to")
+            # Accept both UI format (from/to) and canonical format (source/target)
+            f = e.get("from") or e.get("source")
+            t = e.get("to") or e.get("target")
             if f in by_id and t in by_id:
                 children[f].append(t)
                 indeg[t] = indeg.get(t, 0) + 1
@@ -99,7 +151,7 @@ def register(app):
             node = by_id.get(nid, {})
             if node.get("type") != "action":
                 continue
-            cmd = (node.get("config") or {}).get("command") or node.get("label") or ""
+            cmd = (node.get("config") or node.get("data") or {}).get("command") or node.get("label") or ""
             cmd = str(cmd).strip()
             if not cmd:
                 results.append({"node": nid, "skipped": True})

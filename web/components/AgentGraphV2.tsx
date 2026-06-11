@@ -41,6 +41,15 @@ const NODES: Record<string, NodeDef> = {
   executor: { x: 120, y: 260, label: 'EXECUTOR', color: 'var(--green)' },
   critic:   { x: 120, y: 360, label: 'CRITIC',   color: 'var(--purple)' },
   done:     { x: 280, y: 210, label: 'DONE',     color: 'var(--green)' },
+  error:    { x: 280, y: 310, label: 'ERROR',    color: 'var(--red, #f87171)' },
+  ready:    { x: 280, y: 110, label: 'READY',    color: 'var(--amber)' },
+}
+
+/** Maps backend-emitted node IDs to NODES keys. */
+const NODE_ALIAS: Record<string, string> = {
+  planning:  'planner',
+  executing: 'executor',
+  routing:   'router',
 }
 
 const EDGES: { from: string; to: string }[] = [
@@ -249,6 +258,10 @@ export default function AgentGraphV2({ active: tabActive }: AgentGraphV2Props) {
     let dead = false
 
     function applyEvent(event: GraphEvent) {
+      // Resolve backend node alias to UI node key
+      if (event.node && NODE_ALIAS[event.node]) {
+        event = { ...event, node: NODE_ALIAS[event.node] }
+      }
       setLastEvent(event)
       if (event.type === 'ready') setStatus('online')
       if (event.type === 'node_enter' && event.node) {

@@ -229,7 +229,7 @@ function MessageBubble({ msg }: { msg: Message }) {
 
   if (msg.sender === 'user') return (
     <div className="flex justify-end mb-5 anim-msg-in">
-      <div className="max-w-[min(580px,85%)]">
+      <div className="max-w-[min(580px,95%)] sm:max-w-[min(580px,85%)]">
         <div className="msg-user px-4 py-3 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
           {renderContent(msg.text)}
         </div>
@@ -315,21 +315,65 @@ export default function ChatPanel() {
   const messages  = useJarvis(s => s.messages)
   const sendCmd   = useJarvis(s => s.sendCommand)
   const clearMsgs = useJarvis(s => s.clearMessages)
+  const addMessage = useJarvis(s => s.addMessage)
   const orbState  = useJarvis(s => s.orbState)
   const isMicActive = useJarvis(s => s.isMicActive)
   const toggleMic = useJarvis(s => s.toggleMic)
   const bottomRef = useRef<HTMLDivElement>(null)
   const taRef     = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [hist, setHist] = useState<string[]>([])
   const [hidx, setHidx] = useState(-1)
   const [plIdx, setPlIdx] = useState(0)
   const [dragOver, setDragOver] = useState(false)
   const [pendingImage, setPendingImage] = useState<string | null>(null)
+  const [docCount, setDocCount] = useState(0)
+  const [uploadToast, setUploadToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (messages.length !== 0) return
+    fetch('/api/briefing/today')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.ok && data.briefing) {
+          addMessage(data.briefing, 'jarvis')
+        }
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
   useEffect(() => {
     const t = setInterval(() => setPlIdx(i => (i + 1) % PLACEHOLDERS.length), 3200)
     return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/docs').then(r => r.ok ? r.json() : null).then(data => {
+      if (data?.docs) setDocCount(data.docs.length)
+    }).catch(() => {})
+  }, [])
+
+  const handleFileUpload = useCallback(async (file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    try {
+      const res = await fetch('/api/docs/upload', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (data.ok) {
+        setDocCount(c => c + 1)
+        const msg = `Dokument ${data.name ?? file.name} nahrán (${data.chars ?? '?'} znaků)`
+        setUploadToast(msg)
+        setTimeout(() => setUploadToast(null), 4000)
+      } else {
+        setUploadToast(`Chyba: ${data.error ?? 'upload selhal'}`)
+        setTimeout(() => setUploadToast(null), 4000)
+      }
+    } catch {
+      setUploadToast('Chyba uploadu dokumentu')
+      setTimeout(() => setUploadToast(null), 4000)
+    }
   }, [])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -390,7 +434,7 @@ export default function ChatPanel() {
         {messages.length === 0 ? (
           <HeroPanel onSend={sendCmd} />
         ) : (
-          <div className="max-w-3xl mx-auto px-5 pt-6 pb-4">
+          <div className="max-w-3xl mx-auto px-3 sm:px-5 pt-6 pb-4">
             {messages.map(m => <MessageBubble key={m.id} msg={m} />)}
             <div ref={bottomRef} />
           </div>
@@ -400,7 +444,7 @@ export default function ChatPanel() {
       <InstallProgressBar />
 
       {/* Input area */}
-      <div className="shrink-0 px-5 pb-5 pt-2 max-w-3xl w-full mx-auto flex flex-col gap-2">
+      <div className="shrink-0 px-3 sm:px-5 pb-5 pt-2 max-w-3xl w-full mx-auto flex flex-col gap-2">
         <div className="flex flex-wrap gap-1.5">
           {QUICK_ACTIONS.map(({ label, cmd }) => (
             <button
@@ -435,6 +479,33 @@ export default function ChatPanel() {
           </div>
         )}
 
+        {docCount > 0 && (
+          <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--accent-light)' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span>{docCount} {docCount === 1 ? 'dokument' : docCount < 5 ? 'dokumenty' : 'dokumentů'} k dispozici pro RAG</span>
+          </div>
+        )}
+
+        {uploadToast && (
+          <div className="px-3 py-2 rounded-lg text-xs font-mono" style={{ background: 'rgba(99,102,241,.15)', color: 'var(--accent-light)', border: '1px solid var(--border-accent)' }}>
+            {uploadToast}
+          </div>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.docx,.txt,.md,.py,.js,.ts,.json,.csv"
+          className="hidden"
+          onChange={e => {
+            const file = e.target.files?.[0]
+            if (file) handleFileUpload(file)
+            e.target.value = ''
+          }}
+        />
+
         <div className="input-shell flex gap-2 items-end px-3 py-2">
           <button
             type="button"
@@ -466,6 +537,18 @@ export default function ChatPanel() {
             className="flex-1 bg-transparent border-none resize-none outline-none text-sm py-2"
             style={{ color: 'var(--text)', minHeight: 36, maxHeight: 140 }}
           />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={busy}
+            title="Nahrát dokument (PDF, DOCX, TXT…)"
+            className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center btn-ghost"
+            style={{ color: 'var(--muted)' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+          </button>
           <button
             onClick={send}
             disabled={busy || (!input.trim() && !pendingImage)}

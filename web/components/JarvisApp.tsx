@@ -67,6 +67,7 @@ export default function JarvisApp() {
   const [tab, setTab]  = useState<Tab>('CHAT')
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [spotlightOpen, setSpotlightOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, toggleTheme] = useTheme()
 
   useEffect(() => {
@@ -104,17 +105,37 @@ export default function JarvisApp() {
   return (
     <ErrorBoundary>
       <div data-testid="jarvis-app" className="flex h-screen overflow-hidden relative z-10">
+        {/* Mobile backdrop */}
+        {sidebarOpen && (
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/50"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         <Sidebar
           tab={tab} setTab={setTab}
           setPaletteOpen={setPaletteOpen}
           setSpotlightOpen={setSpotlightOpen}
           clearMessages={clearMessages}
           theme={theme} toggleTheme={toggleTheme}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden main-content-full">
+          {/* Mobile hamburger */}
+          <button
+            className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-lg"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+          >
+            ☰
+          </button>
+
           {/* Status Bar */}
-          <div className="shrink-0 px-4 pt-3 pb-0">
+          <div className="shrink-0 px-4 pt-3 pb-0 pl-14 md:pl-4">
             <JarvisStatusBar />
           </div>
 

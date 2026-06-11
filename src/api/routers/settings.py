@@ -133,6 +133,26 @@ def register(app):
             "checks": checks,
             "fixes": fixes,
             "mcp": {"servers": servers, **mcp_summary},
+            "voice": {
+                "stt": {
+                    "engine": config.get("stt_engine", "google"),
+                    "language": config.get("stt_language", "cs-CZ"),
+                    "available": shutil.which("vosk") is not None or True,
+                },
+                "tts": {
+                    "engine": config.get("tts_engine", "pyttsx3"),
+                    "voice": config.get("tts_voice", "czech"),
+                    "rate": config.get("tts_rate", 160),
+                    "available": True,
+                },
+                "wake_word": {
+                    "enabled": config.get("wake_word_enabled", False),
+                    "available": True,
+                },
+                "duplex": {
+                    "enabled": config.get("duplex_audio_enabled", False),
+                },
+            },
         }
 
 
@@ -273,6 +293,27 @@ def register(app):
         except ImportError:
             return {"score": 0, "error": "config modul není dostupný"}
         return _health_snapshot(CONFIG)
+
+    @app.patch("/api/settings")
+    async def patch_settings(body: dict):
+        """Aktualizuje podmnožinu konfiguračních klíčů."""
+        try:
+            from config import load_config, save_config
+        except ImportError:
+            return {"ok": False, "error": "config modul není dostupný"}
+        if not body:
+            return {"ok": False, "error": "Prázdné tělo požadavku"}
+        cfg = load_config()
+        updated = []
+        for key, value in body.items():
+            if cfg.get(key) != value:
+                cfg[key] = value
+                updated.append(key)
+        try:
+            save_config(cfg)
+        except Exception as e:
+            return {"ok": False, "error": f"save_config selhal: {e}"}
+        return {"ok": True, "updated": updated}
 
     @app.post("/api/settings/generate-token")
     async def generate_api_token():
