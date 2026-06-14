@@ -1,33 +1,52 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useJarvis } from '@/store/jarvis'
 import { Icons } from './Icons'
 
 export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'WORK' | 'FEED' | 'CHECKLIST' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW' | 'MISSIONS' | 'VISION' | 'VOICE'
 
-interface NavItem { id: Tab; label: string; icon: React.ReactNode; key: string }
+interface NavItem { id: Tab; label: string; icon: React.ReactNode; key: string; advanced?: boolean }
 
-const PRIMARY_NAV: NavItem[] = [
+const ALL_NAV: NavItem[] = [
   { id: 'CHAT', label: 'Chat', icon: Icons.chat, key: '1' },
-]
-
-const ADVANCED_NAV: NavItem[] = [
-  { id: 'SYSTEM', label: 'Systém', icon: Icons.system, key: '2' },
-  { id: 'PLUGINS', label: 'Pluginy', icon: Icons.plugins, key: '3' },
-  { id: 'SKILL', label: 'Skill Gen', icon: Icons.skill, key: '4' },
-  { id: 'WORKFLOW', label: 'Workflow', icon: Icons.workflow, key: '0' },
-  { id: 'WORK', label: 'Dnes', icon: Icons.work, key: 'w' },
-  { id: 'FEED', label: 'Feed', icon: Icons.feed, key: 'f' },
-  { id: 'CHECKLIST', label: 'Release', icon: Icons.checklist, key: 'c' },
-  { id: 'AGENT', label: 'Agent', icon: Icons.agent, key: '5' },
-  { id: 'MISSIONS', label: 'Agent mise', icon: Icons.mission, key: 'm' },
-  { id: 'VISION', label: 'Vision', icon: Icons.eye, key: 'v' },
   { id: 'VOICE', label: 'Hlas', icon: Icons.mic, key: 'h' },
+  { id: 'SYSTEM', label: 'Systém', icon: Icons.system, key: '2' },
   { id: 'TIMELINE', label: 'Timeline', icon: Icons.timeline, key: '6' },
-  { id: 'MEMORY', label: 'Paměť', icon: Icons.memory, key: '7' },
   { id: 'DASHBOARD', label: 'Dashboard', icon: Icons.dash, key: '8' },
   { id: 'SETTINGS', label: 'Nastavení', icon: Icons.settings, key: '9' },
+  { id: 'WORKFLOW', label: 'Workflow', icon: Icons.workflow, key: '0', advanced: true },
+  { id: 'MISSIONS', label: 'Agent mise', icon: Icons.mission, key: 'm', advanced: true },
+  { id: 'AGENT', label: 'Agent', icon: Icons.agent, key: '5', advanced: true },
+  { id: 'MEMORY', label: 'Paměť', icon: Icons.memory, key: '7', advanced: true },
+  { id: 'VISION', label: 'Vision', icon: Icons.eye, key: 'v', advanced: true },
+  { id: 'SKILL', label: 'Skill Gen', icon: Icons.skill, key: '4', advanced: true },
+  { id: 'PLUGINS', label: 'Pluginy', icon: Icons.plugins, key: '3', advanced: true },
+  { id: 'WORK', label: 'Dnes', icon: Icons.work, key: 'w', advanced: true },
+  { id: 'FEED', label: 'Feed', icon: Icons.feed, key: 'f', advanced: true },
+  { id: 'CHECKLIST', label: 'Release', icon: Icons.checklist, key: 'c', advanced: true },
 ]
+
+function useLocalStorage<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [value, setValue] = useState<T>(() => {
+    if (typeof window === 'undefined') return defaultValue
+    try {
+      const stored = window.localStorage.getItem(key)
+      return stored !== null ? (JSON.parse(stored) as T) : defaultValue
+    } catch {
+      return defaultValue
+    }
+  })
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value))
+    } catch {
+      // ignore storage errors
+    }
+  }, [key, value])
+
+  return [value, setValue]
+}
 
 function NavButton({ item, tab, setTab }: { item: NavItem; tab: Tab; setTab: (t: Tab) => void }) {
   return (
@@ -70,7 +89,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen, clearMessages, theme, toggleTheme, isOpen = false, onClose }: SidebarProps) {
-  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [advanced, setAdvanced] = useLocalStorage<boolean>('jarvis_advanced_mode', false)
   const connStatus = useJarvis(s => s.connStatus)
   const retry      = useJarvis(s => s.retry)
   const orbState   = useJarvis(s => s.orbState)
@@ -79,7 +98,8 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
 
   const connColor = CONN_COLOR[connStatus] ?? 'var(--muted)'
   const orb = ORB_CFG[orbState] ?? ORB_CFG.idle
-  const hasAdvancedActive = tab !== 'CHAT'
+
+  const visibleNav = ALL_NAV.filter(item => advanced || !item.advanced)
 
   const handleSetTab = (t: Tab) => {
     setTab(t)
@@ -175,37 +195,9 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2.5 py-2 flex flex-col gap-0.5">
-        {PRIMARY_NAV.map(item => (
+        {visibleNav.map(item => (
           <NavButton key={item.id} item={item} tab={tab} setTab={handleSetTab} />
         ))}
-
-        <div className="mt-1">
-          <button
-            onClick={() => setAdvancedOpen(o => !o)}
-            className="nav-item w-full"
-            style={hasAdvancedActive && !advancedOpen ? { color: 'var(--accent-light)' } : undefined}
-          >
-            <span
-              className="w-4 h-4 shrink-0 flex items-center justify-center opacity-80 transition-transform duration-150"
-              style={{ transform: advancedOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </span>
-            <span className="flex-1 truncate text-left">Pokročilé</span>
-            {hasAdvancedActive && !advancedOpen && (
-              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--accent)' }} />
-            )}
-          </button>
-          {advancedOpen && (
-            <div className="flex flex-col gap-0.5 mt-0.5">
-              {ADVANCED_NAV.map(item => (
-                <NavButton key={item.id} item={item} tab={tab} setTab={handleSetTab} />
-              ))}
-            </div>
-          )}
-        </div>
       </nav>
 
       {/* Footer */}
@@ -220,6 +212,17 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
             Spotlight
           </button>
         )}
+        <button
+          onClick={() => setAdvanced(a => !a)}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors"
+          style={{
+            color: 'var(--muted)',
+            background: advanced ? 'rgba(99,102,241,.08)' : 'transparent',
+          }}
+        >
+          <span>{advanced ? '⚙ Pokročilý režim' : '◎ Jednoduchý režim'}</span>
+          <span className="ml-auto text-[10px]">{advanced ? 'zapnut' : 'vypnut'}</span>
+        </button>
         <button onClick={toggleTheme} className="btn-ghost flex items-center gap-2 w-full px-3 py-2 text-xs">
           {theme === 'dark' ? Icons.sun : Icons.moon}
           {theme === 'dark' ? 'Světlý režim' : 'Tmavý režim'}

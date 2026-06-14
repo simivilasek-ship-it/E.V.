@@ -11,7 +11,7 @@ def register(app):
     async def upload_doc(file: UploadFile = File(...)):
         """Upload and ingest a document (PDF, DOCX, TXT, MD, etc.)"""
         try:
-            from doc_ingestion import ingest_file
+            from src.doc_ingestion import ingest_file
             suffix = Path(file.filename or "upload.txt").suffix
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                 content = await file.read()
@@ -29,7 +29,7 @@ def register(app):
     async def list_docs():
         """List all ingested documents."""
         try:
-            from doc_ingestion import list_docs
+            from src.doc_ingestion import list_docs
             return {"docs": list_docs()}
         except Exception as e:
             return {"docs": [], "error": str(e)}
@@ -37,7 +37,7 @@ def register(app):
     @app.delete("/api/docs/{doc_id}")
     async def delete_doc(doc_id: str):
         try:
-            from doc_ingestion import delete_doc
+            from src.doc_ingestion import delete_doc
             ok = delete_doc(doc_id)
             return {"ok": ok}
         except Exception as e:
@@ -47,7 +47,7 @@ def register(app):
     async def query_docs(q: str, top_k: int = 3):
         """Search ingested documents."""
         try:
-            from doc_ingestion import query_docs
+            from src.doc_ingestion import query_docs
             result = query_docs(q, top_k=top_k)
             return {"result": result, "ok": bool(result)}
         except Exception as e:

@@ -11,7 +11,7 @@
 <br/>
 
 [![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.18.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Version](https://img.shields.io/badge/version-5.19.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![Linux-first](https://img.shields.io/badge/Linux--first-22c55e?style=flat-square&logo=linux&logoColor=white)](#linux-out-of-the-box)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
@@ -60,7 +60,7 @@ echo "GROQ_API_KEY=gsk_..." >> .env
 >
 > ![Demo](docs/demo.gif)
 >
-> *No demo.gif yet? Run `jarvis` and try: "jaký je čas", "info o systému", "shrnutí dne"*
+> *Vyzkoušej: "jaký je čas", "info o systému", "shrnutí dne", "otevři chrome"*
 
 ---
 
@@ -293,9 +293,12 @@ RAM: **~34 MB** idle backend · **~650 MB+** with Ollama loaded · runs on any m
 ```
 
 ```
-activity_*.py  Work Timeline — collector, store, bridge
-src/api/       FastAPI · WebSocket · LAN auth · activity routes
-routing.py     Local router (<1 ms) + agent pipeline
+activity_*.py          Work Timeline — collector, store, bridge
+src/api/               FastAPI · WebSocket · LAN auth · activity routes
+src/morning_briefing.py  Ranní briefing + notify-send
+src/doc_ingestion.py   RAG — PDF/DOCX/TXT ingestion + chunking
+src/config_schema.py   Pydantic v2 config validation
+routing.py             Local router (<1 ms) + agent pipeline
 memory.py      Neural memory + GraphRAG + daily summarizer
 mission_*.py   Agent missions + release checklists (SQLite)
 web/           Next.js 16 — Chat, Dnes, Feed, Checklist (Alt+W/F/C/D)

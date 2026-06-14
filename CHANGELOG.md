@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [5.19.0] - 2026-06-14
+
+### Added — 8.5/10 parity push
+- **Swagger / ReDoc v dev módu** — `JARVIS_DEV=1` zapíná `/api/docs`, `/api/redoc`, `/api/openapi.json`; v produkci stále vypnuto
+- **Simple/Advanced mode** — toggle v Sidebar skrývá pokročilé panely (Workflow, Missions, Agent…) pro nové uživatele
+- **API contract testy** — `tests/test_api_contracts.py` pokrývá všechny registrované routery
+- **Vitest 10+ nových testů** — WorkTimeline, DashboardPanel, VoicePanel, ErrorBoundary
+- **src/ migrace** — `morning_briefing`, `doc_ingestion`, `config_schema` přesunuto do `src/` se zpětně-kompatibilními shimmy
+- **CONTRIBUTING.md** — kompletní průvodce pro přispěvatele, struktura projektu, CI kroky
+- **start.sh bezpečnost** — automatické generování API tokenu při bind na non-localhost
+
+### Fixed
+- `requirements.txt` header verze aktualizována na 5.19.0
+- README verze badge aktualizován
+- `docs/architecture.md` verze synchronizovány
+
+### Changed
+- Bump 5.18.0 → 5.19.0
+
 ## [5.18.0] - 2026-06-14
 
 ### Fixed — RAG + Voice + DnD

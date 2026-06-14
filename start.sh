@@ -52,7 +52,18 @@ if command -v ollama &>/dev/null; then
     fi
 fi
 
-# ── 4. Spuštění JARVIS ───────────────────────────────────────────────────────
+# ── 4. Bezpečnost — generuj token pokud bind != localhost ────────────────────
+BIND_HOST="${JARVIS_BIND_HOST:-127.0.0.1}"
+if [ "$BIND_HOST" != "127.0.0.1" ] && [ "$BIND_HOST" != "localhost" ]; then
+    if ! grep -q "JARVIS_API_TOKEN" .env 2>/dev/null; then
+        warn "Bind na $BIND_HOST bez tokenu — generuji API token..."
+        source venv/bin/activate
+        python3 scripts/generate_token.py --write 2>/dev/null && ok "API token vygenerován do .env" || \
+            warn "Token se nepodařilo vygenerovat — spusť: python scripts/generate_token.py --write"
+    fi
+fi
+
+# ── 5. Spuštění JARVIS ───────────────────────────────────────────────────────
 info "Spouštím JARVIS → http://localhost:8002/app"
 echo ""
 exec python3 dashboard.py "$@"

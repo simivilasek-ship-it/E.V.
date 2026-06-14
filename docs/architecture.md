@@ -1,4 +1,4 @@
-# Architektura JARVIS v5.12 v5.10
+# Architektura JARVIS v5.19
 
 ## Přehled
 

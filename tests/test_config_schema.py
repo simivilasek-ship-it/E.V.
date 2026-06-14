@@ -10,7 +10,7 @@ import pytest
 # Ensure project root is on the path when running directly
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from config_schema import (
+from src.config_schema import (
     JarvisSettings,
     VoiceSettings,
     SecuritySettings,

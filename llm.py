@@ -430,7 +430,7 @@ class LLMEngine:
 
         # Document RAG — injektuj relevantní pasáže z nahraných dokumentů
         try:
-            from doc_ingestion import query_docs, list_docs
+            from src.doc_ingestion import query_docs, list_docs
             if list_docs():
                 passages = query_docs(user_text, top_k=3, max_chars=2000)
                 if passages:

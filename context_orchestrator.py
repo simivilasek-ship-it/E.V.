@@ -57,7 +57,7 @@ class ContextOrchestrator:
 
         # RAG: inject relevant doc passages if query is available
         try:
-            from doc_ingestion import query_docs, list_docs
+            from src.doc_ingestion import query_docs, list_docs
             if list_docs():  # only if docs are ingested
                 ctx["has_docs"] = True
                 ctx["doc_names"] = [d["name"] for d in list_docs()[:5]]

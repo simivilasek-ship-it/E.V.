@@ -63,7 +63,7 @@ async def lifespan(application):
         logger.warning(f"Dashboard: install notify init failed: {e}")
 
     try:
-        import morning_briefing as _mb
+        import src.morning_briefing as _mb
         _mb.schedule_briefing(hour=8, minute=0)
         logger.info("Dashboard: ranní briefing naplánován na 08:00")
     except Exception as e:

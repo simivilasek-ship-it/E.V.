@@ -370,7 +370,7 @@ def cmd_config_validate(argv: list[str] | None = None) -> int:
             print(f"ERROR: {msg}")
         return 1
 
-    from config_schema import validate_config
+    from src.config_schema import validate_config
     settings, warns = validate_config(cfg)
 
     if args.json:

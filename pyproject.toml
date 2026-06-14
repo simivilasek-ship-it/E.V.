@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "jarvis-assistant"
-version = "5.18.0"
+version = "5.19.0"
 description = "Lokální AI asistent — ovládej celý PC hlasem nebo textem, 100 % offline"
 readme = "README.md"
 license = { text = "MIT" }
@@ -81,8 +81,12 @@ full = [
 dev = [
     "pytest>=7.4.0",
     "pytest-mock>=3.12.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.26.0",
     "ruff>=0.1.0",
     "mypy>=1.8.0",
+    "pre-commit>=3.6.0",
 ]
 
 [project.scripts]
@@ -145,3 +149,8 @@ strict_equality = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
 exclude = ["gui_legacy/", "web_vite_backup/", "venv/", ".venv/"]
+
+[[tool.mypy.overrides]]
+module = ["src.*"]
+disallow_untyped_defs = true
+check_untyped_defs = true

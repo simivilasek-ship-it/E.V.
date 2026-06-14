@@ -10,17 +10,26 @@ import threading
 from src.api.deps import HAS_FASTAPI, logger
 
 if HAS_FASTAPI:
+    import os
     import uvicorn
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
+    from src.api.deps import __version__
     from src.api.lifespan import lifespan
     from src.api.middleware.auth import ApiTokenAuthMiddleware
     from src.api.paths import ROOT
     from src.api.routers import register_all
     from src.api.ws import broadcast_graph_event
 
-    app = FastAPI(title="JARVIS Dashboard", docs_url=None, redoc_url=None)
+    _dev_mode = os.environ.get("JARVIS_DEV", "0") == "1" or os.environ.get("JARVIS_TEST_MODE", "0") == "1"
+    app = FastAPI(
+        title="JARVIS API",
+        version=__version__,
+        docs_url="/api/docs" if _dev_mode else None,
+        redoc_url="/api/redoc" if _dev_mode else None,
+        openapi_url="/api/openapi.json" if _dev_mode else None,
+    )
     app.router.lifespan_context = lifespan
     app.broadcast_graph_event = broadcast_graph_event
 
@@ -31,6 +40,16 @@ if HAS_FASTAPI:
         allow_headers=["*"],
     )
     app.add_middleware(ApiTokenAuthMiddleware)
+
+    @app.middleware("http")
+    async def _security_headers(request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if not _dev_mode:
+            response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        return response
 
     register_all(app)
 
