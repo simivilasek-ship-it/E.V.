@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [5.18.0] - 2026-06-14
+
+### Fixed — RAG + Voice + DnD
+- **RAG do chatu** — `query_docs()` nyní volán v `llm._build_messages()` s user textem; relevantní pasáže z dokumentů injektovány do system promptu LLM
+- **Voice config unifikace** — VoicePanel duplex toggle nyní posílá `audio_ws_enabled` + `duplex_audio_enabled` (oba klíče); eliminováno 3-klíčové peklo
+- **VoicePanel reálné STT** — Web Speech API (SpeechRecognition) pro test tlačítko místo hardcoded REST; reálný AnalyserNode mic visualizer místo Math.random()
+- **Drag & drop dokumenty** — `handleDrop` v ChatPanel nyní zpracovává PDF/DOCX/TXT (nejen obrázky); přetažení souboru = automatický upload do RAG
+- **doc_ingestion chunking** — text dělen na 500-char chunks s 100-char překryvem; lepší relevance pro dlouhé dokumenty
+- **doc_id content hash** — hash počítán z obsahu dokumentu (ne z temp cesty) → eliminovány duplicity při re-uploadu
+- **Embedding re-ranking** — pokud je EmbeddingEngine dostupný, použije kosinusovou podobnost pro re-ranking
+
+### Added
+- `tests/test_doc_ingestion.py` — 7 testů pro RAG (ingest, dedup, query, delete, chunking, hash stabilita)
+
+### Changed
+- Bump 5.17.0 → 5.18.0
+
 ## [5.17.0] - 2026-06-09
 
 ### Fixed — UI↔API contract bugs

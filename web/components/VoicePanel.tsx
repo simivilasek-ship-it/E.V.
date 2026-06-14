@@ -76,6 +76,10 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
   )
 }
 
+const hasSpeechRecognition = () =>
+  typeof window !== 'undefined' &&
+  ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
+
 export default function VoicePanel() {
   const [health, setHealth] = useState<VoiceHealth>({})
   const [loading, setLoading] = useState(true)
@@ -87,6 +91,9 @@ export default function VoicePanel() {
   const [testLoading, setTestLoading] = useState(false)
   const animFrameRef = useRef<number | null>(null)
   const animTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const addToast = useJarvis(s => s.addToast)
 
   useEffect(() => {
@@ -111,25 +118,78 @@ export default function VoicePanel() {
   }, [])
 
   useEffect(() => {
-    const stop = () => {
+    const stopAnim = () => {
       if (animFrameRef.current !== null) cancelAnimationFrame(animFrameRef.current)
       if (animTimeoutRef.current !== null) clearTimeout(animTimeoutRef.current)
     }
 
+    const stopAudio = () => {
+      streamRef.current?.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+      audioCtxRef.current?.close()
+      audioCtxRef.current = null
+      analyserRef.current = null
+    }
+
     if (!recording) {
-      stop()
+      stopAnim()
+      stopAudio()
       setBars(Array(BAR_COUNT).fill(4))
       return
     }
 
-    const tick = () => {
-      setBars(Array(BAR_COUNT).fill(0).map(() => Math.floor(Math.random() * 26) + 4))
-      animTimeoutRef.current = setTimeout(() => {
+    let usedRealAnalyser = false
+
+    const startRealAnalyser = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        streamRef.current = stream
+        const ctx = new AudioContext()
+        audioCtxRef.current = ctx
+        const analyser = ctx.createAnalyser()
+        analyser.fftSize = 64
+        analyserRef.current = analyser
+        ctx.createMediaStreamSource(stream).connect(analyser)
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount)
+        usedRealAnalyser = true
+
+        const tick = () => {
+          if (!analyserRef.current) return
+          analyserRef.current.getByteFrequencyData(dataArray)
+          const step = Math.floor(dataArray.length / BAR_COUNT)
+          setBars(
+            Array(BAR_COUNT)
+              .fill(0)
+              .map((_, i) => {
+                const raw = dataArray[i * step] ?? 0
+                return Math.max(4, Math.floor((raw / 255) * 30))
+              })
+          )
+          animFrameRef.current = requestAnimationFrame(tick)
+        }
         animFrameRef.current = requestAnimationFrame(tick)
-      }, 80)
+      } catch {
+        if (!usedRealAnalyser) startFallbackAnim()
+      }
     }
-    animFrameRef.current = requestAnimationFrame(tick)
-    return stop
+
+    const startFallbackAnim = () => {
+      const tick = () => {
+        setBars(Array(BAR_COUNT).fill(0).map(() => Math.floor(Math.random() * 26) + 4))
+        animTimeoutRef.current = setTimeout(() => {
+          animFrameRef.current = requestAnimationFrame(tick)
+        }, 80)
+      }
+      animFrameRef.current = requestAnimationFrame(tick)
+    }
+
+    startRealAnalyser()
+
+    return () => {
+      stopAnim()
+      stopAudio()
+    }
   }, [recording])
 
   const toggleDuplex = async () => {
@@ -138,7 +198,7 @@ export default function VoicePanel() {
       await fetch(apiUrl('/api/settings'), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voice_duplex_enabled: next }),
+        body: JSON.stringify({ audio_ws_enabled: next, duplex_audio_enabled: next }),
       })
       setDuplex(next)
       addToast(next ? 'Duplex zapnut' : 'Duplex vypnut', 'success', 2000)
@@ -147,10 +207,8 @@ export default function VoicePanel() {
     }
   }
 
-  const sendTest = async () => {
-    setTestLoading(true)
+  const _sendTextTest = async () => {
     setRecording(true)
-    setTestResponse(null)
     try {
       const res = await fetch(apiUrl('/api/chat/message'), {
         method: 'POST',
@@ -158,14 +216,64 @@ export default function VoicePanel() {
         body: JSON.stringify({ text: 'Jaký je dnešní datum?' }),
       })
       const data = await res.json()
-      setTestResponse(
-        data.response ?? data.message ?? data.text ?? JSON.stringify(data)
-      )
+      setTestResponse(data.response ?? data.message ?? JSON.stringify(data))
     } catch {
-      setTestResponse('Chyba: API není dostupné nebo hlasový vstup není nakonfigurován.')
+      setTestResponse('Chyba: API není dostupné.')
     } finally {
       setTestLoading(false)
       setRecording(false)
+    }
+  }
+
+  const sendTest = async () => {
+    setTestLoading(true)
+    setTestResponse(null)
+
+    if (hasSpeechRecognition()) {
+      const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      const recognition = new SR()
+      recognition.lang = health?.stt?.language || 'cs-CZ'
+      recognition.interimResults = false
+      recognition.maxAlternatives = 1
+
+      setRecording(true)
+      setTestResponse('Poslouchám…')
+
+      recognition.onresult = async (event: any) => {
+        const transcript = event.results[0][0].transcript
+        setTestResponse(`STT: "${transcript}" — odesílám…`)
+        try {
+          const res = await fetch(apiUrl('/api/chat/message'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: transcript }),
+          })
+          const data = await res.json()
+          setTestResponse(`STT: "${transcript}"\n\nJARVIS: ${data.response ?? data.message ?? ''}`)
+        } catch {
+          setTestResponse(`STT: "${transcript}" — API nedostupné`)
+        }
+        setRecording(false)
+        setTestLoading(false)
+      }
+
+      recognition.onerror = (event: any) => {
+        setTestResponse(`STT chyba: ${event.error}. Zkus: "Jaký je dnešní datum?"`)
+        setRecording(false)
+        setTestLoading(false)
+        _sendTextTest()
+      }
+
+      recognition.onend = () => {
+        if (testLoading) {
+          setRecording(false)
+          setTestLoading(false)
+        }
+      }
+
+      recognition.start()
+    } else {
+      await _sendTextTest()
     }
   }
 
@@ -289,6 +397,13 @@ export default function VoicePanel() {
               ? 'vypnuto'
               : '—',
           },
+          {
+            label: 'Prohlížeč STT',
+            dot: hasSpeechRecognition(),
+            value: hasSpeechRecognition()
+              ? 'Dostupné (Web Speech API)'
+              : 'Nedostupné — použij Chrome',
+          },
         ].map(({ label, dot, value }) => (
           <div
             key={label}
@@ -334,7 +449,9 @@ export default function VoicePanel() {
           <line x1="12" y1="19" x2="12" y2="23" />
           <line x1="8" y1="23" x2="16" y2="23" />
         </svg>
-        {testLoading ? 'Nahrávám test větu…' : 'Otestovat hlasový vstup'}
+        {testLoading
+          ? (hasSpeechRecognition() ? 'Poslouchám…' : 'Nahrávám testovací větu…')
+          : (hasSpeechRecognition() ? 'Spustit nahrávání' : 'Odeslat testovací větu')}
       </button>
 
       {/* Inline response */}

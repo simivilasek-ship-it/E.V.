@@ -4,7 +4,7 @@ Načítání a validace z .env, config.json s fallbackem na defaults
 """
 from __future__ import annotations
 
-__version__ = "5.17.0"
+__version__ = "5.18.0"
 
 import os
 import json

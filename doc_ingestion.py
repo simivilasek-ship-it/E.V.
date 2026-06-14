@@ -52,6 +52,28 @@ def _extract_text(path: Path) -> str:
     return f"[Unsupported format: {ext}]"
 
 
+def _chunk_text(text: str, chunk_size: int = 500, overlap: int = 100) -> list[str]:
+    """Split text into overlapping chunks for better retrieval."""
+    if len(text) <= chunk_size:
+        return [text]
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunk = text[start:end]
+        # Try to break at sentence boundary
+        if end < len(text):
+            last_period = chunk.rfind('. ')
+            last_newline = chunk.rfind('\n')
+            break_at = max(last_period, last_newline)
+            if break_at > chunk_size // 2:
+                chunk = text[start:start + break_at + 1]
+                end = start + break_at + 1
+        chunks.append(chunk.strip())
+        start = end - overlap
+    return [c for c in chunks if c.strip()]
+
+
 def _load_index() -> dict:
     if _INDEX_FILE.exists():
         try:
@@ -76,22 +98,45 @@ def ingest_file(path: str | Path) -> dict:
     if not text.strip():
         return {"ok": False, "error": "No text extracted"}
 
-    doc_id = hashlib.sha256(str(p).encode()).hexdigest()[:16]
-    chunk_file = _DOCS_DIR / f"{doc_id}.txt"
-    _DOCS_DIR.mkdir(parents=True, exist_ok=True)
-    chunk_file.write_text(text, encoding="utf-8")
+    # Content-based hash prevents duplicates when ingesting via temp paths
+    doc_id = hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()[:16]
 
+    _DOCS_DIR.mkdir(parents=True, exist_ok=True)
     idx = _load_index()
+
+    # Dedup: if content already indexed, update name/path but skip re-extraction
+    if doc_id in idx:
+        idx[doc_id]["path"] = str(p)
+        idx[doc_id]["name"] = p.name
+        _save_index(idx)
+        existing = idx[doc_id]
+        logger.info(f"Dedup: {p.name} already indexed as {doc_id}")
+        return {
+            "ok": True,
+            "doc_id": doc_id,
+            "name": p.name,
+            "chars": existing.get("chars", 0),
+            "chunks": existing.get("chunks", 1),
+            "dedup": True,
+        }
+
+    # Split into overlapping chunks and persist each one
+    chunks = _chunk_text(text)
+    for i, chunk in enumerate(chunks):
+        chunk_file = _DOCS_DIR / f"{doc_id}_chunk_{i}.txt"
+        chunk_file.write_text(chunk, encoding="utf-8")
+
     idx[doc_id] = {
         "path": str(p),
         "name": p.name,
         "size": len(text),
         "chars": len(text),
+        "chunks": len(chunks),
     }
     _save_index(idx)
 
-    logger.info(f"Ingested {p.name} ({len(text)} chars) → {doc_id}")
-    return {"ok": True, "doc_id": doc_id, "name": p.name, "chars": len(text)}
+    logger.info(f"Ingested {p.name} ({len(text)} chars, {len(chunks)} chunks) → {doc_id}")
+    return {"ok": True, "doc_id": doc_id, "name": p.name, "chars": len(text), "chunks": len(chunks)}
 
 
 def list_docs() -> list[dict]:
@@ -100,46 +145,104 @@ def list_docs() -> list[dict]:
     return [{"id": k, **v} for k, v in idx.items()]
 
 
+def _load_chunks(doc_id: str, meta: dict) -> list[str]:
+    """Load all chunk texts for a document, falling back to single file."""
+    chunk_count = meta.get("chunks", 0)
+    chunks: list[str] = []
+
+    if chunk_count and chunk_count > 0:
+        for i in range(chunk_count):
+            cf = _DOCS_DIR / f"{doc_id}_chunk_{i}.txt"
+            if cf.exists():
+                try:
+                    chunks.append(cf.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+
+    # Backward-compat: fall back to monolithic file
+    if not chunks:
+        legacy = _DOCS_DIR / f"{doc_id}.txt"
+        if legacy.exists():
+            try:
+                chunks = [legacy.read_text(encoding="utf-8")]
+            except Exception:
+                pass
+
+    return chunks
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = sum(x * x for x in a) ** 0.5
+    norm_b = sum(x * x for x in b) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
 def query_docs(query: str, top_k: int = 3, max_chars: int = 2000) -> str:
-    """Simple keyword search over ingested docs. Returns relevant passages."""
+    """Keyword + optional semantic search over ingested docs. Returns relevant passages."""
     idx = _load_index()
     if not idx:
         return ""
 
     query_lower = query.lower()
+    query_words = query_lower.split()
+
+    # (score, doc_name, chunk_text) for all matching chunks
     results: list[tuple[float, str, str]] = []
 
     for doc_id, meta in idx.items():
-        chunk_file = _DOCS_DIR / f"{doc_id}.txt"
-        if not chunk_file.exists():
-            continue
-        try:
-            text = chunk_file.read_text(encoding="utf-8")
-        except Exception:
-            continue
+        chunks = _load_chunks(doc_id, meta)
+        doc_name = meta.get("name", doc_id)
 
-        # Score: count query word occurrences
-        words = query_lower.split()
-        score = sum(text.lower().count(w) for w in words)
-        if score > 0:
-            # Find best passage (window around first match)
-            idx_pos = text.lower().find(words[0]) if words else 0
-            start = max(0, idx_pos - 200)
-            end = min(len(text), idx_pos + 800)
-            passage = text[start:end].strip()
-            results.append((score, meta["name"], passage))
+        for chunk in chunks:
+            score = sum(chunk.lower().count(w) for w in query_words)
+            if score > 0:
+                results.append((score, doc_name, chunk.strip()))
 
     if not results:
         return ""
 
     results.sort(key=lambda x: -x[0])
-    parts = []
+
+    # Semantic re-ranking via EmbeddingEngine when available
+    try:
+        from memory import EmbeddingEngine  # type: ignore
+        _emb = EmbeddingEngine()
+        if _emb.available:
+            query_vec = _emb.embed(query)
+            reranked: list[tuple[float, str, str]] = []
+            for _kw_score, name, chunk in results:
+                chunk_vec = _emb.embed(chunk)
+                sem_score = _cosine_similarity(query_vec, chunk_vec)
+                # Blend keyword rank + semantic score
+                reranked.append((sem_score, name, chunk))
+            reranked.sort(key=lambda x: -x[0])
+            results = reranked
+    except Exception:
+        pass  # fall back to keyword ranking
+
+    # Deduplicate near-identical passages (prefix overlap > 80%)
+    seen: list[str] = []
+    deduped: list[tuple[float, str, str]] = []
+    for score, name, chunk in results:
+        prefix = chunk[:100]
+        if any(prefix in s or s in prefix for s in seen):
+            continue
+        seen.append(prefix)
+        deduped.append((score, name, chunk))
+
+    parts: list[str] = []
     total = 0
-    for score, name, passage in results[:top_k]:
-        if total + len(passage) > max_chars:
+    for _score, name, chunk in deduped[:top_k]:
+        if total + len(chunk) > max_chars:
+            remaining = max_chars - total
+            if remaining > 100:
+                parts.append(f"[{name}]\n{chunk[:remaining].strip()}")
             break
-        parts.append(f"[{name}]\n{passage}")
-        total += len(passage)
+        parts.append(f"[{name}]\n{chunk}")
+        total += len(chunk)
 
     return "\n\n---\n\n".join(parts)
 
@@ -148,9 +251,20 @@ def delete_doc(doc_id: str) -> bool:
     idx = _load_index()
     if doc_id not in idx:
         return False
-    chunk_file = _DOCS_DIR / f"{doc_id}.txt"
-    if chunk_file.exists():
-        chunk_file.unlink()
+
+    meta = idx[doc_id]
+    # Remove chunk files
+    chunk_count = meta.get("chunks", 0)
+    if chunk_count:
+        for i in range(chunk_count):
+            cf = _DOCS_DIR / f"{doc_id}_chunk_{i}.txt"
+            if cf.exists():
+                cf.unlink()
+    # Remove legacy monolithic file if present
+    legacy = _DOCS_DIR / f"{doc_id}.txt"
+    if legacy.exists():
+        legacy.unlink()
+
     del idx[doc_id]
     _save_index(idx)
     return True

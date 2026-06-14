@@ -428,6 +428,16 @@ class LLMEngine:
         except Exception:
             pass
 
+        # Document RAG — injektuj relevantní pasáže z nahraných dokumentů
+        try:
+            from doc_ingestion import query_docs, list_docs
+            if list_docs():
+                passages = query_docs(user_text, top_k=3, max_chars=2000)
+                if passages:
+                    system += f"\n\nRelevantní pasáže z dokumentů uživatele:\n{passages}"
+        except Exception:
+            pass
+
         task = self._llm_router.detect_task(user_text)
         routed_model, temperature, max_tokens = self._llm_router.get_model_for_task(task)
 

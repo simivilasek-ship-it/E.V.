@@ -380,12 +380,16 @@ export default function ChatPanel() {
     e.preventDefault()
     setDragOver(false)
     const file = e.dataTransfer.files[0]
-    if (file?.type.startsWith('image/')) {
+    if (!file) return
+    if (file.type.startsWith('image/')) {
       const reader = new FileReader()
       reader.onload = (ev) => setPendingImage(ev.target?.result as string)
       reader.readAsDataURL(file)
+    } else {
+      // Dokumenty — nahrát do RAG
+      handleFileUpload(file)
     }
-  }, [])
+  }, [handleFileUpload])
 
   const send = useCallback(() => {
     const t = input.trim()
