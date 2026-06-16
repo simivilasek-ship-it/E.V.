@@ -51,3 +51,7 @@ web/.next/
 
 # Legacy GUI (Tkinter — deprecated, not maintained)
 gui_legacy/
+
+# Client WordPress deployment scripts (not part of JARVIS core)
+# These live in tools/wordpress/ — tracked separately if needed
+tools/wordpress/
