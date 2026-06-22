@@ -537,15 +537,71 @@ def _format_match(m: dict) -> str:
         return f"{status_label} {m['time']}  {m['home']} vs {m['away']}"
 
 
+def _brave_sports_search(search_query: str) -> str | None:
+    """Vyhledá sportovní výsledky přes Brave Search API a naformátuje je."""
+    try:
+        from mcp_bridge import get_mcp_bridge
+        bridge = get_mcp_bridge()
+        if not bridge or not bridge.is_available("brave-search"):
+            return None
+        raw = bridge.call_tool("brave-search", "brave_web_search", {
+            "query": search_query,
+            "count": 8,
+        })
+        if not raw or raw == "(prázdný výsledek)" or "Chyba" in str(raw):
+            return None
+
+        # Pokus o parsování JSON výsledků do čitelné podoby
+        import json as _json, re as _re
+        lines = []
+        # Každý řádek může být JSON objekt
+        for line in raw.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = _json.loads(line)
+                title = obj.get("title", "")
+                url   = obj.get("url", "")
+                desc  = obj.get("description", "")
+                if title:
+                    lines.append(f"**{title}**")
+                if desc:
+                    # Zkrátit popis na 200 znaků
+                    lines.append(f"  {desc[:200]}")
+                if url:
+                    lines.append(f"  🔗 {url}")
+                lines.append("")
+            except _json.JSONDecodeError:
+                # Není JSON — přidej jako text
+                if line and not line.startswith("{"):
+                    lines.append(line)
+
+        if not lines:
+            # Fallback — raw text
+            return raw[:2000] if len(raw) > 2000 else raw
+
+        return "\n".join(lines).strip()
+    except Exception:
+        return None
+
+
 def cmd_sports(query: str = "") -> str:
-    """Živé výsledky a zápasy přes ESPN API (bez API klíče).
+    """Sportovní výsledky — primárně Brave Search (aktuální data), fallback ESPN API.
 
     query může být: "fotbal", "premier league", "nhl", "nba", "výsledky dnes" atd.
     """
 
     q = query.lower().strip()
+    today = datetime.now().strftime("%-d. %-m. %Y")
 
-    # Zjisti konkrétní ligu z dotazu
+    # ── 1. Brave Search — aktuální data z webu ───────────────────────────────
+    brave_query = f"sportovní výsledky dnes {query}".strip() if query else f"fotbalové výsledky dnes {today}"
+    brave_result = _brave_sports_search(brave_query)
+    if brave_result:
+        return f"**Sportovní výsledky** *(Brave Search — živá data)*\n\n{brave_result}"
+
+    # ── 2. Fallback: ESPN API ────────────────────────────────────────────────
     target_league = None
     target_label  = None
     for keyword, path in _SPORT_LEAGUES.items():
@@ -557,7 +613,6 @@ def cmd_sports(query: str = "") -> str:
     lines = []
 
     if target_league:
-        # Konkrétní liga
         try:
             matches = _fetch_espn_scores(target_league)
             if not matches:
@@ -568,8 +623,6 @@ def cmd_sports(query: str = "") -> str:
         except Exception as e:
             return f"Chyba při načítání dat pro {target_label}: {e}"
     else:
-        # Přehled — nejpopulárnější ligy
-        today = datetime.now().strftime("%d. %m. %Y")
         lines.append(f"**Sportovní přehled — {today}**\n")
 
         found_any = False
@@ -585,8 +638,6 @@ def cmd_sports(query: str = "") -> str:
 
                 found_any = True
                 lines.append(f"{label}:")
-
-                # Živé zápasy mají přednost
                 show = live or today_m or ended[:3]
                 for m in show[:4]:
                     lines.append(f"  {_format_match(m)}")
@@ -595,6 +646,6 @@ def cmd_sports(query: str = "") -> str:
                 continue
 
         if not found_any:
-            return "Nepodařilo se načíst sportovní data. Zkus konkrétní ligu: 'premier league výsledky'"
+            return "Nepodařilo se načíst sportovní data. Zkus: 'premier league výsledky'"
 
     return "\n".join(lines).rstrip()
