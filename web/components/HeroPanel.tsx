@@ -85,17 +85,18 @@ function MetricPill({ label, value, color, unit = '%' }: {
   label: string; value: number | string; color: string; unit?: string
 }) {
   const numVal = typeof value === 'number' ? value : null
-  const warn = numVal !== null && numVal > 85 ? 'var(--red)' : numVal !== null && numVal > 70 ? 'var(--amber)' : color
+  const clamped = numVal !== null ? Math.min(Math.max(numVal, 0), 100) : null
+  const warn = clamped !== null && clamped > 85 ? 'var(--red)' : clamped !== null && clamped > 70 ? 'var(--amber)' : color
   return (
     <div className="card flex flex-col items-center gap-1 px-4 py-3">
       <div className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--muted)' }}>{label}</div>
       <div className="font-mono text-xl font-bold" style={{ color: warn }}>
-        {value}{typeof value === 'number' ? unit : ''}
+        {clamped !== null ? clamped.toFixed(0) : value}{typeof value === 'number' ? unit : ''}
       </div>
-      {numVal !== null && (
+      {clamped !== null && (
         <div className="w-full h-1 rounded-full" style={{ background: 'rgba(255,255,255,.06)' }}>
           <div className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${Math.min(numVal, 100)}%`, background: warn, boxShadow: `0 0 6px ${warn}` }}/>
+            style={{ width: `${clamped}%`, background: warn, boxShadow: `0 0 6px ${warn}` }}/>
         </div>
       )}
     </div>

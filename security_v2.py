@@ -104,6 +104,30 @@ ACTION_PERMISSIONS: Dict[str, PermissionLevel] = {
 
     # Duplex audio
     "audio_ws":         PermissionLevel.SAFE,
+
+    # Sports / news / info (read-only, safe)
+    "sports":           PermissionLevel.SAFE,
+    "news":             PermissionLevel.SAFE,
+    "stock_price":      PermissionLevel.SAFE,
+    "currency":         PermissionLevel.SAFE,
+    "crypto":           PermissionLevel.SAFE,
+    "joke":             PermissionLevel.SAFE,
+    "fact":             PermissionLevel.SAFE,
+    "recipe":           PermissionLevel.SAFE,
+    "calendar":         PermissionLevel.SAFE,
+    "reminder":         PermissionLevel.STANDARD,
+
+    # Music / media extended
+    "music_play":       PermissionLevel.SAFE,
+    "spotify":          PermissionLevel.SAFE,
+    "radio":            PermissionLevel.SAFE,
+
+    # Vision extended
+    "vision_describe":  PermissionLevel.SAFE,
+    "ocr":              PermissionLevel.SAFE,
+
+    # Clipboard
+    "clipboard_get":    PermissionLevel.SAFE,
 }
 
 # ── Shell Command Security ────────────────────────────────────────────────────
