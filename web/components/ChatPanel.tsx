@@ -5,6 +5,8 @@ import remarkGfm from 'remark-gfm'
 import { useEV, type Message, type MessageMode } from '@/store/ev'
 import { Icons } from './Icons'
 import HeroPanel from './HeroPanel'
+import ProactiveSuggestions from './ProactiveSuggestions'
+import EVOrb from './EVOrb'
 
 const PLACEHOLDERS = [
   { text: 'Otevři Spotify…', tag: 'ovládání PC' },
@@ -211,17 +213,21 @@ function renderContent(text: string) {
 
 function TypingDots() {
   return (
-    <div className="flex gap-1.5 py-1">
-      {[0, 1, 2].map(i => (
-        <div key={i} className="w-1.5 h-1.5 rounded-full anim-pulse"
-          style={{ background: 'var(--accent-light)', animationDelay: `${i * 0.15}s` }} />
-      ))}
+    <div className="flex items-center gap-2 py-1 anim-fade-in">
+      <span className="text-[11px] font-mono" style={{ color: 'var(--muted)' }}>E.V. zpracovává</span>
+      <div className="flex gap-1">
+        {[0, 1, 2].map(i => (
+          <div key={i} className="w-1.5 h-1.5 rounded-full anim-pulse"
+            style={{ background: 'var(--accent-light)', animationDelay: `${i * 0.18}s` }} />
+        ))}
+      </div>
     </div>
   )
 }
 
 function MessageBubble({ msg }: { msg: Message }) {
   const [copied, setCopied] = useState(false)
+  const orbState = useEV(s => s.orbState)
   const copy = () => {
     navigator.clipboard.writeText(msg.text ?? '')
     setCopied(true); setTimeout(() => setCopied(false), 1400)
@@ -241,15 +247,11 @@ function MessageBubble({ msg }: { msg: Message }) {
   )
 
   const badge = msg.mode ? MODE_BADGE[msg.mode] : null
+  const bubbleOrbState = msg.streaming ? orbState : 'idle'
 
   return (
     <div className="flex gap-3 mb-6 anim-msg-in">
-      <div
-        className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center font-display text-[10px] font-bold tracking-tight"
-        style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)', color: '#fff' }}
-      >
-        EV
-      </div>
+      <EVOrb size="sm" state={bubbleOrbState} />
       <div className="flex-1 min-w-0 max-w-[min(740px,95%)]">
         <div className="flex items-center gap-2 mb-1.5">
           <span className="font-medium text-xs" style={{ color: 'var(--text-secondary)' }}>E.V.</span>
@@ -445,6 +447,7 @@ export default function ChatPanel() {
         )}
       </div>
 
+      <ProactiveSuggestions />
       <InstallProgressBar />
 
       {/* Input area */}

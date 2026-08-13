@@ -389,8 +389,14 @@ class LLMEngine:
         logger.info(f"UserProfile injektován do LLM ({len(profile_summary)} znaků)")
 
     def _build_system_prompt(self) -> str:
-        """Sestaví systémový prompt včetně user profilu."""
-        prompt = SYSTEM_PROMPT
+        """Sestaví systémový prompt včetně personality layer a user profilu."""
+        try:
+            from src.personality import EVPersonality as _EVP
+            _personality_prefix = _EVP().build_system_prompt(user_name=_USER)
+            prompt = _personality_prefix + "\n\n---\n\n" + SYSTEM_PROMPT
+        except Exception as _pe:
+            logger.debug("EVPersonality nedostupná, používám základní prompt: %s", _pe)
+            prompt = SYSTEM_PROMPT
         if self._profile_context:
             prompt += f"\n\n{self._profile_context}"
         return prompt

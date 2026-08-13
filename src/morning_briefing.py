@@ -89,30 +89,47 @@ def _get_yesterday_summary() -> str:
 class MorningBriefing:
     """Generates a Czech-language morning briefing string."""
 
-    def generate(self) -> str:
+    def generate(self, user_name: str = "Simone") -> str:
         now = datetime.now()
         day_name = _DAYS_CS[now.weekday()]
         date_str = now.strftime("%d.%m.%Y")
+        time_str = now.strftime("%H:%M")
 
         yesterday_summary = _get_yesterday_summary()
         dirty_repos = _find_dirty_repos()
 
-        if dirty_repos:
-            git_line = "necommitované změny v: " + ", ".join(dirty_repos[:5])
+        hour = now.hour
+        if hour < 12:
+            greeting = f"## Dobré ráno, Simone. Systémy E.V. jsou online. ☀️"
+        elif hour < 18:
+            greeting = f"## Odpolední aktualizace systémů. 🌤️"
         else:
-            git_line = "vše čisté"
+            greeting = f"## Večerní přehled. Systémy E.V. v nočním módu. 🌙"
 
-        parts = [
-            f"## Dobré ráno! ☀️",
-            f"Dnes je **{day_name} {date_str}**.",
+        narrative_parts = [
+            greeting,
             "",
-            f"**Včera:** {yesterday_summary}.",
+            f"**Datum:** {day_name} **{date_str}** · **Čas:** {time_str}",
             "",
-            f"**Git:** {git_line}.",
-            "",
-            f"> 💡 Tip: Napiš **\"co mám dělat\"** pro dnešní přehled.",
         ]
-        return "\n".join(parts)
+
+        if dirty_repos:
+            narrative_parts += [
+                "**📂 Otevřené projekty s necommitovanými změnami:**",
+            ]
+            for repo in dirty_repos[:3]:
+                narrative_parts.append(f"- `{repo}`")
+            narrative_parts.append("")
+        else:
+            narrative_parts += ["**📂 Git:** Všechny projekty jsou čisté. ✓", ""]
+
+        narrative_parts += [
+            f"**📊 Včerejší aktivita:** {yesterday_summary}",
+            "",
+            "> 💡 Napiš **\"co mám dělat dnes\"** nebo **\"připrav workspace\"** pro zahájení práce.",
+        ]
+
+        return "\n".join(narrative_parts)
 
 
 def send_briefing() -> str:

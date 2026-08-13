@@ -1,4 +1,5 @@
 """Register all API routers on the FastAPI app."""
+import logging
 from src.api.routers import (
     activity,
     agents,
@@ -21,6 +22,8 @@ from src.api.routers import (
     workflows,
     ws_agents,
 )
+
+logger = logging.getLogger(__name__)
 
 ROUTERS = (
     monitoring,
@@ -49,3 +52,8 @@ ROUTERS = (
 def register_all(app):
     for mod in ROUTERS:
         mod.register(app)
+    try:
+        from src.api.routers.proactive import router as proactive_router
+        app.include_router(proactive_router)
+    except Exception as e:
+        logger.warning("Proactive router: %s", e)

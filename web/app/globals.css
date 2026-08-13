@@ -382,6 +382,42 @@ body::before {
 ol > li { list-style: decimal; display: list-item; }
 ol > li > span:first-child { display: none; }
 
+/* ── Cinematic EV animations ──────────────────────────────────── */
+@keyframes ev-pulse {
+  0%,100% { transform: scale(1);    opacity: .9; box-shadow: 0 0 0 0 rgba(99,102,241,.4); }
+  50%      { transform: scale(1.05); opacity: 1;  box-shadow: 0 0 0 8px rgba(99,102,241,0); }
+}
+@keyframes ev-think {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes ev-wave {
+  0%,100% { transform: scaleY(1);   opacity: .8; }
+  50%     { transform: scaleY(1.8); opacity: 1;  }
+}
+@keyframes ev-glow {
+  0%,100% { box-shadow: 0 0 8px rgba(99,102,241,.3); }
+  50%     { box-shadow: 0 0 24px rgba(99,102,241,.7); }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes status-pulse-green  { 0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.5)} 50%{box-shadow:0 0 0 4px rgba(52,211,153,0)} }
+@keyframes status-pulse-amber  { 0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.5)} 50%{box-shadow:0 0 0 4px rgba(251,191,36,0)} }
+@keyframes status-pulse-blue   { 0%,100%{box-shadow:0 0 0 0 rgba(96,165,250,.5)} 50%{box-shadow:0 0 0 4px rgba(96,165,250,0)} }
+@keyframes status-pulse-cyan   { 0%,100%{box-shadow:0 0 0 0 rgba(56,189,248,.5)} 50%{box-shadow:0 0 0 4px rgba(56,189,248,0)} }
+
+.ev-orb-idle  { animation: ev-pulse 2s ease-in-out infinite, ev-glow 3s ease-in-out infinite; }
+.ev-orb-think { animation: ev-think 1s linear infinite; }
+.ev-orb-speak { animation: ev-pulse 0.4s ease-in-out infinite; }
+.msg-in       { animation: slide-in-right 0.2s ease-out forwards; }
+
+.status-dot-idle      { animation: status-pulse-green 2.5s ease-in-out infinite; }
+.status-dot-thinking  { animation: status-pulse-amber 0.7s ease-in-out infinite; }
+.status-dot-speaking  { animation: status-pulse-blue  0.5s ease-in-out infinite; }
+.status-dot-listening { animation: status-pulse-cyan  0.8s ease-in-out infinite; }
+
 /* ── Mobile responsive ────────────────────────────────────────── */
 @media (max-width: 768px) {
   :root {

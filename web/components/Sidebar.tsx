@@ -171,7 +171,15 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
 
         <div className="flex items-center justify-between px-1">
           <span className="status-pill" style={{ color: orb.color, borderColor: 'var(--border)' }}>
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: orb.color }} />
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                orbState === 'idle'      ? 'status-dot-idle' :
+                orbState === 'thinking'  ? 'status-dot-thinking' :
+                orbState === 'speaking'  ? 'status-dot-speaking' :
+                orbState === 'listening' ? 'status-dot-listening' : ''
+              }`}
+              style={{ background: orb.color }}
+            />
             {orb.label}
           </span>
           {system.cpu > 0 && (
