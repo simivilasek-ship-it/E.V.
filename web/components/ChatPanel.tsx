@@ -54,14 +54,14 @@ function renderContent(text: string) {
       components={{
         // Paragraphs
         p: ({ children }) => (
-          <p className="mb-3 last:mb-0 leading-relaxed text-sm" style={{ color: 'var(--text)' }}>
+          <p className="mb-3 last:mb-0 text-sm" style={{ color: 'var(--text)', lineHeight: '1.75' }}>
             {children}
           </p>
         ),
 
         // Headings — Copilot-style
         h1: ({ children }) => (
-          <h1 className="text-base font-semibold mt-5 mb-2 pb-2"
+          <h1 className="text-base font-semibold mt-5 mb-3 pb-2"
             style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>
             {children}
           </h1>
@@ -74,27 +74,27 @@ function renderContent(text: string) {
         ),
         h3: ({ children }) => (
           <h3 className="text-sm font-medium mt-3 mb-1.5"
-            style={{ color: 'var(--text-secondary)' }}>
+            style={{ color: 'var(--accent-light)' }}>
             {children}
           </h3>
         ),
 
-        // Lists
+        // Lists — Gemini style
         ul: ({ children }) => (
-          <ul className="my-2 ml-1 flex flex-col gap-1">
+          <ul className="my-2 flex flex-col gap-1.5 ml-0">
             {children}
           </ul>
         ),
         ol: ({ children }) => (
-          <ol className="my-2 ml-4 list-decimal flex flex-col gap-1">
+          <ol className="my-2 flex flex-col gap-1.5 ml-4 list-decimal">
             {children}
           </ol>
         ),
         li: ({ children }) => (
-          <li className="flex gap-2 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
-            <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0"
-              style={{ background: 'var(--accent-light)', flexShrink: 0 }} />
-            <span>{children}</span>
+          <li className="flex gap-2.5 text-sm" style={{ color: 'var(--text)', lineHeight: '1.7' }}>
+            <span className="mt-2 w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ background: 'var(--accent-light)', minWidth: 6 }} />
+            <span className="flex-1">{children}</span>
           </li>
         ),
 
@@ -245,10 +245,10 @@ function MessageBubble({ msg }: { msg: Message }) {
   return (
     <div className="flex gap-3 mb-6 anim-msg-in">
       <div
-        className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center font-display text-xs font-bold"
+        className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center font-display text-[10px] font-bold tracking-tight"
         style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)', color: '#fff' }}
       >
-        J
+        EV
       </div>
       <div className="flex-1 min-w-0 max-w-[min(740px,95%)]">
         <div className="flex items-center gap-2 mb-1.5">

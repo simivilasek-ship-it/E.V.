@@ -102,13 +102,17 @@ class MorningBriefing:
         else:
             git_line = "vše čisté"
 
-        lines = [
-            f"Dobré ráno! Dnes je {day_name} {date_str}.",
-            f"Včera: {yesterday_summary}.",
-            f"Git: {git_line}.",
-            'Tip: Napiš "co mám dělat" pro dnešní přehled.',
+        parts = [
+            f"## Dobré ráno! ☀️",
+            f"Dnes je **{day_name} {date_str}**.",
+            "",
+            f"**Včera:** {yesterday_summary}.",
+            "",
+            f"**Git:** {git_line}.",
+            "",
+            f"> 💡 Tip: Napiš **\"co mám dělat\"** pro dnešní přehled.",
         ]
-        return "\n".join(lines)
+        return "\n".join(parts)
 
 
 def send_briefing() -> str:
