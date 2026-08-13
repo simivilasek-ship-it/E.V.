@@ -55,3 +55,6 @@ gui_legacy/
 # Client WordPress deployment scripts (not part of JARVIS core)
 # These live in tools/wordpress/ — tracked separately if needed
 tools/wordpress/
+/node_modules/
+/package-lock.json
+# root package.json excluded - project uses web/package.json
