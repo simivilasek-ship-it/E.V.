@@ -43,7 +43,7 @@ def register(app):
         """Odešle desktop notifikaci přes libnotify."""
         from notification_engine import get_notification_engine
         ok = get_notification_engine().send(
-            title=body.get("title", "JARVIS"),
+            title=body.get("title", "E.V."),
             body=body.get("body", ""),
             urgent=body.get("urgent", False)
         )

@@ -3,7 +3,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
-JARVIS_VERSION=$(python3 -c "from config import __version__; print(__version__)" 2>/dev/null || echo "5.4.0")
+E.V._VERSION=$(python3 -c "from config import __version__; print(__version__)" 2>/dev/null || echo "5.4.0")
 DEFAULT_MODEL="qwen2.5:3b"
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -15,7 +15,7 @@ warn() { echo -e "${YELLOW}  ! $1${NC}"; }
 err()  { echo -e "${RED}  ✗ $1${NC}"; }
 
 echo "============================================"
-echo "  JARVIS v${JARVIS_VERSION} — Instalace"
+echo "  E.V. v${E.V._VERSION} — Instalace"
 echo "============================================"
 echo
 
@@ -108,7 +108,7 @@ UNIT_DIR="$HOME/.config/systemd/user"
 UNIT_DEST="$UNIT_DIR/jarvis.service"
 if [ -f "desktop/jarvis.service" ]; then
     mkdir -p "$UNIT_DIR"
-    sed "s|@JARVIS_DIR@|${SCRIPT_DIR}|g" desktop/jarvis.service > "$UNIT_DEST"
+    sed "s|@E.V._DIR@|${SCRIPT_DIR}|g" desktop/jarvis.service > "$UNIT_DEST"
     ok "Unit zapsán → $UNIT_DEST"
     echo "    systemctl --user enable --now jarvis.service   # autostart"
     echo "    systemctl --user status jarvis.service"
@@ -118,7 +118,7 @@ if [ -f "desktop/jarvis.service" ]; then
         cp .env "$HOME/.config/jarvis/.env"
         ok ".env copiado a ~/.config/jarvis/.env"
     elif [ ! -f "$HOME/.config/jarvis/.env" ]; then
-        echo "# JARVIS configuration" > "$HOME/.config/jarvis/.env"
+        echo "# E.V. configuration" > "$HOME/.config/jarvis/.env"
         echo "# Run: python scripts/generate_token.py --write" >> "$HOME/.config/jarvis/.env"
         ok "Created empty ~/.config/jarvis/.env"
     fi

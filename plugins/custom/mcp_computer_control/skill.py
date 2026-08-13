@@ -1,5 +1,5 @@
 """
-JARVIS Skill — Computer Control MCP
+E.V. Skill — Computer Control MCP
 Ovládání celého počítače přes computer-control-mcp (AB498).
 Nástroje: screenshot, OCR, klikání, psaní, okna, klávesnice.
 

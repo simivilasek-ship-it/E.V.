@@ -1,1 +1,1 @@
-"""FastAPI middleware for the JARVIS API."""
+"""FastAPI middleware for the E.V. API."""

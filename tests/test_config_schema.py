@@ -1,5 +1,5 @@
 """
-Tests for config_schema.py — Pydantic v2 JARVIS config validation.
+Tests for config_schema.py — Pydantic v2 E.V. config validation.
 """
 import sys
 import os

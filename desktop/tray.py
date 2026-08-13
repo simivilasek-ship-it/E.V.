@@ -1,5 +1,5 @@
 """
-JARVIS System Tray
+E.V. System Tray
 Spustitelný samostatně: python -m desktop.tray
 Předpokládá, že backend běží na BACKEND_URL (spusť scripts/start.sh nejdříve).
 """
@@ -41,15 +41,15 @@ def run_tray(backend_url: str = BACKEND_URL) -> None:
         sys.exit(0)
 
     icon = pystray.Icon(
-        "JARVIS",
+        "E.V.",
         _make_icon(),
-        "JARVIS",
+        "E.V.",
         menu=pystray.Menu(
             pystray.MenuItem("Otevřít dashboard", open_dashboard, default=True),
             pystray.MenuItem("Ukončit", quit_tray),
         ),
     )
-    print(f"JARVIS tray aktivní ({backend_url}) — Ctrl+C nebo 'Ukončit' pro exit")
+    print(f"E.V. tray aktivní ({backend_url}) — Ctrl+C nebo 'Ukončit' pro exit")
     icon.run()
 
 

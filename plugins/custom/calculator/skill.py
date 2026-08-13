@@ -1,4 +1,4 @@
-"""JARVIS Skill — Kalkulačka"""
+"""E.V. Skill — Kalkulačka"""
 import re
 import math
 import logging

@@ -1,5 +1,5 @@
 """
-JARVIS router — media routing.
+E.V. router — media routing.
 Handles music/Spotify/YouTube playback and screen vision commands.
 """
 import re

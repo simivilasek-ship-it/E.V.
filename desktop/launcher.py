@@ -1,5 +1,5 @@
 """
-JARVIS Desktop Launcher
+E.V. Desktop Launcher
 Spustí FastAPI backend a otevře React UI v prohlížeči nebo pywebview okně.
 
 Použití:
@@ -27,7 +27,7 @@ WEB_DIST     = ROOT / "web_dist"
 BACKEND_PORT = 8002
 BACKEND_URL  = f"http://127.0.0.1:{BACKEND_PORT}"
 APP_URL      = f"http://127.0.0.1:{BACKEND_PORT}/app"   # React web chat
-WINDOW_TITLE = "JARVIS"
+WINDOW_TITLE = "E.V."
 USE_WEBVIEW  = "--webview" in sys.argv
 USE_TRAY     = "--tray" in sys.argv
 
@@ -73,7 +73,7 @@ def wait_for_backend(timeout: float = 15.0) -> bool:
 # ── System tray ───────────────────────────────────────
 
 def start_tray(url: str, open_fn) -> bool:
-    """Spustí systémový tray s ikonou JARVIS. Vrátí False při selhání."""
+    """Spustí systémový tray s ikonou E.V. Vrátí False při selhání."""
     try:
         import pystray
         from PIL import Image, ImageDraw
@@ -91,9 +91,9 @@ def start_tray(url: str, open_fn) -> bool:
             sys.exit(0)
 
         icon = pystray.Icon(
-            "JARVIS",
+            "E.V.",
             img,
-            "JARVIS",
+            "E.V.",
             menu=pystray.Menu(
                 pystray.MenuItem("Otevřít", on_open, default=True),
                 pystray.MenuItem("Ukončit", on_quit),
@@ -187,13 +187,13 @@ def run_browser(url: str) -> None:
             continue
     if not opened:
         webbrowser.open(url)
-    print(f"  JARVIS běží → {url}")
+    print(f"  E.V. běží → {url}")
     print("  Stiskni Ctrl+C pro ukončení backendu.")
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\nJARVIS zastaven.")
+        print("\nE.V. zastaven.")
         sys.exit(0)
 
 
@@ -201,7 +201,7 @@ def run_browser(url: str) -> None:
 
 def main():
     from config import __version__
-    print(f"JARVIS v{__version__}")
+    print(f"E.V. v{__version__}")
 
     # Sestav React pokud chybí web_dist
     if not WEB_DIST.exists():

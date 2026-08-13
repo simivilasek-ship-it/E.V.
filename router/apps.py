@@ -1,5 +1,5 @@
 """
-JARVIS router — app and site routing.
+E.V. router — app and site routing.
 Handles open/close/install commands and website navigation.
 """
 import os

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useJarvis } from '@/store/jarvis'
+import { useEV } from '@/store/ev'
 import { Icons } from './Icons'
 
 export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'WORK' | 'FEED' | 'CHECKLIST' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW' | 'MISSIONS' | 'VISION' | 'VOICE'
@@ -89,12 +89,12 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen, clearMessages, theme, toggleTheme, isOpen = false, onClose }: SidebarProps) {
-  const [advanced, setAdvanced] = useLocalStorage<boolean>('jarvis_advanced_mode', false)
-  const connStatus = useJarvis(s => s.connStatus)
-  const retry      = useJarvis(s => s.retry)
-  const orbState   = useJarvis(s => s.orbState)
-  const model      = useJarvis(s => s.currentModel)
-  const system     = useJarvis(s => s.system)
+  const [advanced, setAdvanced] = useLocalStorage<boolean>('ev_advanced_mode', false)
+  const connStatus = useEV(s => s.connStatus)
+  const retry      = useEV(s => s.retry)
+  const orbState   = useEV(s => s.orbState)
+  const model      = useEV(s => s.currentModel)
+  const system     = useEV(s => s.system)
 
   const connColor = CONN_COLOR[connStatus] ?? 'var(--muted)'
   const orb = ORB_CFG[orbState] ?? ORB_CFG.idle
@@ -125,7 +125,7 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
         </div>
         <div className="flex-1">
           <div className="font-display text-base font-bold tracking-tight" style={{ color: 'var(--text)' }}>
-            JARVIS
+            E.V.
           </div>
           <div className="text-[11px] font-mono" style={{ color: 'var(--muted)' }}>
             v5.15 · Work OS

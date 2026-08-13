@@ -1,5 +1,5 @@
 """
-JARVIS — User Profile
+E.V. — User Profile
 Permanentní úložiště faktů o uživateli (nikdy nedecays).
 Fakta se extrahují automaticky z konverzací + lze ukládat ručně.
 

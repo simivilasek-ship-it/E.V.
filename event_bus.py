@@ -1,5 +1,5 @@
 """
-JARVIS — Event Bus / Message Bus
+E.V. — Event Bus / Message Bus
 Centrální pub/sub systém. Všechny moduly komunikují přes eventy.
 
 Použití:
@@ -69,8 +69,8 @@ class EventType:
     BUILD_FAIL        = "build.fail"         # build selhal
 
     # System
-    JARVIS_READY      = "system.ready"       # JARVIS připraven
-    JARVIS_SHUTDOWN   = "system.shutdown"    # JARVIS se ukončuje
+    JARVIS_READY      = "system.ready"       # E.V. připraven
+    JARVIS_SHUTDOWN   = "system.shutdown"    # E.V. se ukončuje
 
     # Active window
     ACTIVE_WINDOW_CHANGED = "active_window.changed"  # aktivní okno se změnilo

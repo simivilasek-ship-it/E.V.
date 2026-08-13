@@ -1,5 +1,5 @@
 'use client'
-import { useJarvis } from '@/store/jarvis'
+import { useEV } from '@/store/ev'
 
 const TYPE_STYLE: Record<string, { accent: string; bg: string }> = {
   success: { accent: 'var(--green)', bg: 'rgba(52,211,153,.1)' },
@@ -9,8 +9,8 @@ const TYPE_STYLE: Record<string, { accent: string; bg: string }> = {
 }
 
 export default function ToastContainer() {
-  const toasts     = useJarvis(s => s.toasts)
-  const removeToast = useJarvis(s => s.removeToast)
+  const toasts     = useEV(s => s.toasts)
+  const removeToast = useEV(s => s.removeToast)
 
   return (
     <div className="fixed bottom-5 right-5 flex flex-col gap-2 z-50 pointer-events-none">

@@ -1,13 +1,13 @@
 ---
 name: Feature request
-about: Návrh nové funkce pro JARVIS
+about: Návrh nové funkce pro E.V.
 title: '[FEAT] '
 labels: enhancement
 assignees: ''
 ---
 
 ## Popis funkce
-<!-- Co by JARVIS měl umět -->
+<!-- Co by E.V. měl umět -->
 
 ## Motivace
 <!-- Proč je tato funkce užitečná -->

@@ -1,5 +1,5 @@
 """
-JARVIS — Cache Manager System
+E.V. — Cache Manager System
 Caching strategie pro LLM responses, API calls, atd.
 """
 

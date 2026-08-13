@@ -14,8 +14,8 @@ const baseState = {
   addToast: vi.fn(),
 }
 
-vi.mock('@/store/jarvis', () => ({
-  useJarvis: (selector: (s: typeof baseState) => unknown) => selector(baseState),
+vi.mock('@/store/ev', () => ({
+  useEV: (selector: (s: typeof baseState) => unknown) => selector(baseState),
 }))
 
 // ── Fetch helpers ──────────────────────────────────────────────────────────────

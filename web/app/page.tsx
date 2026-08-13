@@ -1,5 +1,5 @@
-import JarvisApp from '@/components/JarvisApp'
+import EVApp from '@/components/EVApp'
 
 export default function Home() {
-  return <JarvisApp />
+  return <EVApp />
 }

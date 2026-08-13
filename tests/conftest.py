@@ -1,5 +1,5 @@
 """
-JARVIS pytest configuration and fixtures
+E.V. pytest configuration and fixtures
 """
 
 import pytest

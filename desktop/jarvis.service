@@ -1,14 +1,14 @@
 [Unit]
-Description=JARVIS — local AI assistant (backend + web UI)
-Documentation=https://github.com/simivilasek-ship-it/Jarvis
+Description=E.V. — local AI assistant (backend + web UI)
+Documentation=https://github.com/simivilasek-ship-it/E.V.
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=@JARVIS_DIR@
+WorkingDirectory=@E.V._DIR@
 EnvironmentFile=-%h/.config/jarvis/.env
-ExecStart=@JARVIS_DIR@/venv/bin/python dashboard.py --no-open
+ExecStart=@E.V._DIR@/venv/bin/python dashboard.py --no-open
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1

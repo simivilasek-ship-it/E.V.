@@ -1,5 +1,5 @@
 """
-Testy pro JARVIS Plugin Marketplace.
+Testy pro E.V. Plugin Marketplace.
 """
 
 import io

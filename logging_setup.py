@@ -1,5 +1,5 @@
 """
-JARVIS — Structured Logging Setup
+E.V. — Structured Logging Setup
 Logování s loguru pro JSON structured logs
 """
 
@@ -130,7 +130,7 @@ def setup_logging(log_file: str = "jarvis.log",
     # Propoj loguru s Python logging
     _redirect_logging_to_loguru()
     
-    loguru_logger.info("JARVIS logging inicializován", extra={
+    loguru_logger.info("E.V. logging inicializován", extra={
         "log_level": log_level,
         "json_format": json_format,
         "log_file": log_file,

@@ -1,4 +1,4 @@
-"""JARVIS unified runtime — Copilot + Agent pipeline pro web API."""
+"""E.V. unified runtime — Copilot + Agent pipeline pro web API."""
 from __future__ import annotations
 
 import logging
@@ -13,7 +13,7 @@ _ready = threading.Event()
 
 
 def init_runtime() -> None:
-    """Spustí plný JarvisApp (agenti, security, proactive, mise)."""
+    """Spustí plný EVApp (agenti, security, proactive, mise)."""
     global _runtime
     with _lock:
         if _runtime is not None:
@@ -23,19 +23,19 @@ def init_runtime() -> None:
 
             CONFIG["wake_word_enabled"] = False
             CONFIG["web_mode"] = True
-            from app_core import JarvisApp
+            from app_core import EVApp
 
-            logger.info("JARVIS runtime: inicializuji Copilot + Agent pipeline…")
-            _runtime = JarvisApp()
+            logger.info("E.V. runtime: inicializuji Copilot + Agent pipeline…")
+            _runtime = EVApp()
             _ready.set()
-            logger.info("JARVIS runtime připraven (agenti, security, proactive, mise)")
+            logger.info("E.V. runtime připraven (agenti, security, proactive, mise)")
         except Exception as e:
-            logger.error(f"JARVIS runtime init selhal: {e}", exc_info=True)
+            logger.error(f"E.V. runtime init selhal: {e}", exc_info=True)
             raise
 
 
 def get_runtime():
-    """Vrátí singleton JarvisApp; lazy init pokud lifespan ještě neběžel."""
+    """Vrátí singleton EVApp; lazy init pokud lifespan ještě neběžel."""
     if _runtime is None:
         init_runtime()
     return _runtime

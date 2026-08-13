@@ -1,5 +1,5 @@
 """
-JARVIS — Cloud Router (Groq + OpenRouter)
+E.V. — Cloud Router (Groq + OpenRouter)
 Hybridní přepínač: jednoduché dotazy → Ollama (lokálně),
 komplexní/kódovací/reasoning → Groq nebo OpenRouter (500+ tok/s).
 
@@ -295,7 +295,7 @@ class CloudRouter:
             "Authorization": f"Bearer {self._openrouter_key}",
             "Content-Type":  "application/json",
             "HTTP-Referer":  "https://github.com/jarvis-ai",
-            "X-Title":       "JARVIS",
+            "X-Title":       "E.V.",
         }
         resp = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -323,7 +323,7 @@ class CloudRouter:
             "Authorization": f"Bearer {self._openrouter_key}",
             "Content-Type":  "application/json",
             "HTTP-Referer":  "https://github.com/jarvis-ai",
-            "X-Title":       "JARVIS",
+            "X-Title":       "E.V.",
         }
         with requests.post(
             "https://openrouter.ai/api/v1/chat/completions",

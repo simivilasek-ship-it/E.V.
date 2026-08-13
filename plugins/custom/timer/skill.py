@@ -1,4 +1,4 @@
-"""JARVIS Skill — Časovač"""
+"""E.V. Skill — Časovač"""
 import re
 import threading
 import time

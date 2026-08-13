@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useJarvis } from '@/store/jarvis'
+import { useEV } from '@/store/ev'
 import { apiUrl } from '@/lib/api'
 
 // Ollama status widget
@@ -240,12 +240,12 @@ function logColor(text: string) {
 
 interface SystemPanelProps { fullMode?: boolean; compact?: boolean }
 export default function SystemPanel(_props: SystemPanelProps = {}) {
-  const system   = useJarvis(s => s.system) as SystemData
-  const agents   = useJarvis(s => s.agents) as unknown as Array<Record<string, unknown>>
-  const logs     = useJarvis(s => s.logs) as Array<{ text?: string }>
-  const isConn   = useJarvis(s => s.isConnected) as boolean
-  const fetchAge = useJarvis(s => s.fetchAgents) as () => void
-  const clearLogs= useJarvis(s => s.clearLogs) as () => void
+  const system   = useEV(s => s.system) as SystemData
+  const agents   = useEV(s => s.agents) as unknown as Array<Record<string, unknown>>
+  const logs     = useEV(s => s.logs) as Array<{ text?: string }>
+  const isConn   = useEV(s => s.isConnected) as boolean
+  const fetchAge = useEV(s => s.fetchAgents) as () => void
+  const clearLogs= useEV(s => s.clearLogs) as () => void
 
   const [cpuHist,  setCpuHist]  = useState<number[]>([])
   const [ramHist,  setRamHist]  = useState<number[]>([])

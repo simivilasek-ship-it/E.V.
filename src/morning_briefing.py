@@ -1,5 +1,5 @@
 """
-JARVIS Morning Briefing
+E.V. Morning Briefing
 Proactive daily briefing sent via notify-send + injected into chat on first open.
 """
 from __future__ import annotations
@@ -118,7 +118,7 @@ def send_briefing() -> str:
     # Send desktop notification
     try:
         subprocess.run(
-            ["notify-send", "JARVIS", briefing, "--icon=dialog-information"],
+            ["notify-send", "E.V.", briefing, "--icon=dialog-information"],
             timeout=5,
             capture_output=True,
         )

@@ -39,7 +39,7 @@ def register(app):
 
     @app.get("/api/memory")
     async def memory_query(q: str = ""):
-        """Dotaz do JARVIS paměti."""
+        """Dotaz do E.V. paměti."""
         try:
             from memory import JarvisMemory
             from config import CONFIG

@@ -1,4 +1,4 @@
-"""JARVIS Skill — Schránka"""
+"""E.V. Skill — Schránka"""
 import re
 import subprocess
 import logging

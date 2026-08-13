@@ -1,5 +1,5 @@
 """
-JARVIS — Mission Manager
+E.V. — Mission Manager
 Systém dlouhodobých autonomních misí s plánováním přes LLM, prováděním ReAct agentem
 a vyhodnocením výsledků.
 

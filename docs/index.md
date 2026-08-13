@@ -1,6 +1,6 @@
-# JARVIS v5.12 — Dokumentace
+# E.V. v5.12 — Dokumentace
 
-Vítejte v dokumentaci JARVIS — lokálního AI asistenta ve stylu **Copilot / Gemini**, s **agentním** plánováním a **plnou správou PC**.
+Vítejte v dokumentaci E.V. — lokálního AI asistenta ve stylu **Copilot / Gemini**, s **agentním** plánováním a **plnou správou PC**.
 
 ---
 
@@ -8,9 +8,9 @@ Vítejte v dokumentaci JARVIS — lokálního AI asistenta ve stylu **Copilot / 
 
 | Chci... | Stránka |
 |---------|---------|
-| Pochopit jak JARVIS funguje uvnitř | [Architektura](architecture.md) |
-| Integrovat JARVIS přes API | [API Reference](api-reference.md) |
-| Nastavit JARVIS pro své potřeby | [Konfigurace](configuration.md) |
+| Pochopit jak E.V. funguje uvnitř | [Architektura](architecture.md) |
+| Integrovat E.V. přes API | [API Reference](api-reference.md) |
+| Nastavit E.V. pro své potřeby | [Konfigurace](configuration.md) |
 | Napsat vlastní plugin | [Vývoj pluginů](plugin-development.md) |
 | Pochopit agentní systém | [Agenti](agents.md) |
 | Rozumět paměti a GraphRAG | [Paměť](memory.md) |
@@ -55,9 +55,9 @@ UI: **http://localhost:8002/app**
 
 ---
 
-## Co je JARVIS?
+## Co je E.V.?
 
-JARVIS je lokální AI asistent s těmito schopnostmi:
+E.V. je lokální AI asistent s těmito schopnostmi:
 
 ### Mluví a slyší v reálném čase
 Whisper Live, Web Speech API v prohlížeči, barge-in.
@@ -93,7 +93,7 @@ Text/Hlas → CommandRouter (routing.py)
  (akce)    (multi-step) (+ kontext PC)
 ```
 
-Web API používá stejný pipeline přes `src/api/runtime.py` → `JarvisApp` singleton.
+Web API používá stejný pipeline přes `src/api/runtime.py` → `E.V.App` singleton.
 
 Viz [Architektura](architecture.md).
 

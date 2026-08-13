@@ -1,5 +1,5 @@
 """
-JARVIS — Security 2.0
+E.V. — Security 2.0
 Audit log, úrovně oprávnění, detekce nebezpečných patternů, sandbox.
 """
 
@@ -320,7 +320,7 @@ class AuditLog:
 # ── Security Manager ──────────────────────────────────
 
 class SecurityManager:
-    """Hlavní bezpečnostní vrstva JARVIS 2.0."""
+    """Hlavní bezpečnostní vrstva E.V. 2.0."""
 
     def __init__(self, max_permission: PermissionLevel = PermissionLevel.ELEVATED) -> None:
         self._max_permission: PermissionLevel = max_permission

@@ -35,7 +35,7 @@ def _identify_app_from_title(title: str) -> str:
     if "google chrome" in t or " chromium" in t:
         return "Chrome"
     if "jarvis" in t:
-        return "JARVIS"
+        return "E.V."
     if "visual studio code" in t or t.endswith(" - code"):
         return "VS Code"
     if "zed " in t or t.startswith("zed"):

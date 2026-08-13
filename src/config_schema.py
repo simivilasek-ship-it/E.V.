@@ -1,5 +1,5 @@
 """
-JARVIS Config Schema — Pydantic v2 validation for config.json
+E.V. Config Schema — Pydantic v2 validation for config.json
 Usage: from src.config_schema import JarvisSettings, validate_config
 """
 from __future__ import annotations
@@ -30,7 +30,7 @@ class SecuritySettings(BaseModel):
     def warn_insecure(self) -> "SecuritySettings":
         if not self.api_auth_required and self.api_bind_host not in ("127.0.0.1", "localhost"):
             warnings.warn(
-                "JARVIS: api_auth_required=False with non-localhost binding is insecure!",
+                "E.V.: api_auth_required=False with non-localhost binding is insecure!",
                 stacklevel=2,
             )
         return self
@@ -43,7 +43,7 @@ class AgentSettings(BaseModel):
 
 
 class JarvisSettings(BaseModel):
-    """Full validated JARVIS configuration."""
+    """Full validated E.V. configuration."""
 
     ollama_url: str = "http://localhost:11434/api/chat"
     ollama_model: str = "qwen2.5:3b"

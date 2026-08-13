@@ -1,5 +1,5 @@
 """
-JARVIS FastAPI application factory.
+E.V. FastAPI application factory.
 
 Spuštění: python dashboard.py  (port 8002)
 """
@@ -24,7 +24,7 @@ if HAS_FASTAPI:
 
     _dev_mode = os.environ.get("JARVIS_DEV", "0") == "1" or os.environ.get("JARVIS_TEST_MODE", "0") == "1"
     app = FastAPI(
-        title="JARVIS API",
+        title="E.V. API",
         version=__version__,
         docs_url="/api/docs" if _dev_mode else None,
         redoc_url="/api/redoc" if _dev_mode else None,

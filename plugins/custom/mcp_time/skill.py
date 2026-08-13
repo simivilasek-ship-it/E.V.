@@ -1,5 +1,5 @@
 """
-JARVIS Skill — MCP Time
+E.V. Skill — MCP Time
 Timezone-aware dotazy na čas přes MCP Time server.
 
 Příkazy:

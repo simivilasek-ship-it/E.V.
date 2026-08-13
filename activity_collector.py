@@ -1,5 +1,5 @@
 """
-JARVIS — Activity Collector
+E.V. — Activity Collector
 Sleduje aplikace, git, docker a zapisuje do ActivityStore.
 """
 
@@ -74,7 +74,7 @@ class ActivityCollector:
             target=self._loop, daemon=True, name="ActivityCollector")
         self._thread.start()
         self._store.record(
-            "session.summary", title="JARVIS session start",
+            "session.summary", title="E.V. session start",
             source="activity_collector",
         )
         logger.info("ActivityCollector spuštěn")

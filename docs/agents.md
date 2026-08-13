@@ -1,6 +1,6 @@
-# Agentní systém JARVIS
+# Agentní systém E.V.
 
-JARVIS obsahuje tři typy agentů, každý vhodný pro jiný typ úkolů. Všichni sdílí stejné nástroje a paměťový systém.
+E.V. obsahuje tři typy agentů, každý vhodný pro jiný typ úkolů. Všichni sdílí stejné nástroje a paměťový systém.
 
 Agenti se spouštějí **automaticky** z `CommandRouter` (`routing.py`) — po LocalRouteru a pluginech, **před** Copilot LLM. Web chat (`process_for_web`) používá stejnou logiku.
 
@@ -291,7 +291,7 @@ V `AgentGraphV2` komponentě klikni na **Debug** → **Replay** pro přehrání 
 
 ## Dva typy „misí“
 
-JARVIS má **dva oddělené systémy** — neslučují se do jedné databáze:
+E.V. má **dva oddělené systémy** — neslučují se do jedné databáze:
 
 | Systém | Modul | API | UI | Účel |
 |--------|-------|-----|-----|------|

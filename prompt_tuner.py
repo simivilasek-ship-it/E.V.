@@ -1,5 +1,5 @@
 """
-JARVIS Prompt Tuner
+E.V. Prompt Tuner
 Sleduje úspěšnost odpovědí a učí se jaké systémové prompty fungují nejlépe.
 """
 from __future__ import annotations

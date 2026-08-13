@@ -1,4 +1,4 @@
-"""Integration tests for JARVIS FastAPI — TestClient with mocked runtime where needed."""
+"""Integration tests for E.V. FastAPI — TestClient with mocked runtime where needed."""
 from __future__ import annotations
 
 import json

@@ -1,4 +1,4 @@
-"""Tests for JARVIS WorkflowEngine."""
+"""Tests for E.V. WorkflowEngine."""
 from __future__ import annotations
 import sys
 import os

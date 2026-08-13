@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useJarvis } from '@/store/jarvis'
+import { useEV } from '@/store/ev'
 
 const LEVEL_COLORS: Record<string, string> = {
   info: 'var(--muted)', success: 'var(--green)', warning: 'var(--amber)', error: 'var(--red)',
@@ -69,11 +69,11 @@ function ProactiveCard({ sug, onDismiss, onAction }: {
 }
 
 export default function ActivityFeed({ compact = false }: { compact?: boolean }) {
-  const feed = useJarvis(s => s.activityFeed)
-  const suggestions = useJarvis(s => s.proactiveSuggestions)
-  const connectActivity = useJarvis(s => s.connectActivity)
-  const dismissSuggestion = useJarvis(s => s.dismissSuggestion)
-  const sendCommand = useJarvis(s => s.sendCommand)
+  const feed = useEV(s => s.activityFeed)
+  const suggestions = useEV(s => s.proactiveSuggestions)
+  const connectActivity = useEV(s => s.connectActivity)
+  const dismissSuggestion = useEV(s => s.dismissSuggestion)
+  const sendCommand = useEV(s => s.sendCommand)
 
   useEffect(() => { connectActivity() }, [connectActivity])
 

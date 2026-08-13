@@ -227,7 +227,7 @@ class TestNormalizeText:
 
     def test_lowercases(self):
         from commands.utils import normalize_text
-        assert normalize_text("JARVIS") == "jarvis"
+        assert normalize_text("E.V.") == "jarvis"
 
     def test_empty_string(self):
         from commands.utils import normalize_text

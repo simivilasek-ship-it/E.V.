@@ -51,7 +51,7 @@ def register(app):
             client = OllamaClient(CONFIG["ollama_url"], CONFIG["ollama_model"])
 
             system = """\
-    Jsi expert na tvorbu JARVIS pluginů. Vygeneruj funkční plugin pro zadaný účel.
+    Jsi expert na tvorbu E.V. pluginů. Vygeneruj funkční plugin pro zadaný účel.
 
     Plugin se skládá ze dvou souborů:
     1. skill.py — Python kód

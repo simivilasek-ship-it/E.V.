@@ -49,7 +49,7 @@ const NODE_LABELS: Record<NodeType, string> = {
 const NODE_HINTS: Record<NodeType, string> = {
   trigger:   'Spouští workflow (event, čas, manuálně)',
   condition: 'Větev podle výrazu (true/false)',
-  action:    'Příkaz pro JARVIS (jako v chatu)',
+  action:    'Příkaz pro E.V. (jako v chatu)',
   delay:     'Pauza před dalším krokem (sekundy)',
   notify:    'Desktop notifikace uživateli',
 }

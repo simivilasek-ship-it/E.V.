@@ -1,5 +1,5 @@
 """
-JARVIS — ReAct Agent
+E.V. — ReAct Agent
 Implementuje Reasoning + Acting smyčku pro vícesvůlové úkoly.
 
 Formát:
@@ -102,7 +102,7 @@ class ReactAgent:
     """
 
     SYSTEM_PROMPT_V2 = """\
-Jsi JARVIS, inteligentní AI asistent. Pro splnění úkolu používáš nástroje.
+Jsi E.V., inteligentní AI asistent. Pro splnění úkolu používáš nástroje.
 Před každou akcí nejprve proveď introspekci ohledně dosavadního postupu vzhledem k plánu.
 
 Plán, který máš následovat:
@@ -137,7 +137,7 @@ Dostupné nástroje:
     def _generate_plan(self, user_text: str) -> List[str]:
         """Vygeneruje plán kroků pro zadaný úkol."""
         prompt = (
-            f"Jsi JARVIS Plánovač. Rozděl úkol: '{user_text}' na 2 až 4 konkrétní kroky pro nástroje.\n"
+            f"Jsi E.V. Plánovač. Rozděl úkol: '{user_text}' na 2 až 4 konkrétní kroky pro nástroje.\n"
             "Vrať pouze JSON pole řetězců, např. [\"krok 1\", \"krok 2\"]. Nic jiného nevypisuj."
         )
         try:
@@ -323,7 +323,7 @@ Dostupné nástroje:
             on_step(f"[Plan] Plán: " + " → ".join(plan))
 
         system_msg = (
-            "Jsi JARVIS, AI asistent. Používáš nástroje k splnění úkolů. "
+            "Jsi E.V., AI asistent. Používáš nástroje k splnění úkolů. "
             "Komunikuješ česky. Když máš výsledek, odpověz přímo.\n"
             f"Plán, který máš následovat:\n{plan_text}\n"
             "Před každým voláním nástroje (tool call) nejprve napiš do textového obsahu (content) zprávu ve formátu:\n"

@@ -1,5 +1,5 @@
 """
-vision_v2.py — JARVIS Vision v2
+vision_v2.py — E.V. Vision v2
 
 Layers:
   1. RealTimeScreenMonitor  — kontinuální zachytávání obrazovky, detekce změn

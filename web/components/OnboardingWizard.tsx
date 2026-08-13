@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 
-const STORAGE_KEY = 'jarvis-onboarding-v1'
+const STORAGE_KEY = 'ev-onboarding-v1'
 
 type Step = { id: string; label: string; ok: boolean | null; hint: string }
 
@@ -61,7 +61,7 @@ export default function OnboardingWizard() {
       style={{ background: 'rgba(10,11,16,.85)', backdropFilter: 'blur(10px)' }}>
       <div className="w-full max-w-md rounded-2xl glass-panel p-6 anim-slide-up"
         style={{ boxShadow: '0 24px 64px rgba(0,0,0,.5)' }}>
-        <h2 className="font-display text-lg font-semibold mb-1">Vítej v JARVIS</h2>
+        <h2 className="font-display text-lg font-semibold mb-1">Vítej v E.V.</h2>
         <p className="text-sm mb-5" style={{ color: 'var(--muted)' }}>
           Rychlá kontrola prostředí — můžeš přeskočit a doladit později v Nastavení.
         </p>

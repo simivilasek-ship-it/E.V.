@@ -121,7 +121,7 @@ export default function MissionPanel() {
         <textarea
           value={description}
           onChange={e => setDescription(e.target.value)}
-          placeholder="Popis — co má JARVIS dlouhodobě splnit"
+          placeholder="Popis — co má E.V. dlouhodobě splnit"
           rows={3}
           className="text-sm px-3 py-2 rounded-lg font-mono w-full resize-y"
           style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--border)', color: 'var(--text)' }}

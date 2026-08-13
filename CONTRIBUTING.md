@@ -1,9 +1,9 @@
-# Contributing to JARVIS
+# Contributing to E.V.
 
 ## Quick start for contributors
 
 ```bash
-git clone https://github.com/simivilasek-ship-it/Jarvis.git && cd Jarvis
+git clone https://github.com/simivilasek-ship-it/E.V..git && cd E.V.
 ./install.sh
 source venv/bin/activate
 pytest tests/ -x -q  # run tests

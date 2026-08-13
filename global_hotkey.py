@@ -1,5 +1,5 @@
 """
-JARVIS Global Hotkey — Alt+Space kdekoliv v OS vyvolá quick input.
+E.V. Global Hotkey — Alt+Space kdekoliv v OS vyvolá quick input.
 Funguje na Linuxu přes pynput nebo keyboard lib.
 Opt-in: pokud lib chybí, molly gracefully.
 """

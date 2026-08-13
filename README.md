@@ -1,21 +1,21 @@
 <div align="center">
 
-<img src="jarvis.png" width="90" alt="JARVIS" />
+<img src="jarvis.png" width="90" alt="E.V." />
 
-# JARVIS
+# E.V.
 
 **Local AI assistant for Linux — chat, system commands, and optional autonomous control.**
 
-> **Why JARVIS exists:** Your desktop already knows which window is active, what's eating RAM, and which apps are open — but cloud assistants don't. JARVIS runs on your machine, turns that live context into answers and actions, and keeps everyday commands on a sub-millisecond local router so you are not sending your screen to someone else's API.
+> **Why E.V. exists:** Your desktop already knows which window is active, what's eating RAM, and which apps are open — but cloud assistants don't. E.V. runs on your machine, turns that live context into answers and actions, and keeps everyday commands on a sub-millisecond local router so you are not sending your screen to someone else's API.
 
 <br/>
 
-[![CI](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/Jarvis/actions/workflows/test.yml)
-[![Version](https://img.shields.io/badge/version-5.19.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![CI](https://github.com/simivilasek-ship-it/E.V./actions/workflows/test.yml/badge.svg)](https://github.com/simivilasek-ship-it/E.V./actions/workflows/test.yml)
+[![Version](https://img.shields.io/badge/version-5.19.0-6366f1?style=flat-square)](https://github.com/simivilasek-ship-it/E.V.)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3b82f6?style=flat-square)](https://python.org)
 [![Linux-first](https://img.shields.io/badge/Linux--first-22c55e?style=flat-square&logo=linux&logoColor=white)](#linux-out-of-the-box)
 [![License](https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-730%2B%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/Jarvis)
+[![Tests](https://img.shields.io/badge/tests-730%2B%20passing-22d3a5?style=flat-square)](https://github.com/simivilasek-ship-it/E.V.)
 
 </div>
 
@@ -24,8 +24,8 @@
 ## Quickstart
 
 ```bash
-git clone https://github.com/simivilasek-ship-it/Jarvis.git
-cd Jarvis
+git clone https://github.com/simivilasek-ship-it/E.V..git
+cd E.V.
 ./start.sh
 ```
 
@@ -82,7 +82,7 @@ echo "GROQ_API_KEY=gsk_..." >> .env
 
 ## Who is it for
 
-| You are… | JARVIS gives you… |
+| You are… | E.V. gives you… |
 |----------|-------------------|
 | **Linux daily driver** | Czech/English chat, open apps, weather, hardware info — no ChatGPT tab, no copy-paste |
 | **Developer on local-first** | Ollama + optional Groq, agent graph for multi-step tasks, MCP/plugins when you need them |
@@ -104,13 +104,13 @@ Not for you if you want a hosted SaaS with zero setup, or if you need polished W
   <tr>
     <td width="50%">
       <a href="docs/dashboard.jpg">
-        <img src="docs/dashboard.jpg" alt="JARVIS dashboard — chat, quick actions, live PC context" width="100%"/>
+        <img src="docs/dashboard.jpg" alt="E.V. dashboard — chat, quick actions, live PC context" width="100%"/>
       </a>
       <br/><sub><b>Dashboard</b> — chat, rychlé akce, živý kontext PC</sub>
     </td>
     <td width="50%">
       <a href="docs/demo.gif">
-        <img src="docs/demo.gif" alt="JARVIS demo — agent graph and PC overview" width="100%"/>
+        <img src="docs/demo.gif" alt="E.V. demo — agent graph and PC overview" width="100%"/>
       </a>
       <br/><sub><b>Agent flow</b> — multi-step task v reálném čase</sub>
     </td>
@@ -128,7 +128,7 @@ Not for you if you want a hosted SaaS with zero setup, or if you need polished W
 You:    "Open Chrome, research the best Python async libraries,
          summarize findings, and save a note."
 
-JARVIS: Opening Chrome...                      ✓  0.3s
+E.V.: Opening Chrome...                      ✓  0.3s
         Searching: best Python async libraries ✓  1.8s
         Reading top 5 results...               ✓  4.2s
         Summarizing with Groq LLaMA 3.3...     ✓  5.1s
@@ -165,7 +165,7 @@ JARVIS: Opening Chrome...                      ✓  0.3s
 
 ## Linux out of the box
 
-> **Linux-first:** JARVIS is developed and tested primarily on Linux (Ubuntu/Debian). macOS and Windows support exists but is less complete.
+> **Linux-first:** E.V. is developed and tested primarily on Linux (Ubuntu/Debian). macOS and Windows support exists but is less complete.
 
 After `./install.sh` and `python3 dashboard.py`, these work **without extra configuration**:
 
@@ -186,7 +186,7 @@ After `./install.sh` and `python3 dashboard.py`, these work **without extra conf
 | **Voice input (Whisper)** | Whisper model download on first use; mic permissions |
 | **Background workers** | `.env` tokens for Slack, email (IMAP), GitHub, calendar |
 | **Screen / UI automation** | Opt-in: `computer_use_enabled=true` in `config.json` (AT-SPI on Linux) |
-| **LAN dashboard access** | `JARVIS_BIND_HOST=0.0.0.0` + `JARVIS_API_AUTH_REQUIRED=1` + token |
+| **LAN dashboard access** | `E.V._BIND_HOST=0.0.0.0` + `E.V._API_AUTH_REQUIRED=1` + token |
 
 API binds to **`127.0.0.1` by default** — not exposed on your network unless you change it.
 
@@ -196,7 +196,7 @@ API binds to **`127.0.0.1` by default** — not exposed on your network unless y
 
 ### 1 · Optional PC automation (opt-in)
 
-With **`computer_use_enabled`** and vision sandbox, JARVIS can preview and execute UI actions — OCR first, vision model fallback. This is **disabled by default**; enable only when you need it.
+With **`computer_use_enabled`** and vision sandbox, E.V. can preview and execute UI actions — OCR first, vision model fallback. This is **disabled by default**; enable only when you need it.
 
 ```python
 # Requires computer_use_enabled + vision sandbox approval
@@ -249,7 +249,7 @@ One chat, three automatic modes:
 | **Action** | OS commands (regex router, &lt;1 ms) | *"Open Firefox"*, *"Screenshot"*, *"Weather in Prague"*, *"What time is it?"* |
 | **Agent** | Multi-step tasks (needs LLM) | *"Find X and save a note"*, *"Check repo and summarize"* |
 
-JARVIS injects **live PC context** — active window, open apps, CPU/RAM/disk — into Copilot replies when available.
+E.V. injects **live PC context** — active window, open apps, CPU/RAM/disk — into Copilot replies when available.
 
 ```bash
 "PC overview"          # system snapshot + windows + top processes
@@ -277,7 +277,7 @@ RAM: **~34 MB** idle backend · **~650 MB+** with Ollama loaded · runs on any m
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    JARVIS v5.16                      │
+│                    E.V. v5.16                      │
 │                                                     │
 │  ┌──────────┐    ┌─────────────┐    ┌───────────┐  │
 │  │ Next.js  │◄──►│  FastAPI    │◄──►│  Ollama   │  │
@@ -335,14 +335,14 @@ Light theme (`data-theme="light"`) works across **all** panels.
 
 ## Security
 
-- API listens on **`127.0.0.1` by default** — override with `JARVIS_BIND_HOST` only if you need LAN access
-- When binding to `0.0.0.0`, set **`JARVIS_API_AUTH_REQUIRED=1`** and a strong `JARVIS_API_TOKEN`
+- API listens on **`127.0.0.1` by default** — override with `E.V._BIND_HOST` only if you need LAN access
+- When binding to `0.0.0.0`, set **`E.V._API_AUTH_REQUIRED=1`** and a strong `E.V._API_TOKEN`
 - Shell commands go through a **blacklist** (`rm -rf /`, `dd`, reverse shells, fork bombs — always blocked)
 - Agent actions require **permission levels** — destructive ops need user confirmation
 - **Web UI confirmation modal** — when the browser is connected, ELEVATED actions wait for approve/deny (`/ws/confirm`)
 - Every action is **audit-logged** to `~/.jarvis_audit.jsonl`
-- Headless/CI without web client blocks `ELEVATED` by default (opt-in: `JARVIS_HEADLESS_APPROVE_ELEVATED=1`)
-- **Docker:** `docker-compose.yml` enables API auth by default — set `JARVIS_API_TOKEN` in `.env`
+- Headless/CI without web client blocks `ELEVATED` by default (opt-in: `E.V._HEADLESS_APPROVE_ELEVATED=1`)
+- **Docker:** `docker-compose.yml` enables API auth by default — set `E.V._API_TOKEN` in `.env`
 - **Docker hardening** — `cap_drop: ALL`, `no-new-privileges`, tmpfs for `/tmp`, memory + CPU limits
 - **Token generator** — `python scripts/generate_token.py --write` creates a cryptographically secure API token
 - **systemd isolation** — service loads secrets from `~/.config/jarvis/.env` (not the project root)

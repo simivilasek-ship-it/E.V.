@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useJarvis } from '@/store/jarvis'
+import { useEV } from '@/store/ev'
 import { apiUrl } from '@/lib/api'
 
 const STEP_COLORS: Record<string, string> = {
@@ -150,7 +150,7 @@ function RunCard({ run }: RunCardProps) {
 }
 
 export default function AgentTimeline() {
-  const logs = useJarvis((s: { logs: Array<{ text?: string }> }) => s.logs)
+  const logs = useEV((s: { logs: Array<{ text?: string }> }) => s.logs)
   const [runs, setRuns] = useState<Run[]>([])
   const [live, setLive] = useState<Run | null>(null)  // probíhající run
 

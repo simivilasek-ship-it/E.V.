@@ -1,5 +1,5 @@
 """
-JARVIS — Web Dashboard (backward-compatible entrypoint).
+E.V. — Web Dashboard (backward-compatible entrypoint).
 
 Implementation lives in src/api/.
 """

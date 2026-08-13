@@ -1,7 +1,7 @@
 """
 memory_graph.py
 
-Lightweight SQLite-backed graph store for JARVIS (MVP).
+Lightweight SQLite-backed graph store for E.V. (MVP).
 Stores entities and relations (triplets) with timestamps, source and confidence.
 Provides simple embedding stub + fuzzy name resolution.
 """

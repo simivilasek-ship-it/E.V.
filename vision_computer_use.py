@@ -1,6 +1,6 @@
 """
-JARVIS — Vision-Guided Computer Use
-Umožňuje JARVISovi „vidět" obrazovku a ovládat UI jako člověk:
+E.V. — Vision-Guided Computer Use
+Umožňuje E.V. „vidět" obrazovku a ovládat UI jako člověk:
   screenshot → vision model (LLaVA / Qwen2-VL) → souřadnice → pyautogui akce
 
 Použití:

@@ -1,5 +1,5 @@
 """
-JARVIS — Graf agenta (LangGraph styl)
+E.V. — Graf agenta (LangGraph styl)
 Stavový graf se 4 uzly: Planner → Router → Executor → Critic.
 
 Výhody oproti lineárnímu ReAct:
@@ -96,7 +96,7 @@ class AgentState:
 # ── Systémové prompty uzlů ────────────────────────────────────────
 
 _PLANNER_PROMPT = """\
-Jsi JARVIS plánovač. Rozděl úkol na 2–5 konkrétních kroků.
+Jsi E.V. plánovač. Rozděl úkol na 2–5 konkrétních kroků.
 
 Vrať POUZE JSON pole kroků, nic jiného:
 ["krok 1", "krok 2", "krok 3"]
@@ -106,7 +106,7 @@ Maximálně 5 kroků. Žádné vysvětlování.
 """
 
 _ROUTER_PROMPT = """\
-Jsi JARVIS router. Rozhodneš co udělat s aktuálním krokem.
+Jsi E.V. router. Rozhodneš co udělat s aktuálním krokem.
 
 Dostupné nástroje:
 {tools}
@@ -125,7 +125,7 @@ Nic jiného nevypisuj.
 """
 
 _CRITIC_PROMPT = """\
-Jsi JARVIS kritik. Zhodnoť výsledek nástroje.
+Jsi E.V. kritik. Zhodnoť výsledek nástroje.
 
 Krok: {step}
 Výsledek: {result}
@@ -328,7 +328,7 @@ class AgentGraph:
         )
         raw = self._llm([
             {"role": "system", "content":
-                "Jsi JARVIS. Shrň výsledky provedených kroků do jedné stručné české věty."},
+                "Jsi E.V.. Shrň výsledky provedených kroků do jedné stručné české věty."},
             {"role": "user", "content":
                 f"Úkol: {state.task}\n\nVýsledky kroků:\n{obs_text}"},
         ])

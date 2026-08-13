@@ -1,4 +1,4 @@
-"""JARVIS CLI subcommands — `jarvis log --today`."""
+"""E.V. CLI subcommands — `jarvis log --today`."""
 from __future__ import annotations
 
 import argparse
@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
 
 def _format_summary_markdown(data: dict) -> str:
-    lines = [f"# JARVIS — přehled {data.get('date', date.today().isoformat())}", ""]
+    lines = [f"# E.V. — přehled {data.get('date', date.today().isoformat())}", ""]
     for item in data.get("summary") or []:
         lines.append(f"- {item}")
     if not data.get("summary"):
@@ -96,10 +96,10 @@ def cmd_log(argv: list[str] | None = None) -> int:
 
 
 def cmd_briefing(argv: list[str] | None = None) -> int:
-    """Send the JARVIS morning briefing immediately."""
+    """Send the E.V. morning briefing immediately."""
     import argparse
 
-    parser = argparse.ArgumentParser(prog="jarvis briefing", description="JARVIS ranní přehled")
+    parser = argparse.ArgumentParser(prog="jarvis briefing", description="E.V. ranní přehled")
     parser.add_argument(
         "--schedule",
         metavar="HH:MM",
@@ -132,7 +132,7 @@ def cmd_release(argv: list[str] | None = None) -> int:
     from pathlib import Path
     from datetime import date
 
-    parser = argparse.ArgumentParser(prog="jarvis release", description="JARVIS release assistant")
+    parser = argparse.ArgumentParser(prog="jarvis release", description="E.V. release assistant")
     parser.add_argument("--bump", choices=["patch", "minor", "major"], default="patch")
     parser.add_argument("--dry-run", action="store_true", help="Show what would change, don't write")
     parser.add_argument("--push", action="store_true", help="git tag + push after release")
@@ -297,7 +297,7 @@ def cmd_release(argv: list[str] | None = None) -> int:
         f"[x] CHANGELOG.md updated",
         "[ ] pytest tests/ test_jarvis.py -q",
         "[ ] cd web && npm run build",
-        f"[ ] git tag -a v{nv} -m 'JARVIS v{nv}'",
+        f"[ ] git tag -a v{nv} -m 'E.V. v{nv}'",
         f"[ ] git push origin main && git push origin v{nv}",
     ]
     for c in checks:
@@ -316,17 +316,17 @@ def cmd_release(argv: list[str] | None = None) -> int:
             ["git", "commit", "-m", f"chore: bump version to {nv}"],
             cwd=root, check=True,
         )
-        subprocess.run(["git", "tag", "-a", f"v{nv}", "-m", f"JARVIS v{nv}"], cwd=root, check=True)
+        subprocess.run(["git", "tag", "-a", f"v{nv}", "-m", f"E.V. v{nv}"], cwd=root, check=True)
         subprocess.run(["git", "push", "origin", "main"], cwd=root, check=True)
         subprocess.run(["git", "push", "origin", f"v{nv}"], cwd=root, check=True)
         print(f"  ✓ Pushed v{nv}")
 
-    print(f"\n✓ Release v{nv} prepared. Run tests, then: git tag -a v{nv} -m 'JARVIS v{nv}' && git push origin main v{nv}")
+    print(f"\n✓ Release v{nv} prepared. Run tests, then: git tag -a v{nv} -m 'E.V. v{nv}' && git push origin main v{nv}")
     return 0
 
 
 def cmd_config_validate(argv: list[str] | None = None) -> int:
-    """Validate JARVIS config.json with the Pydantic schema."""
+    """Validate E.V. config.json with the Pydantic schema."""
     import argparse
     import json
     import os
@@ -334,7 +334,7 @@ def cmd_config_validate(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(
         prog="jarvis config validate",
-        description="Validate JARVIS config.json against the Pydantic schema.",
+        description="Validate E.V. config.json against the Pydantic schema.",
     )
     parser.add_argument(
         "--path", type=str, default="",

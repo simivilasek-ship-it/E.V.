@@ -81,7 +81,7 @@ export default function SkillGenerator() {
 
   return (
     <div style={{ fontFamily: 'IBM Plex Mono, monospace', color: 'var(--text)' }}>
-      <div style={S.title}>AUTO-SKILL GENERATION — napiš co má plugin dělat, JARVIS napíše kód</div>
+      <div style={S.title}>AUTO-SKILL GENERATION — napiš co má plugin dělat, E.V. napíše kód</div>
 
       {/* Prompt */}
       <div style={S.card}>

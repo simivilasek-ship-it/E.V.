@@ -1,4 +1,4 @@
-# Konfigurace JARVIS v5.12
+# Konfigurace E.V. v5.12
 
 Konfigurace se načítá v pořadí: `DEFAULT_CONFIG` → `config.json` → `.env` (nejvyšší priorita).
 
@@ -70,7 +70,7 @@ UI: panel **Mise** (Alt+M)
 | Klíč / Env | Výchozí | Popis |
 |------------|---------|-------|
 | `audio_ws_enabled` | `true` | WebSocket `/ws/audio` pro VAD/duplex |
-| `JARVIS_HEADLESS_APPROVE_ELEVATED` | *(unset)* | Opt-in auto-schválení ELEVATED v headless bez web UI |
+| `E.V._HEADLESS_APPROVE_ELEVATED` | *(unset)* | Opt-in auto-schválení ELEVATED v headless bez web UI |
 
 Pokud je otevřený web dashboard, nebezpečné akce čekají na modal v prohlížeči (`/ws/confirm`).
 
@@ -217,7 +217,7 @@ Pokud je otevřený web dashboard, nebezpečné akce čekají na modal v prohlí
 ```bash
 # Ve výchozím nastavení jsou ELEVATED akce v headless režimu ZAMÍTNUTY.
 # Pro povolení (jen na důvěryhodných serverech):
-export JARVIS_HEADLESS_APPROVE_ELEVATED=1
+export E.V._HEADLESS_APPROVE_ELEVATED=1
 ```
 
 ---

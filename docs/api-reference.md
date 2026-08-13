@@ -1,4 +1,4 @@
-# API Reference — JARVIS v5.12
+# API Reference — E.V. v5.12
 
 Backend běží na `http://localhost:8002`. Všechny endpointy vrací JSON pokud není uvedeno jinak.
 
@@ -77,7 +77,7 @@ Aktuální systémové metriky (CPU, RAM, GPU, disk, síť).
 
 ### `GET /api/status`
 
-Detailní status všech JARVIS subsystémů.
+Detailní status všech E.V. subsystémů.
 
 **Response:**
 ```json
@@ -446,12 +446,12 @@ Pořídí screenshot a spustí OCR + UI element analýzu.
 **Response:**
 ```json
 {
-  "ocr_text": "Visual Studio Code\nFile Edit Selection View...\nclass JarvisMemory:",
+  "ocr_text": "Visual Studio Code\nFile Edit Selection View...\nclass E.V.Memory:",
   "active_app": "code",
   "ui_elements": [
     { "role": "button", "name": "File",    "x": 42,  "y": 28 },
     { "role": "input",  "name": "",        "x": 400, "y": 28 },
-    { "role": "label",  "name": "JARVIS",  "x": 120, "y": 380 }
+    { "role": "label",  "name": "E.V.",  "x": 120, "y": 380 }
   ],
   "clickable_count": 47
 }
@@ -473,7 +473,7 @@ Katalog všech dostupných pluginů.
       "id": "calculator",
       "name": "calculator",
       "description": "Rozšířená kalkulačka s historií výpočtů",
-      "author": "JARVIS team",
+      "author": "E.V. team",
       "version": "2.1.0",
       "rating": 4.8,
       "reviews": 12,
@@ -495,7 +495,7 @@ Nainstaluje plugin z registru nebo GitHub.
 
 **Response:**
 ```json
-{ "ok": true, "message": "Plugin 'calculator' nainstalován. Restartuj JARVIS pro aktivaci." }
+{ "ok": true, "message": "Plugin 'calculator' nainstalován. Restartuj E.V. pro aktivaci." }
 ```
 
 ---
@@ -620,7 +620,7 @@ Odešle desktopovou notifikaci.
 **Request:**
 ```json
 {
-  "title": "JARVIS",
+  "title": "E.V.",
   "body": "Úkol dokončen",
   "urgency": "normal"
 }
@@ -640,10 +640,10 @@ Dnešní události + agregovaný přehled.
 ```json
 {
   "events": [
-    { "id": "abc", "type": "git.commit", "title": "feat: timeline", "project": "Jarvis", "ts": 1748901234 }
+    { "id": "abc", "type": "git.commit", "title": "feat: timeline", "project": "E.V.", "ts": 1748901234 }
   ],
   "summary": {
-    "summary": ["4h práce na Jarvis", "7 commitů", "2 buildy selhaly"],
+    "summary": ["4h práce na E.V.", "7 commitů", "2 buildy selhaly"],
     "commits": 7,
     "builds_failed": 2,
     "total_hours": 4.0
@@ -661,7 +661,7 @@ Přirozený dotaz o aktivitě.
 
 ```
 GET /api/activity/query?q=Co%20jsem%20d%C4%9Blal%20dnes%3F
-→ { "answer": "• 4h práce na Jarvis\n• 7 commitů", "data": {...} }
+→ { "answer": "• 4h práce na E.V.\n• 7 commitů", "data": {...} }
 ```
 
 ### `GET /api/workspace`

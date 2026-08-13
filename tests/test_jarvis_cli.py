@@ -15,4 +15,4 @@ def test_log_markdown(capsys):
     from jarvis_cli import cmd_log
     assert cmd_log(["--markdown", "--today"]) == 0
     out = capsys.readouterr().out
-    assert "# JARVIS" in out or "Žádná" in out or "aktivita" in out.lower()
+    assert "# E.V." in out or "Žádná" in out or "aktivita" in out.lower()

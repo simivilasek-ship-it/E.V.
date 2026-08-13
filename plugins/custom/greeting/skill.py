@@ -1,4 +1,4 @@
-"""JARVIS Skill — Přivítání"""
+"""E.V. Skill — Přivítání"""
 import re
 import random
 from datetime import datetime

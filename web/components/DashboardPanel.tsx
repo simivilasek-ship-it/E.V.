@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { useJarvis } from '@/store/jarvis'
+import { useEV } from '@/store/ev'
 import { apiUrl } from '@/lib/api'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -69,8 +69,8 @@ function AgentBadge({ name, status }: { name: string; status: string }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────
 export default function DashboardPanel() {
-  const system  = useJarvis(s => s.system)
-  const agents  = useJarvis(s => s.agents)
+  const system  = useEV(s => s.system)
+  const agents  = useEV(s => s.agents)
 
   const [data, setData]       = useState<DashData>({})
   const [loading, setLoading] = useState(true)

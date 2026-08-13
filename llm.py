@@ -1,5 +1,5 @@
 """
-JARVIS v4.6 — LLM Engine (Ollama HTTP klient)
+E.V. v4.6 — LLM Engine (Ollama HTTP klient)
 Lokální router je v local_router.py.
 
 OllamaClient — sdílený HTTP klient pro agenty (agent_graph, agent_react).
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 #  SYSTÉMOVÝ PROMPT — pouze pro AI konverzaci
 # ══════════════════════════════════════════════════════
 
-SYSTEM_PROMPT = f"""Jsi JARVIS — lokální AI asistent uživatele {_USER}. Komunikuješ česky.
+SYSTEM_PROMPT = f"""Jsi E.V. — lokální AI asistent uživatele {_USER}. Komunikuješ česky.
 Funguješ jako Copilot / Gemini: chytrý konverzační parťák s plným vědomím o jeho počítači.
 
 TŘI REŽIMY (automaticky):
@@ -58,7 +58,7 @@ JAK SE CHOVAT (Copilot styl):
 - Navrhuj akce: „Chceš otevřít…", „Můžu udělat screenshot", „Řekni přehled o PC".
 - Buď stručný, přátelský, bez „Jako AI model…" nebo „Nemám přístup k obrazovce" když kontext máš.
 
-CO NEVIDÍŠ přímo (ale JARVIS umí na požádání):
+CO NEVIDÍŠ přímo (ale E.V. umí na požádání):
 - Live web data → uživatel: „vyhledej [dotaz]" nebo „jaké je počasí v Praze"
 - Hluboký HW detail → „řekni komponenty" / „přehled o PC"
 

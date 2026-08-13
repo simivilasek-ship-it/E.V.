@@ -1,5 +1,5 @@
 """
-JARVIS v3.0 — Wake word detektor
+E.V. v3.0 — Wake word detektor
 Detekuje klíčové slovo "JARVISe" pro probuzení asistenta.
 
 Používá porpoise (lehký) nebo fallback na SpeechRecognition.

@@ -1,5 +1,5 @@
 """
-JARVIS Document Ingestion — PDF, DOCX, TXT extraction for RAG.
+E.V. Document Ingestion — PDF, DOCX, TXT extraction for RAG.
 Usage: from src.doc_ingestion import ingest_file, query_docs
 """
 from __future__ import annotations

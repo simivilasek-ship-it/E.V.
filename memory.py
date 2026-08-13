@@ -1,6 +1,6 @@
 """
-JARVIS v4.4 — Neural Memory System + Daily Summarizer
-Integrovaný brain-inspired memory layer pro JARVIS.
+E.V. v4.4 — Neural Memory System + Daily Summarizer
+Integrovaný brain-inspired memory layer pro E.V..
 DailySummarizer extrahuje fakta z dnešních konverzací a ukládá do UserProfile.
 """
 
@@ -547,7 +547,7 @@ class ProceduralMemory:
 
 
 # ??????????????????????????????????????????????????????
-#  JARVIS MEMORY (unifikovaná fasáda)
+#  E.V. MEMORY (unifikovaná fasáda)
 # ??????????????????????????????????????????????????????
 
 def _extract_entities_simple(text: str) -> list[tuple[str, str, str]]:
@@ -597,7 +597,7 @@ def _extract_entities_simple(text: str) -> list[tuple[str, str, str]]:
 
 class JarvisMemory:
     """
-    Paměťová fasáda pro JARVIS.
+    Paměťová fasáda pro E.V..
     Preferuje neural-ai-memory pokud je nainstalovaná,
     jinak používá vestavěný JSON store (vždy funkční).
     """
@@ -1223,7 +1223,7 @@ class ConversationSummarizer:
         # Sestav kontext pro sumarizaci
         context = "\n".join(m.get("content", "")[:200] for m in old_memories)
 
-        prompt = f"""Toto jsou starší konverzace s uživatelem JARVIS asistenta.
+        prompt = f"""Toto jsou starší konverzace s uživatelem E.V. asistenta.
 Vytvoř stručný souhrn klíčových faktů o uživateli (max 5 vět):
 
 {context}

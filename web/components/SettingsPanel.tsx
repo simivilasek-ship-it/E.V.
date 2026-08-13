@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { useJarvis } from '@/store/jarvis'
+import { useEV } from '@/store/ev'
 import { apiUrl } from '@/lib/api'
 import AuditLogPanel from '@/components/AuditLogPanel'
 
@@ -160,7 +160,7 @@ function SaveButton({ onClick, loading }: { onClick: () => void; loading: boolea
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function SettingsPanel() {
-  const addToast = useJarvis(s => s.addToast)
+  const addToast = useEV(s => s.addToast)
 
   const [settings, setSettings] = useState<Settings>({
     model: '',
@@ -722,7 +722,7 @@ export default function SettingsPanel() {
       <Section title="API Token">
         <div className="flex flex-col gap-2">
           <span className="text-xs" style={{ color: 'var(--muted)' }}>
-            Vygeneruj bezpečný API token pro JARVIS_API_TOKEN v .env souboru
+            Vygeneruj bezpečný API token pro E.V._API_TOKEN v .env souboru
           </span>
           <button
             onClick={async () => {

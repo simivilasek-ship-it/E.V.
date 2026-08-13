@@ -1,5 +1,5 @@
 """
-JARVIS Skill — Plugin Marketplace
+E.V. Skill — Plugin Marketplace
 Instalace, seznam a správa pluginů z GitHubu.
 
 Příkazy:

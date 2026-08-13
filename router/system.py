@@ -1,5 +1,5 @@
 """
-JARVIS router — system and file routing.
+E.V. router — system and file routing.
 Handles system info, shutdown/restart, disk, network, weather, timers, file
 operations, search, MCP tools, and misc utilities.
 """

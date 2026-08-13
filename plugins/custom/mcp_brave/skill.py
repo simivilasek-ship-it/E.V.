@@ -1,5 +1,5 @@
 """
-JARVIS Skill — MCP Brave Search
+E.V. Skill — MCP Brave Search
 Vyhledávání přes Brave Search API skrze MCP server.
 Vrací skutečné výsledky přímo do chatu — ne jen otevření prohlížeče.
 

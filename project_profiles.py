@@ -1,5 +1,5 @@
 """
-JARVIS Project Profiles
+E.V. Project Profiles
 Auto-detects current git repository and returns project-specific context.
 """
 from __future__ import annotations

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-JARVIS v3.0 — Unit testy
+E.V. v3.0 — Unit testy
 Spuštění: python test_jarvis.py
 Pokrývá: config, STT, TTS, LLM, Commands, LocalRouter,
          AsyncEngine, ErrorHandler, PluginManager

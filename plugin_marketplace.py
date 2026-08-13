@@ -1,5 +1,5 @@
 """
-JARVIS Plugin Marketplace
+E.V. Plugin Marketplace
 Stahování, seznam a správa pluginů z GitHub.
 
 Příkazy (přes LocalRouter):
@@ -24,14 +24,14 @@ logger = logging.getLogger(__name__)
 
 
 class PluginMarketplace:
-    # Registr vestavěných pluginů dodávaných s JARVIS.
+    # Registr vestavěných pluginů dodávaných s E.V..
     # Tyto pluginy jsou součástí repozitáře v plugins/builtin/ —
     # "instalace" jen zkopíruje složku do plugins/custom/.
     REGISTRY = {
         "hello-world": {
             "repo":        "simivilasek-ship-it/jarvis-plugin-hello",
             "description": "Ukázkový plugin — základ pro vlastní vývoj",
-            "author":      "JARVIS team",
+            "author":      "E.V. team",
             "version":     "1.0.0",
             "rating":      4.5,
             "downloads":   142,
@@ -41,7 +41,7 @@ class PluginMarketplace:
         "calculator": {
             "repo":        None,
             "description": "Rozšířená kalkulačka s historií výpočtů",
-            "author":      "JARVIS team",
+            "author":      "E.V. team",
             "version":     "2.1.0",
             "rating":      4.8,
             "downloads":   1024,
@@ -52,7 +52,7 @@ class PluginMarketplace:
         "timer": {
             "repo":        None,
             "description": "Časovač s hlasovým upozorněním",
-            "author":      "JARVIS team",
+            "author":      "E.V. team",
             "version":     "1.3.0",
             "rating":      4.7,
             "downloads":   856,
@@ -63,7 +63,7 @@ class PluginMarketplace:
         "clipboard": {
             "repo":        None,
             "description": "Správa schránky — kopírování, vkládání, historie",
-            "author":      "JARVIS team",
+            "author":      "E.V. team",
             "version":     "1.1.0",
             "rating":      4.6,
             "downloads":   634,
@@ -74,7 +74,7 @@ class PluginMarketplace:
         "greeting": {
             "repo":        None,
             "description": "Pozdravy a základní konverzace",
-            "author":      "JARVIS team",
+            "author":      "E.V. team",
             "version":     "1.0.0",
             "rating":      4.3,
             "downloads":   412,
@@ -85,7 +85,7 @@ class PluginMarketplace:
         "mcp-filesystem": {
             "repo":        None,
             "description": "MCP Filesystem — čtení souborů a adresářů",
-            "author":      "JARVIS team",
+            "author":      "E.V. team",
             "version":     "1.2.0",
             "rating":      4.9,
             "downloads":   789,
@@ -96,7 +96,7 @@ class PluginMarketplace:
         "mcp-brave": {
             "repo":        None,
             "description": "MCP Brave Search — webové vyhledávání (vyžaduje BRAVE_API_KEY)",
-            "author":      "JARVIS team",
+            "author":      "E.V. team",
             "version":     "1.1.0",
             "rating":      4.7,
             "downloads":   523,
@@ -193,7 +193,7 @@ class PluginMarketplace:
             src = Path(info["builtin_path"])
             if src.exists():
                 shutil.copytree(src, dest)
-                return f"Plugin '{name}' nainstalován (builtin). Restartuj JARVIS pro aktivaci."
+                return f"Plugin '{name}' nainstalován (builtin). Restartuj E.V. pro aktivaci."
             return f"Vestavěný plugin '{name}' nebyl nalezen v {src}."
 
         # If this is an MCP plugin and auto-install is enabled, use mcp_installer
@@ -209,7 +209,7 @@ class PluginMarketplace:
                 r.raise_for_status()
                 plan = install_from_zip_bytes(name, r.content)
                 if plan.get("ok"):
-                    return f"MCP server '{name}' nainstalován do {plan.get('path')}. Restartuj JARVIS pro aktivaci."
+                    return f"MCP server '{name}' nainstalován do {plan.get('path')}. Restartuj E.V. pro aktivaci."
                 return f"MCP instalace selhala: {plan.get('error')}"
             except Exception as e:
                 return f"MCP instalace se nepovedla: {e}"
@@ -246,7 +246,7 @@ class PluginMarketplace:
             except Exception:
                 pass
 
-            return f"Plugin '{name}' nainstalován. Restartuj JARVIS pro aktivaci."
+            return f"Plugin '{name}' nainstalován. Restartuj E.V. pro aktivaci."
         except Exception as e:
             if dest.exists():
                 shutil.rmtree(dest, ignore_errors=True)
@@ -403,7 +403,7 @@ class PluginMarketplace:
                             from config import CONFIG
                             names = ", ".join(updates.keys())
                             get_notification_engine(CONFIG).notify(
-                                title="JARVIS Marketplace",
+                                title="E.V. Marketplace",
                                 body=f"Dostupné aktualizace: {names}",
                                 urgency="low",
                             )

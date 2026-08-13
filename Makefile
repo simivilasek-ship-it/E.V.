@@ -3,9 +3,9 @@
 # Výchozí cíl
 help:
 	@echo ""
-	@echo "  JARVIS — příkazy"
+	@echo "  E.V. — příkazy"
 	@echo ""
-	@echo "  make start    — spustit JARVIS (nainstaluje vše pokud chybí)"
+	@echo "  make start    — spustit E.V. (nainstaluje vše pokud chybí)"
 	@echo "  make install  — pouze instalace"
 	@echo "  make update   — git pull + reinstall závislostí"
 	@echo "  make stop     — zastavit běžící server"
@@ -50,7 +50,7 @@ release:
 	git tag "v$$VERSION" 2>/dev/null || echo "Tag already exists"; \
 	git push origin main --tags; \
 	gh release create "v$$VERSION" \
-	  --title "JARVIS v$$VERSION" \
+	  --title "E.V. v$$VERSION" \
 	  --notes-file <(grep -A 50 "\[$$VERSION\]" CHANGELOG.md | head -51) \
 	  2>/dev/null && echo "  ✓ GitHub Release v$$VERSION vytvořen" || \
 	  echo "  GitHub Release: run 'gh release create v$$VERSION' manually"

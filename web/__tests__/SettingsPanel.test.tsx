@@ -18,8 +18,8 @@ vi.mock('@/lib/audioDuplex', () => ({
 
 const mockAddToast = vi.fn()
 
-vi.mock('@/store/jarvis', () => ({
-  useJarvis: (selector: (s: Record<string, unknown>) => unknown) =>
+vi.mock('@/store/ev', () => ({
+  useEV: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({ addToast: mockAddToast }),
 }))
 

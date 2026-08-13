@@ -1,5 +1,5 @@
 """
-JARVIS Smart Notifications
+E.V. Smart Notifications
 - CPU/RAM/Disk alarmy
 - Připomínky (scheduled)
 - Systémové události

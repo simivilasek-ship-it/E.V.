@@ -1,5 +1,5 @@
 """
-JARVIS — Autonomous Background Workers
+E.V. — Autonomous Background Workers
 Periodicky monitoruje e-mail, git repozitáře, kalendář a Slack.
 Pokud detekuje důležitou událost, pošle proaktivní notifikaci uživateli.
 
@@ -39,7 +39,7 @@ class WorkerEvent:
     title: str
     body: str
     urgency: str = "low"   # low | medium | high
-    action_hint: str = ""  # co JARVIS může udělat
+    action_hint: str = ""  # co E.V. může udělat
 
 
 # ── Základní worker ───────────────────────────────────────────────────────────

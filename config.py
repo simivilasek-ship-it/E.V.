@@ -1,5 +1,5 @@
 """
-JARVIS — Konfigurace
+E.V. — Konfigurace
 Načítání a validace z .env, config.json s fallbackem na defaults
 """
 from __future__ import annotations
@@ -84,7 +84,7 @@ DEFAULT_CONFIG = {
     "mcp_result_limit": 32_000,   # max znaků z MCP nástroje před zkrácením
     # Nové MCP servery v4.5
     "mcp_github_enabled": True,             # vyžaduje GITHUB_TOKEN v .env
-    "mcp_sqlite_enabled": False,            # opt-in (JARVIS má vlastní memory API)
+    "mcp_sqlite_enabled": False,            # opt-in (E.V. má vlastní memory API)
     "mcp_youtube_transcript_enabled": True, # bez API klíče
     "mcp_everything_enabled": False,        # opt-in desktop search
     "mcp_google_maps_enabled": True,        # vyžaduje GOOGLE_MAPS_API_KEY v .env

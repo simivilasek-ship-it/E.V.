@@ -1,5 +1,5 @@
 """
-JARVIS Multi-Agent Role System
+E.V. Multi-Agent Role System
 4 specializované role: Planner, Researcher, Executor, Critic.
 Každá role má vlastní system prompt a specializaci.
 """

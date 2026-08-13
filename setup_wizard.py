@@ -1,5 +1,5 @@
 """
-JARVIS — Průvodce prvního spuštění
+E.V. — Průvodce prvního spuštění
 Spusť: python jarvis.py --setup   nebo   python setup_wizard.py
 """
 from __future__ import annotations
@@ -140,9 +140,9 @@ def save_config(cfg: dict):
 
 def run():
     print(f"\n{BOLD}{'='*50}")
-    print("  JARVIS — Průvodce prvního spuštění")
+    print("  E.V. — Průvodce prvního spuštění")
     print(f"{'='*50}{NC}")
-    print("  Zkontrolujeme závislosti a nastavíme JARVIS.")
+    print("  Zkontrolujeme závislosti a nastavíme E.V..")
     print("  Stiskni Enter pro přeskočení nebo zadej hodnotu.\n")
 
     issues = []
@@ -214,7 +214,7 @@ def run():
     hdr("Krok 4/4 — Wake word")
     current_ww = cfg.get("wake_word", "jarvis")
     print(f"  Aktuální wake word: '{current_ww}'")
-    print("  JARVIS se probudí když řekneš toto slovo.")
+    print("  E.V. se probudí když řekneš toto slovo.")
     ww = ask("Wake word", current_ww)
     cfg["wake_word"] = ww.lower().strip() or "jarvis"
     cfg["wake_word_enabled"] = ask("Zapnout wake word? (ano/ne)", "ano").lower() in ("ano", "a", "yes", "y", "1")
@@ -232,7 +232,7 @@ def run():
         for issue in issues:
             print(f"    - {issue}")
     print(f"""
-  Spuštění JARVIS:
+  Spuštění E.V.:
     {CYAN}source venv/bin/activate && python jarvis.py{NC}
 
   Web dashboard:
@@ -242,9 +242,9 @@ def run():
     README.md nebo https://github.com/simivilasek-ship-it/Jarvis
 """)
 
-    start = ask("Spustit JARVIS teď? (ano/ne)", "ano")
+    start = ask("Spustit E.V. teď? (ano/ne)", "ano")
     if start.lower() in ("ano", "a", "yes", "y", "1"):
-        print(f"\n  {GREEN}Spouštím JARVIS...{NC}\n")
+        print(f"\n  {GREEN}Spouštím E.V....{NC}\n")
         os.execv(sys.executable, [sys.executable, "jarvis.py"])
 
 

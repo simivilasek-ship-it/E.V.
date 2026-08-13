@@ -1,5 +1,5 @@
 """
-JARVIS — Activity Bridge
+E.V. — Activity Bridge
 Propojuje EventBus, ActivityStore, Agent Timeline a WebSocket feed.
 """
 
@@ -217,7 +217,7 @@ def add_proactive_suggestion(
         try:
             from notification_engine import Notification, send_desktop_notification
             send_desktop_notification(Notification(
-                title=f"JARVIS — {title}",
+                title=f"E.V. — {title}",
                 body=detail or title,
                 icon="dialog-warning" if severity == "warning" else "dialog-error",
                 urgent=severity in ("error", "critical"),

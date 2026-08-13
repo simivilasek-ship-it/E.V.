@@ -1,5 +1,5 @@
 """
-JARVIS — Routing pipeline
+E.V. — Routing pipeline
 Vyčleněno z app_core.py pro lepší čitelnost a testovatelnost.
 
 CommandRouter zpracovává příkaz v pořadí:
@@ -12,7 +12,7 @@ import logging
 from typing import TYPE_CHECKING, Callable, Optional, Tuple
 
 if TYPE_CHECKING:
-    from app_core import JarvisApp
+    from app_core import EVApp
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def _agent_plan_preview(text: str) -> str:
 class CommandRouter:
     """Zapouzdřuje routing logiku — nezávislá na GUI lifecycle."""
 
-    def __init__(self, app: "JarvisApp"):
+    def __init__(self, app: "EVApp"):
         self._app = app
 
     # ── Veřejné API ───────────────────────────────────

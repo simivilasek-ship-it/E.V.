@@ -1,6 +1,6 @@
 # Vision a Computer Use
 
-JARVIS umí vidět obrazovku a ovládat počítač jako člověk — klikat na tlačítka, vyplňovat formuláře, číst obsah aplikací.
+E.V. umí vidět obrazovku a ovládat počítač jako člověk — klikat na tlačítka, vyplňovat formuláře, číst obsah aplikací.
 
 ---
 
@@ -199,7 +199,7 @@ def on_screen_change(event):
 
 monitor.start(on_change=on_screen_change)
 
-# ... JARVIS běží ...
+# ... E.V. běží ...
 
 monitor.stop()
 ```
@@ -217,7 +217,7 @@ class ChangeEvent:
 
 ### Integrace s Proactive Engine
 
-RealTimeScreenMonitor je propojen s Proactive Engine — pokud se otevře nový soubor ve VS Code, JARVIS automaticky zkontroluje TODO/FIXME komentáře.
+RealTimeScreenMonitor je propojen s Proactive Engine — pokud se otevře nový soubor ve VS Code, E.V. automaticky zkontroluje TODO/FIXME komentáře.
 
 ---
 

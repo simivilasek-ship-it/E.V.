@@ -1,5 +1,5 @@
 """
-JARVIS — hlavní vstupní bod
+E.V. — hlavní vstupní bod
 Výchozí: spustí backend + otevře prohlížeč na http://localhost:8002/app
 """
 
@@ -41,7 +41,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(
         prog="jarvis",
-        description=f"JARVIS v{__version__} — lokální AI asistent",
+        description=f"E.V. v{__version__} — lokální AI asistent",
     )
     parser.add_argument("--gui",       action="store_true",
                         help="[LEGACY] Tkinter GUI (deprecated; výchozí je Next.js web UI na /app)")
@@ -54,7 +54,7 @@ def main():
     parser.add_argument("--setup",     action="store_true",
                         help="Průvodce prvního spuštění")
     parser.add_argument("--version",   action="version",
-                        version=f"JARVIS {__version__}")
+                        version=f"E.V. {__version__}")
     args = parser.parse_args()
 
     if args.setup:
@@ -71,7 +71,7 @@ def main():
         # --gui příznak ponechán pro zpětnou kompatibilitu,
         # ale Tkinter okno bylo nahrazeno headless backendem.
         # Použij výchozí launcher (Next.js + dashboard) pro webové UI.
-        print(f"JARVIS v{__version__} — příznak --gui je deprecated, spouštím headless backend.")
+        print(f"E.V. v{__version__} — příznak --gui je deprecated, spouštím headless backend.")
         print("Webové UI: http://localhost:8002/app  (spusť: cd web && npm run dev)")
         import dashboard
         dashboard.run()

@@ -1,5 +1,5 @@
 """
-JARVIS Demo Script
+E.V. Demo Script
 ==================
 Spusť tenhle script před natáčením dema.
 Připraví prostředí, ověří že vše běží a vytvoří demo soubory.
@@ -7,7 +7,7 @@ Připraví prostředí, ověří že vše běží a vytvoří demo soubory.
 Použití:
     python3 demo.py
 
-Pak spusť JARVIS a zadej příkaz:
+Pak spusť E.V. a zadej příkaz:
     "Open Chrome, research the best Python async libraries,
      summarize findings, and save a note."
 """
@@ -32,7 +32,7 @@ def check(label: str, fn) -> bool:
 
 def main():
     print(f"\n{SEP}")
-    print("  JARVIS Demo — kontrola prostředí")
+    print("  E.V. Demo — kontrola prostředí")
     print(f"{SEP}\n")
 
     ok = True
@@ -43,8 +43,8 @@ def main():
         .raise_for_status() or "online"
     ))
 
-    # 2. JARVIS backend běží?
-    ok &= check("JARVIS backend :8002", lambda: (
+    # 2. E.V. backend běží?
+    ok &= check("E.V. backend :8002", lambda: (
         __import__("requests").get("http://localhost:8002/health", timeout=3)
         .raise_for_status() or "online"
     ))
@@ -80,7 +80,7 @@ def main():
   "Open Chrome, research the best Python async libraries,
    summarize the top 3, and save a note to my notes folder."
 """)
-    print("  Co JARVIS udělá (~30 sekund):")
+    print("  Co E.V. udělá (~30 sekund):")
     print("""
   0.3s  → Otevře Chrome
   2.0s  → Vyhledá "best Python async libraries 2025"
@@ -93,10 +93,10 @@ def main():
     print("  TIPY PRO NATÁČENÍ:")
     print("""
   • Rozlišení: 1920×1080, tmavý režim
-  • Okno: JARVIS dashboard na levé straně, Chrome na pravé
+  • Okno: E.V. dashboard na levé straně, Chrome na pravé
   • OBS: zapni "Highlight mouse clicks"
   • Délka: 30–60 sekund, žádný střih — jeden záběr
-  • Thumbnail: "JARVIS controls Chrome" + GIF z Computer Use
+  • Thumbnail: "E.V. controls Chrome" + GIF z Computer Use
 """)
     print(f"{SEP}\n")
 

@@ -1,6 +1,6 @@
-# JARVIS Web UI (Next.js)
+# E.V. Web UI (Next.js)
 
-Jediný frontend pro JARVIS v5.9 — HUD dashboard napojený na FastAPI backend (`:8002`).
+Jediný frontend pro E.V. v5.9 — HUD dashboard napojený na FastAPI backend (`:8002`).
 
 > Legacy Vite stack (`web/src/`, `web_vite_backup/`) byl odstraněn v5.9. Všechny panely jsou v `web/components/`.
 

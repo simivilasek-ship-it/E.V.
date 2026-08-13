@@ -47,7 +47,7 @@ def test_save_and_load_roundtrip(llm_engine, tmp_path):
     history_path = tmp_path / "history.json"
 
     messages = [
-        {"role": "user",      "content": "Ahoj JARVIS"},
+        {"role": "user",      "content": "Ahoj E.V."},
         {"role": "assistant", "content": "Ahoj! Jak ti mohu pomoci?"},
         {"role": "user",      "content": "Kolik je hodin?"},
         {"role": "assistant", "content": "Nevím přesný čas."},

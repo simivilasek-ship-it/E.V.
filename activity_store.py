@@ -1,5 +1,5 @@
 """
-JARVIS — Work Activity Store
+E.V. — Work Activity Store
 Append-only SQLite log pracovní aktivity: git, docker, aplikace, agenti, příkazy.
 """
 

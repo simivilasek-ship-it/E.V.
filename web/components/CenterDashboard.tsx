@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useJarvis, type Message } from '@/store/jarvis'
+import { useEV, type Message } from '@/store/ev'
 
 // ── Recent conversations ──────────────────────────────
 function RecentConversations({ messages }: { messages: Message[] }) {
@@ -47,7 +47,7 @@ interface AgentInfo {
 }
 
 function AgentStatus() {
-  const agents = useJarvis(s => s.agents) as Record<string, { status?: string; last?: string }>
+  const agents = useEV(s => s.agents) as Record<string, { status?: string; last?: string }>
 
   const list: AgentInfo[] = Object.entries(agents).slice(0, 4).map(([name, v]) => ({
     name,
@@ -197,7 +197,7 @@ function OpenWindows() {
 
 // ── Main CenterDashboard ──────────────────────────────
 export default function CenterDashboard() {
-  const messages = useJarvis(s => s.messages)
+  const messages = useEV(s => s.messages)
 
   return (
     <div style={{

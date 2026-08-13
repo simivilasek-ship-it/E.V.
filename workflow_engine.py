@@ -1,5 +1,5 @@
 """
-JARVIS Workflow Engine
+E.V. Workflow Engine
 Uživatel definuje: "Když X → udělej Y"
 Příklady:
   "Když je CPU > 90% → screenshot + notifikace"
@@ -27,7 +27,7 @@ class Workflow:
     name: str
     trigger_type: str        # "cpu_threshold" | "time" | "app_opened" | "manual" | "keyword"
     trigger_config: dict     # {"threshold": 90} | {"time": "09:00"} | {"app": "code"}
-    action: str              # příkaz pro JARVIS (jako by ho uživatel řekl)
+    action: str              # příkaz pro E.V. (jako by ho uživatel řekl)
     enabled: bool = True
     last_fired: float = 0
     cooldown_seconds: int = 300  # minimální interval mezi spuštěními

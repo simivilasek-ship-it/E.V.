@@ -1,5 +1,5 @@
 """
-JARVIS — LLM Router 2.0
+E.V. — LLM Router 2.0
 Inteligentní routing požadavků na různé modely podle úkolu.
 Fallback při selhání, token-budget management, task-specific modely.
 """

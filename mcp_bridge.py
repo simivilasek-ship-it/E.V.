@@ -1,5 +1,5 @@
 """
-JARVIS v4.4 — MCP Bridge
+E.V. v4.4 — MCP Bridge
 Správce připojení k MCP serverům (filesystem, brave-search, …).
 Každý server se spouští jako subprocess přes stdio.
 Volání jsou synchronní (asyncio.run) pro kompatibilitu s ostatními moduly.
@@ -50,7 +50,7 @@ class MCPServerConfig:
 
 class MCPBridge:
     """
-    Správce MCP serverů pro JARVIS.
+    Správce MCP serverů pro E.V..
     call_tool() je synchronní — spouští asyncio smyčku v samostatném vlákně,
     aby nerozbil GUI vlákno.
     """
@@ -210,7 +210,7 @@ class MCPBridge:
         return list(self._servers.keys())
 
 
-# ── Továrna — výchozí konfigurace pro JARVIS ─────────
+# ── Továrna — výchozí konfigurace pro E.V. ─────────
 
 def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
     """
@@ -341,14 +341,14 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
         logger.info("GitHub MCP: GITHUB_TOKEN není nastaven → zakázáno. Přidej do .env: GITHUB_TOKEN=...")
 
     # ── SQLite MCP — dotazy do libovolné SQLite databáze ─
-    # Výchozí: JARVIS vlastní paměť DB. Lze přepsat přes config.
+    # Výchozí: E.V. vlastní paměť DB. Lze přepsat přes config.
     sqlite_db = config.get("mcp_sqlite_db", os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "memory_data", "memories.db"))
     bridge.register(MCPServerConfig(
         name="sqlite",
         command="npx",
         args=["-y", "@modelcontextprotocol/server-sqlite", "--db-path", sqlite_db],
-        enabled=config.get("mcp_sqlite_enabled", False),  # opt-in (JARVIS má vlastní memory API)
+        enabled=config.get("mcp_sqlite_enabled", False),  # opt-in (E.V. má vlastní memory API)
     ))
 
     # ── YouTube Transcript MCP — titulky bez stahování ──

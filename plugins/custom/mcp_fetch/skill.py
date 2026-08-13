@@ -1,5 +1,5 @@
 """
-JARVIS Skill — Web Fetch
+E.V. Skill — Web Fetch
 Načítá obsah webových stránek a vyhledává na DuckDuckGo.
 Nepotřebuje API klíč ani MCP server — přímé HTTP přes requests.
 
@@ -47,7 +47,7 @@ def _fetch(url: str, max_chars: int = 3000) -> str:
         if not url.startswith("http"):
             url = "https://" + url
         r = requests.get(url, timeout=10, headers={
-            "User-Agent": "Mozilla/5.0 (compatible; JARVIS/3.1)"
+            "User-Agent": "Mozilla/5.0 (compatible; E.V./3.1)"
         })
         r.raise_for_status()
         ct = r.headers.get("content-type", "")
@@ -68,7 +68,7 @@ def _ddg_search(query: str, max_chars: int = 2500) -> str:
         import requests
         url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
         r = requests.get(url, timeout=10, headers={
-            "User-Agent": "Mozilla/5.0 (compatible; JARVIS/3.1)",
+            "User-Agent": "Mozilla/5.0 (compatible; E.V./3.1)",
             "Accept-Language": "cs,en;q=0.9",
         })
         r.raise_for_status()

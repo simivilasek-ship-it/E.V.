@@ -1,19 +1,19 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Full-stack E2E tests for JARVIS.
+ * Full-stack E2E tests for E.V..
  * Runs against the Python backend (dashboard.py) on port 8002.
  * Backend is started automatically via playwright.config.ts webServer.
  */
 
-test.describe('JARVIS — full-stack E2E', () => {
+test.describe('E.V. — full-stack E2E', () => {
 
-  test('page loads JARVIS UI', async ({ page }) => {
+  test('page loads E.V. UI', async ({ page }) => {
     await page.goto('/app');
     await page.waitForLoadState('domcontentloaded');
 
     // Root app container should be present
-    const app = page.locator('[data-testid="jarvis-app"]');
+    const app = page.locator('[data-testid="ev-app"]');
     await expect(app).toBeVisible({ timeout: 15_000 });
   });
 
@@ -74,7 +74,7 @@ test.describe('JARVIS — full-stack E2E', () => {
       expect(pageContent.length).toBeGreaterThan(500);
     } else {
       // Fallback: just confirm the app is rendered
-      await expect(page.locator('[data-testid="jarvis-app"]')).toBeVisible();
+      await expect(page.locator('[data-testid="ev-app"]')).toBeVisible();
     }
   });
 

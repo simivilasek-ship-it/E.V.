@@ -1,5 +1,5 @@
 """
-JARVIS v4.4 — Offline Mode System
+E.V. v4.4 — Offline Mode System
 Umožňuje fungovat offline s fallback LLM a queued commands
 """
 
@@ -169,7 +169,7 @@ class OfflineManager:
         if not kb_file.exists():
             kb: Dict[str, Any] = {
                 "Python": "Python je programovací jazyk zaměřený na čitelnost a jednoduchost.",
-                "JARVIS": "JARVIS je hlasový AI asistent poháněný Ollama.",
+                "E.V.": "E.V. je hlasový AI asistent poháněný Ollama.",
                 "Offline": "Offline režim umožňuje fungovat bez internetu s omezenou funkčností.",
             }
             try:

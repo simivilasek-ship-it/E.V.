@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { useJarvis } from '@/store/jarvis'
+import { useEV } from '@/store/ev'
 import CenterDashboard from './CenterDashboard'
 
 // ── Status Bar ────────────────────────────────────────
@@ -10,10 +10,10 @@ interface StatusItem {
   color?: string
 }
 
-export function JarvisStatusBar() {
-  const connStatus   = useJarvis(s => s.connStatus)
-  const currentModel = useJarvis(s => s.currentModel)
-  const plugins      = useJarvis(s => s.plugins) as Array<{ status?: string }>
+export function EVStatusBar() {
+  const connStatus   = useEV(s => s.connStatus)
+  const currentModel = useEV(s => s.currentModel)
+  const plugins      = useEV(s => s.plugins) as Array<{ status?: string }>
   const [mcpCount, setMcpCount] = useState('—')
   const [agentStatus] = useState('Ready')
 
@@ -149,9 +149,9 @@ const QUICK_ACTIONS = [
 
 // ── Hero Panel ────────────────────────────────────────
 export default function HeroPanel({ onSend }: { onSend: (cmd: string) => void }) {
-  const system   = useJarvis(s => s.system)
-  const isConn   = useJarvis(s => s.isConnected)
-  const connStatus = useJarvis(s => s.connStatus)
+  const system   = useEV(s => s.system)
+  const isConn   = useEV(s => s.isConnected)
+  const connStatus = useEV(s => s.connStatus)
 
   const [profile, setProfile] = useState<{ name: string; model: string }>({ name: '', model: '' })
   const wsRef = useRef<WebSocket | null>(null)

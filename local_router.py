@@ -1,6 +1,6 @@
 # Backward-compatible shim — implementation in router/
 """
-JARVIS — Lokální router (regex/fuzzy bez LLM)
+E.V. — Lokální router (regex/fuzzy bez LLM)
 Zpracovává 95% příkazů lokálně.
 
 The LocalRouter class lives here for backward compatibility.

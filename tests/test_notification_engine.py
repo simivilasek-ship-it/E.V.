@@ -1,5 +1,5 @@
 """
-Testy pro JARVIS Smart Notifications (notification_engine.py)
+Testy pro E.V. Smart Notifications (notification_engine.py)
 """
 from __future__ import annotations
 import time
@@ -98,5 +98,5 @@ class TestNotificationEngineSmoke:
     def test_engine_send_no_crash(self):
         engine = NotificationEngine()
         with patch("subprocess.run", side_effect=FileNotFoundError):
-            result = engine.send("JARVIS test", "tělo notifikace", urgent=False)
+            result = engine.send("E.V. test", "tělo notifikace", urgent=False)
         assert result is False

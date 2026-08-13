@@ -7,7 +7,7 @@ interface State { error: Error | null }
 export default class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) { super(props); this.state = { error: null } }
   static getDerivedStateFromError(e: Error): State { return { error: e } }
-  componentDidCatch(e: Error, info: unknown) { console.error('JARVIS UI Error:', e, info) }
+  componentDidCatch(e: Error, info: unknown) { console.error('E.V. UI Error:', e, info) }
 
   render() {
     if (!this.state.error) return this.props.children

@@ -1,5 +1,5 @@
 """
-JARVIS — Background Agents
+E.V. — Background Agents
 Autonomní agenti běžící na pozadí — monitorují systém a reagují na podmínky.
 """
 
@@ -182,7 +182,7 @@ class ProcessWatcherAgent(BaseAgent):
 class IdleDetectorAgent(BaseAgent):
     """
     Detekuje nečinnost uživatele.
-    Po X minutách bez příkazu přejde JARVIS do úsporného režimu.
+    Po X minutách bez příkazu přejde E.V. do úsporného režimu.
     """
 
     name = "idle_detector"
@@ -208,7 +208,7 @@ class IdleDetectorAgent(BaseAgent):
             self._idle_announced = True
             self.emit(EventType.AGENT_INFO, {
                 "idle_minutes": idle_secs / 60,
-                "message": f"JARVIS nečinný {idle_secs/60:.0f} minut.",
+                "message": f"E.V. nečinný {idle_secs/60:.0f} minut.",
             })
 
 

@@ -1,5 +1,5 @@
 """
-JARVIS — Agent Tools Registry
+E.V. — Agent Tools Registry
 Definuje nástroje dostupné ReAct agentovi. Každý nástroj je wrapper
 nad existujícím CommandExecutor nebo MCPBridge — žádná duplicita logiky.
 """

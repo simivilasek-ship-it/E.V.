@@ -1,5 +1,5 @@
 """
-JARVIS v4.4 — Plugin / Skill System
+E.V. v4.4 — Plugin / Skill System
 Podporuje dva formáty:
   1. Složka se skill.py + manifest.json  (Leon-style)
   2. Jednoduchý .py soubor s get_routes() / get_actions()
@@ -43,7 +43,7 @@ _SAFE_IMPORTS: Set[str] = {
     "unittest", "unittest.mock", "urllib", "urllib.parse",
     "urllib.request", "uuid", "warnings", "weakref", "xml",
     "xml.etree", "xml.etree.ElementTree", "zipfile",
-    # třetí strany — běžně používané v JARVIS pluginech
+    # třetí strany — běžně používané v E.V. pluginech
     "requests", "bs4", "beautifulsoup4", "pydantic", "yaml",
     "numpy", "pandas", "PIL", "pillow",
     # vlastní moduly projektu
@@ -77,7 +77,7 @@ MANIFEST_SCHEMA = {
         "system.info",     # psutil, platform (jen čtení)
         # MCP
         "mcp",             # mcp_bridge přístup
-        "internal",        # interní JARVIS moduly
+        "internal",        # interní E.V. moduly
         # Vision
         "vision.capture",  # screenshot, kamera
         # Keyboard/Mouse
@@ -900,7 +900,7 @@ def create_plugin_manager(config: Dict[str, Any] = None) -> PluginManager:
     # Vestavěný systémový plugin
     sys_plugin = SystemPlugin(PluginMetadata(
         name="system", version="3.1.0",
-        description="Základní systémové funkce", author="JARVIS",
+        description="Základní systémové funkce", author="E.V.",
     ))
     manager.plugins["system"] = sys_plugin
     sys_plugin.on_load()

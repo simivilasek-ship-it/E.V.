@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-JARVIS API token generator.
+E.V. API token generator.
 Usage:
     python scripts/generate_token.py            # print new token
     python scripts/generate_token.py --write    # write to .env file
@@ -23,7 +23,7 @@ def generate_token(length: int = 48) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="JARVIS API token generator")
+    parser = argparse.ArgumentParser(description="E.V. API token generator")
     parser.add_argument("--write", action="store_true", help="Append token to .env")
     parser.add_argument("--rotate", action="store_true", help="Replace existing token in .env")
     parser.add_argument("--length", type=int, default=48, help="Token length (default 48)")

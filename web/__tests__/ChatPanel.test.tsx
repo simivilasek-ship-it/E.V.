@@ -37,8 +37,8 @@ const baseState = {
   addMessage: vi.fn(),
 }
 
-vi.mock('@/store/jarvis', () => ({
-  useJarvis: (selector: (s: typeof baseState) => unknown) => selector(baseState),
+vi.mock('@/store/ev', () => ({
+  useEV: (selector: (s: typeof baseState) => unknown) => selector(baseState),
 }))
 
 // HeroPanel is rendered when messages is empty — provide a simple stub
@@ -48,7 +48,7 @@ vi.mock('@/components/HeroPanel', () => ({
       <button onClick={() => onSend('test quick')}>Quick Action</button>
     </div>
   ),
-  JarvisStatusBar: () => null,
+  EVStatusBar: () => null,
 }))
 
 beforeEach(() => {
@@ -80,9 +80,9 @@ describe('ChatPanel', () => {
 
     const textarea = screen.getByTestId('chat-input') as HTMLTextAreaElement
     await userEvent.click(textarea)
-    await userEvent.type(textarea, 'Hello JARVIS')
+    await userEvent.type(textarea, 'Hello E.V.')
 
-    expect(textarea.value).toBe('Hello JARVIS')
+    expect(textarea.value).toBe('Hello E.V.')
   })
 
   it('send button is disabled when input is empty', async () => {

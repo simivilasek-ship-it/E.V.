@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { useJarvis } from '@/store/jarvis'
+import { useEV } from '@/store/ev'
 import { apiUrl } from '@/lib/api'
 
 interface SttHealth {
@@ -94,7 +94,7 @@ export default function VoicePanel() {
   const audioCtxRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const addToast = useJarvis(s => s.addToast)
+  const addToast = useEV(s => s.addToast)
 
   useEffect(() => {
     const poll = async () => {
@@ -249,7 +249,7 @@ export default function VoicePanel() {
             body: JSON.stringify({ text: transcript }),
           })
           const data = await res.json()
-          setTestResponse(`STT: "${transcript}"\n\nJARVIS: ${data.response ?? data.message ?? ''}`)
+          setTestResponse(`STT: "${transcript}"\n\nE.V.: ${data.response ?? data.message ?? ''}`)
         } catch {
           setTestResponse(`STT: "${transcript}" — API nedostupné`)
         }
@@ -468,7 +468,7 @@ export default function VoicePanel() {
             className="font-mono text-[10px] block mb-1.5 uppercase tracking-wide"
             style={{ color: 'var(--green)' }}
           >
-            JARVIS odpověděl:
+            E.V. odpověděl:
           </span>
           {testResponse}
         </div>

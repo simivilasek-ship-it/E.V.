@@ -85,9 +85,9 @@ class TestSystemPrompt:
         assert len(SYSTEM_PROMPT) > 0
     
     def test_system_prompt_contains_jarvis(self):
-        """Ensure system prompt identifies as JARVIS"""
+        """Ensure system prompt identifies as E.V."""
         from llm import SYSTEM_PROMPT
-        assert "JARVIS" in SYSTEM_PROMPT or "jarvis" in SYSTEM_PROMPT.lower()
+        assert "E.V." in SYSTEM_PROMPT or "jarvis" in SYSTEM_PROMPT.lower()
     
     def test_system_prompt_czech(self):
         """Ensure system prompt is in Czech"""

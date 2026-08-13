@@ -1,5 +1,5 @@
 'use client'
-import { useJarvis } from '@/store/jarvis'
+import { useEV } from '@/store/ev'
 
 const ACTION_LABELS: Record<string, string> = {
   delete_file: 'Smazat soubor',
@@ -11,8 +11,8 @@ const ACTION_LABELS: Record<string, string> = {
 }
 
 export default function ConfirmModal() {
-  const pending = useJarvis(s => s.pendingConfirm)
-  const respond = useJarvis(s => s.respondConfirm)
+  const pending = useEV(s => s.pendingConfirm)
+  const respond = useEV(s => s.respondConfirm)
 
   if (!pending) return null
 

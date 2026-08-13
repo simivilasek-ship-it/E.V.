@@ -1,6 +1,6 @@
 # MCP servery — co reálně funguje (Linux)
 
-JARVIS registruje až 18 MCP serverů v `mcp_bridge.py`. Pro denní použití stačí **5 spolehlivých** bez placených API klíčů.
+E.V. registruje až 18 MCP serverů v `mcp_bridge.py`. Pro denní použití stačí **5 spolehlivých** bez placených API klíčů.
 
 ## Předpoklady
 
@@ -44,7 +44,7 @@ Bez klíče jsou automaticky **vypnuté** — UI může ukazovat `enabled: true`
 | **playwright** | `mcp_playwright_enabled=false` — těžký headless browser |
 | **puppeteer** | Deprecated npm balíček, často timeout |
 | **computer-control** | Pomaleý start (OCR deps), potřebuje `DISPLAY` |
-| **sqlite** | Vypnuto — JARVIS má vlastní memory API |
+| **sqlite** | Vypnuto — E.V. má vlastní memory API |
 | **everything-search** | Primárně Windows |
 
 ## Kdy se MCP používá

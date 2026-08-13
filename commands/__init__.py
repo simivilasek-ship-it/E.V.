@@ -1,5 +1,5 @@
 """
-JARVIS commands package.
+E.V. commands package.
 CommandExecutor deleguje na podmoduly: system, apps, media, files, utils.
 """
 

@@ -1,4 +1,4 @@
-"""Unified JARVIS launcher — one command for backend + web UI."""
+"""Unified E.V. launcher — one command for backend + web UI."""
 from __future__ import annotations
 
 import argparse
@@ -162,7 +162,7 @@ def _restart_from_pid_file() -> None:
     if pid is None:
         print("==> Žádný PID soubor — pokračuji čistým startem.")
         return
-    print(f"==> Ukončuji předchozí JARVIS (PID {pid})…")
+    print(f"==> Ukončuji předchozí E.V. (PID {pid})…")
     if not _kill_graceful(pid):
         owner = _port_owner_pid(8002)
         if owner:
@@ -200,7 +200,7 @@ def _open_browser(url: str, delay: float = 1.2) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="JARVIS — backend + web UI")
+    parser = argparse.ArgumentParser(description="E.V. — backend + web UI")
     parser.add_argument("--port", type=int, default=8002, help="HTTP port (default: 8002)")
     parser.add_argument("--no-open", action="store_true", help="Neotevírat prohlížeč")
     parser.add_argument("--no-build", action="store_true", help="Nespouštět build frontendu")
@@ -261,7 +261,7 @@ def main(argv: list[str] | None = None) -> None:
     signal.signal(signal.SIGTERM, _on_exit)
     signal.signal(signal.SIGINT, _on_exit)
 
-    print(f"JARVIS ready {url}")
+    print(f"E.V. ready {url}")
     if not args.no_open:
         _open_browser(url)
 

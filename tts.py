@@ -1,5 +1,5 @@
 """
-JARVIS v4.2 — Text-to-Speech (TTS)
+E.V. v4.2 — Text-to-Speech (TTS)
 Jeden worker vlákno + queue → věty se přehrávají sériově,
 žádné souběžné přehrávání, žádné blokování více vláken.
 """

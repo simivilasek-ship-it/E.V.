@@ -3,7 +3,7 @@
 ## [5.19.0] - 2026-06-14
 
 ### Added — 8.5/10 parity push
-- **Swagger / ReDoc v dev módu** — `JARVIS_DEV=1` zapíná `/api/docs`, `/api/redoc`, `/api/openapi.json`; v produkci stále vypnuto
+- **Swagger / ReDoc v dev módu** — `E.V._DEV=1` zapíná `/api/docs`, `/api/redoc`, `/api/openapi.json`; v produkci stále vypnuto
 - **Simple/Advanced mode** — toggle v Sidebar skrývá pokročilé panely (Workflow, Missions, Agent…) pro nové uživatele
 - **API contract testy** — `tests/test_api_contracts.py` pokrývá všechny registrované routery
 - **Vitest 10+ nových testů** — WorkTimeline, DashboardPanel, VoicePanel, ErrorBoundary
@@ -64,10 +64,10 @@
 ### Added
 - **Daily morning briefing** (`morning_briefing.py`) — proactive `notify-send` briefing with yesterday's work summary, git dirty state, and day overview; `jarvis briefing` CLI command
 - **Voice panel** (`web/components/VoicePanel.tsx`) — first-class voice UI: mic visualizer, STT/TTS status, duplex toggle, test phrase, graceful offline fallback; added to sidebar
-- **Pydantic config schema** (`config_schema.py`) — `JarvisSettings` with grouped `VoiceSettings`, `SecuritySettings`, `AgentSettings`; `jarvis config validate` CLI
+- **Pydantic config schema** (`config_schema.py`) — `E.V.Settings` with grouped `VoiceSettings`, `SecuritySettings`, `AgentSettings`; `jarvis config validate` CLI
 - **Router domain modules** (`router/`) — split 1034-line `local_router.py` into `constants.py`, `apps.py`, `media.py`, `system.py`, `memory_routes.py`; `moodle` site moved to user-overridable `custom_sites` config key
 - **Vitest + RTL** — `web/vitest.config.ts`, `web/vitest.setup.ts`, `web/__tests__/SettingsPanel.test.tsx`, `web/__tests__/ChatPanel.test.tsx`; added to CI web job
-- **Full-stack E2E** — Playwright now starts Python backend on `:8002` with `JARVIS_TEST_MODE=1`; tests cover API health, chat, confirm modal, settings; `data-testid` attrs on key components
+- **Full-stack E2E** — Playwright now starts Python backend on `:8002` with `E.V._TEST_MODE=1`; tests cover API health, chat, confirm modal, settings; `data-testid` attrs on key components
 - **Security startup warning** — `runner.py` prints visible banner when `api_auth_required=False` and host is not localhost
 - **Memory conflict regression test** (`tests/test_memory_conflict.py`)
 - **Keyboard shortcuts section** in README
@@ -176,7 +176,7 @@
 - **Unified Mission DB** — checklisty (`missions.py`) migrovány do SQLite `missions.db` (`mission_type='checklist'`)
 - `missions.py` je tenký shim nad `mission_manager.py`
 - Autonomní mise (`/api/missions`) a checklisty (`/api/missions/checklist`) sdílí jednu DB, oddělené `mission_type`
-- `activity_store.reset_activity_store()` + env `JARVIS_ACTIVITY_DB` pro izolované testy
+- `activity_store.reset_activity_store()` + env `E.V._ACTIVITY_DB` pro izolované testy
 
 ---
 
@@ -251,7 +251,7 @@
 
 ### Changed
 - **Canonical module tree** — root modules are source of truth; duplicate `src/*` implementations removed (`docs/CANONICAL.md`)
-- **Secure defaults** — `api_bind_host: 127.0.0.1`; Docker Compose enables `JARVIS_API_AUTH_REQUIRED=1`
+- **Secure defaults** — `api_bind_host: 127.0.0.1`; Docker Compose enables `E.V._API_AUTH_REQUIRED=1`
 - Verze **5.6.0** across `config.py`, `pyproject.toml`, Docker, requirements
 - **563 tests** passing in CI
 
@@ -264,7 +264,7 @@
 
 ### Added
 - **UI redesign** — DM Sans, glass panels, collapsible Advanced sidebar, hardware markdown
-- **LAN API auth** — `JARVIS_API_AUTH_REQUIRED`, `JARVIS_API_TOKEN`, middleware in `src/api/middleware/auth.py`
+- **LAN API auth** — `E.V._API_AUTH_REQUIRED`, `E.V._API_TOKEN`, middleware in `src/api/middleware/auth.py`
 - **Unified API pipeline** — `/api/chat`, `/ws/chat` via `process_chat()`; `/api/command` deprecated
 - **Install events** — WebSocket progress via `event_bus` + `install_notify.py`
 
@@ -456,7 +456,7 @@
 
 ### Added
 - SQLite-backed Memory Graph (entities + relations) with timestamps, source and confidence.
-- Heuristic extractor + GraphStore integration in JarvisMemory (writes triplets to memory_data/memory_graph.db).
+- Heuristic extractor + GraphStore integration in E.V.Memory (writes triplets to memory_data/memory_graph.db).
 - Dashboard integration: /api/memory/graph includes graph entities and relations in UI.
 - Tests: basic unit tests for graph store and retriever.
 
@@ -470,7 +470,7 @@
 - Unit tests covering headless confirm behavior and proactive features.
 
 ### Changed
-- Security: headless mode no longer auto-approves ELEVATED actions. Introduced env var JARVIS_HEADLESS_APPROVE_ELEVATED to allow explicit override.
+- Security: headless mode no longer auto-approves ELEVATED actions. Introduced env var E.V._HEADLESS_APPROVE_ELEVATED to allow explicit override.
 - README: documented headless security behavior and proactive feature notes.
 
 ### Fixed

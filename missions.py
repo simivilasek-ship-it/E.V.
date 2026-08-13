@@ -1,5 +1,5 @@
 """
-JARVIS — Release Checklist shim
+E.V. — Release Checklist shim
 Checklisty jsou uložené v SQLite (mission_manager.py, mission_type='checklist').
 Tento modul zachovává API kompatibilitu pro missions_checklist router a testy.
 """

@@ -1,6 +1,6 @@
 """
-JARVIS v4.4 — Async Operations
-Unified async/threading layer for JARVIS operations.
+E.V. v4.4 — Async Operations
+Unified async/threading layer for E.V. operations.
 Provides consistent async execution with proper error handling and lifecycle management.
 """
 

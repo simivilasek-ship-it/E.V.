@@ -1,5 +1,5 @@
 """
-JARVIS router — neural memory routing.
+E.V. router — neural memory routing.
 Handles remember/forget/recall commands.
 """
 import re

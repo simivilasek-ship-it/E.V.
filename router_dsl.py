@@ -1,5 +1,5 @@
 """
-JARVIS — Mini DSL pro LocalRouter
+E.V. — Mini DSL pro LocalRouter
 Kompiluje pattern stringy do regex + handler mapování.
 
 Syntaxe:

@@ -1,5 +1,5 @@
 """
-JARVIS Skill — MCP Puppeteer
+E.V. Skill — MCP Puppeteer
 Browser automation přes Puppeteer MCP server.
 
 Příkazy:

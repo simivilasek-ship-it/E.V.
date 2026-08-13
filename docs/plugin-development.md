@@ -1,4 +1,4 @@
-# Vývoj pluginů pro JARVIS
+# Vývoj pluginů pro E.V.
 
 Plugin je Python balíček v adresáři `plugins/custom/<název>/` s manifestem a entry pointem. Pluginy mohou přidávat nové příkazy, nástroje pro agenty, API endpointy nebo background workery.
 
@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 class MujPlugin:
     """
     Hlavní třída pluginu.
-    JARVIS automaticky zavolá register() po načtení.
+    E.V. automaticky zavolá register() po načtení.
     """
 
     name    = "muj-plugin"
@@ -73,7 +73,7 @@ class MujPlugin:
         self.config = config
         logger.info(f"MujPlugin inicializován")
 
-    # ── Akce volaná z JARVIS příkazů ─────────────────
+    # ── Akce volaná z E.V. příkazů ─────────────────
 
     def muj_prikaz(self, arg: str = "", **kwargs) -> str:
         """
@@ -89,11 +89,11 @@ class MujPlugin:
         logger.info(f"muj_prikaz volán s arg={arg!r}")
         return f"Výsledek pro: {arg}"
 
-    # ── Registrace do JARVIS ekosystému ──────────────
+    # ── Registrace do E.V. ekosystému ──────────────
 
     def register(self, registry) -> None:
         """
-        Registruje plugin do JARVIS.
+        Registruje plugin do E.V..
         Voláno automaticky po načtení pluginu.
 
         Args:
@@ -118,7 +118,7 @@ class MujPlugin:
 
 
 def create_plugin(config: dict) -> MujPlugin:
-    """Factory funkce — JARVIS ji volá pro vytvoření instance."""
+    """Factory funkce — E.V. ji volá pro vytvoření instance."""
     return MujPlugin(config)
 ```
 
@@ -273,11 +273,11 @@ result = mp.run_sandboxed(
 print(result["stdout"])
 ```
 
-Sandbox nastavuje env proměnnou `JARVIS_SANDBOX=1` — plugin ji může detekovat:
+Sandbox nastavuje env proměnnou `E.V._SANDBOX=1` — plugin ji může detekovat:
 
 ```python
 import os
-if os.environ.get("JARVIS_SANDBOX"):
+if os.environ.get("E.V._SANDBOX"):
     # Omezený režim — nevolat destruktivní operace
     pass
 ```

@@ -1,5 +1,5 @@
 """
-JARVIS router package — domain routing modules.
+E.V. router package — domain routing modules.
 
 NOTE: LocalRouter is defined in local_router.py (root level) for backward
 compatibility. Do NOT import local_router here — it imports from this package

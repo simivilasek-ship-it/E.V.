@@ -1,1 +1,1 @@
-"""JARVIS developer scripts package."""
+"""E.V. developer scripts package."""

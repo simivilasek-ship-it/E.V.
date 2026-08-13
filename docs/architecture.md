@@ -1,8 +1,8 @@
-# Architektura JARVIS v5.19
+# Architektura E.V. v5.19
 
 ## Přehled
 
-JARVIS je vrstvená aplikace složená z Python backendu, Next.js frontendu a desktopového wrapperu. Každá vrstva komunikuje přes jasně definované rozhraní — REST API, WebSocket streamy nebo přímé Python importy.
+E.V. je vrstvená aplikace složená z Python backendu, Next.js frontendu a desktopového wrapperu. Každá vrstva komunikuje přes jasně definované rozhraní — REST API, WebSocket streamy nebo přímé Python importy.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -92,7 +92,7 @@ JARVIS je vrstvená aplikace složená z Python backendu, Next.js frontendu a de
 
 | Soubor | Odpovědnost |
 |--------|-------------|
-| `memory.py` | `JarvisMemory` — hlavní paměťový systém, SQLite + embeddingy |
+| `memory.py` | `E.V.Memory` — hlavní paměťový systém, SQLite + embeddingy |
 | `memory_graph.py` | `SQLiteGraphStore` — knowledge graph (entity + relace) |
 | `graph_extractor.py` | `GraphRAGMemory` — automatická extrakce entit z konverzací |
 | `user_profile.py` | Profil uživatele, preference, extrakce faktů |
@@ -159,7 +159,7 @@ POST /api/chat  nebo  WS /ws/chat
 src/api/runtime.py  →  process_chat()
        │
        ▼
-JarvisApp (singleton, web_mode=true)
+E.V.App (singleton, web_mode=true)
        │
        ▼
 CommandRouter.process_for_web()  [routing.py]

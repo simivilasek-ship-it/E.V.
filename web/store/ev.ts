@@ -9,7 +9,7 @@ export type MessageMode = 'copilot' | 'akce' | 'agent'
 export interface Message {
   id: string
   text: string
-  sender: 'user' | 'jarvis'
+  sender: 'user' | 'ev'
   ts: number
   streaming?: boolean
   error?: boolean
@@ -40,7 +40,7 @@ export interface PendingConfirm {
   timeout_s?: number
 }
 
-interface JarvisState {
+interface EVState {
   // Connection
   orbState:    OrbState
   messages:    Message[]
@@ -92,7 +92,7 @@ interface JarvisState {
   respondConfirm: (approved: boolean) => void
   toggleMic:      () => void
   sendCommand:    (text: string) => Promise<void>
-  addMessage:     (text: string, sender: 'user' | 'jarvis', extra?: Partial<Message>) => void
+  addMessage:     (text: string, sender: 'user' | 'ev', extra?: Partial<Message>) => void
   updateLastMessage: (patch: Partial<Message>) => void
   clearMessages:  () => void
   clearLogs:      () => void
@@ -137,7 +137,7 @@ const getApiBase = () => {
   return BACKEND_HTTP  // Dev: jdi přímo na backend (CORS povolen)
 }
 
-export const useJarvis = create<JarvisState>((set, get) => ({
+export const useEV = create<EVState>((set, get) => ({
   orbState: 'idle', messages: [], logs: [], toasts: [],
   system: { cpu: 0, ram: 0, disk: 0, cpu_temp: null, net: null, gpu: null },
   agents: {}, plugins: [], currentModel: '',
@@ -212,7 +212,7 @@ export const useJarvis = create<JarvisState>((set, get) => ({
           const structured = isError && msg.error_detail
             ? `**Instalace ${msg.app} selhala**\n\n- **Důvod:** ${msg.error_detail}${msg.errors?.length ? `\n- **Detail:** ${msg.errors.join('; ')}` : ''}`
             : text
-          get().addMessage(structured, 'jarvis', { error: isError })
+          get().addMessage(structured, 'ev', { error: isError })
           if (isError) get().addToast(msg.error_detail || text, 'error', 6000)
           else if (msg.stage === 'success') get().addToast(text, 'success', 4000)
           set(s => ({
@@ -411,7 +411,7 @@ export const useJarvis = create<JarvisState>((set, get) => ({
             set(s => {
               const msgs = [...s.messages]
               for (let i = msgs.length - 1; i >= 0; i--) {
-                if (msgs[i].sender === 'jarvis') {
+                if (msgs[i].sender === 'ev') {
                   msgs[i] = { ...msgs[i], mode }
                   break
                 }
@@ -440,7 +440,7 @@ export const useJarvis = create<JarvisState>((set, get) => ({
   async sendCommand(text) {
     if (!text?.trim()) return
     get().addMessage(text, 'user')
-    get().addMessage('', 'jarvis', { streaming: true })
+    get().addMessage('', 'ev', { streaming: true })
     get().setOrbState('thinking')
 
     const chatWs = get()._chatWs
@@ -559,7 +559,7 @@ export const useJarvis = create<JarvisState>((set, get) => ({
         onListening: () => set({ isMicActive: true, orbState: 'listening' }),
         onTranscript: (text) => get().addMessage(text, 'user'),
         onResponse: (text) => {
-          get().addMessage(text, 'jarvis')
+          get().addMessage(text, 'ev')
           get().setOrbState('idle')
         },
         onSpeaking: () => get().setOrbState('speaking'),

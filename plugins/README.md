@@ -1,4 +1,4 @@
-# JARVIS Plugins
+# E.V. Plugins
 
 Každý plugin = složka s těmito soubory:
 - `plugin.py` — implementace

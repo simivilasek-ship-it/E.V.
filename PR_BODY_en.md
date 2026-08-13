@@ -4,7 +4,7 @@ Short description:
 This PR introduces a ProactiveEngine that listens for active-window changes and generates contextual suggestions when the user opens a code file in VS Code (scans TODO/FIXME, recent failing tests, git summary). It also adds a daily markdown report generator that saves per-day summaries to ~/jarvis_reports/YYYY-MM-DD.md.
 
 Security change:
-- Headless mode no longer auto-approves ELEVATED actions (e.g. delete_file, shutdown). To opt-in for controlled/dev environments, set environment variable JARVIS_HEADLESS_APPROVE_ELEVATED=1. This change reduces the risk of unintended critical actions on headless deployments.
+- Headless mode no longer auto-approves ELEVATED actions (e.g. delete_file, shutdown). To opt-in for controlled/dev environments, set environment variable E.V._HEADLESS_APPROVE_ELEVATED=1. This change reduces the risk of unintended critical actions on headless deployments.
 
 Files added/modified:
 - Added: proactive.py (new module)

@@ -1,5 +1,5 @@
 """
-JARVIS Skill — MCP Filesystem
+E.V. Skill — MCP Filesystem
 Pokročilé souborové operace přes @modelcontextprotocol/server-filesystem.
 
 Oproti základním file příkazům navíc:

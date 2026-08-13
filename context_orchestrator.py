@@ -1,5 +1,5 @@
 """
-JARVIS Context Orchestrator v2
+E.V. Context Orchestrator v2
 Sbírá kontext prostředí a vkládá ho do system promptu.
 Kontext = aktivní okno + seznam oken + clipboard + systém + čas.
 """

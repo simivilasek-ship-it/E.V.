@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# JARVIS — jeden příkaz pro spuštění
+# E.V. — jeden příkaz pro spuštění
 # Automaticky nainstaluje vše co chybí a spustí server.
 set -e
 
@@ -15,7 +15,7 @@ info() { echo -e "  → $1"; }
 warn() { echo -e "${YELLOW}  ! $1${NC}"; }
 
 echo ""
-echo "  🤖  JARVIS"
+echo "  🤖  E.V."
 echo ""
 
 # ── 1. Python ────────────────────────────────────────────────────────────────
@@ -53,9 +53,9 @@ if command -v ollama &>/dev/null; then
 fi
 
 # ── 4. Bezpečnost — generuj token pokud bind != localhost ────────────────────
-BIND_HOST="${JARVIS_BIND_HOST:-127.0.0.1}"
+BIND_HOST="${E.V._BIND_HOST:-127.0.0.1}"
 if [ "$BIND_HOST" != "127.0.0.1" ] && [ "$BIND_HOST" != "localhost" ]; then
-    if ! grep -q "JARVIS_API_TOKEN" .env 2>/dev/null; then
+    if ! grep -q "E.V._API_TOKEN" .env 2>/dev/null; then
         warn "Bind na $BIND_HOST bez tokenu — generuji API token..."
         source venv/bin/activate
         python3 scripts/generate_token.py --write 2>/dev/null && ok "API token vygenerován do .env" || \
@@ -63,7 +63,7 @@ if [ "$BIND_HOST" != "127.0.0.1" ] && [ "$BIND_HOST" != "localhost" ]; then
     fi
 fi
 
-# ── 5. Spuštění JARVIS ───────────────────────────────────────────────────────
-info "Spouštím JARVIS → http://localhost:8002/app"
+# ── 5. Spuštění E.V. ───────────────────────────────────────────────────────
+info "Spouštím E.V. → http://localhost:8002/app"
 echo ""
 exec python3 dashboard.py "$@"

@@ -1,5 +1,5 @@
 """
-JARVIS Skill — MCP Memory (Knowledge Graph)
+E.V. Skill — MCP Memory (Knowledge Graph)
 Persistentní paměť jako knowledge graph přes @modelcontextprotocol/server-memory.
 Ukládá entity a jejich vztahy — silnější než prostý text.
 

@@ -1,5 +1,5 @@
 """
-JARVIS — Whisper Live: Real-time duplex audio
+E.V. — Whisper Live: Real-time duplex audio
 Nahrazuje staré blocking STT (Google/Vosk) kontinuálním streamingem.
 
 Architektura:

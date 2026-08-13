@@ -1,6 +1,6 @@
-# Paměťový systém JARVIS
+# Paměťový systém E.V.
 
-JARVIS používá vícevrstvý paměťový systém kombinující SQLite embeddingy, knowledge graph a neural memory.
+E.V. používá vícevrstvý paměťový systém kombinující SQLite embeddingy, knowledge graph a neural memory.
 
 ---
 
@@ -8,7 +8,7 @@ JARVIS používá vícevrstvý paměťový systém kombinující SQLite embeddin
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    JarvisMemory (memory.py)                   │
+│                    E.V.Memory (memory.py)                   │
 │                                                              │
 │  ┌──────────────────┐    ┌────────────────────────────────┐  │
 │  │  Epizodická      │    │  SQLite Memory Store           │  │
@@ -163,7 +163,7 @@ pip install sentence-transformers
 
 ### Fallback: TF-IDF keyword overlap
 
-Pokud sentence-transformers není nainstalováno, JARVIS použije keyword overlap:
+Pokud sentence-transformers není nainstalováno, E.V. použije keyword overlap:
 
 ```python
 similarity = len(words_a & words_b) / len(words_a | words_b)
@@ -178,10 +178,10 @@ Tento fallback má nižší recall pro sémanticky podobné, ale jinak formulova
 ### Ruční spuštění
 
 ```python
-from memory import JarvisMemory
+from memory import E.V.Memory
 from config import CONFIG
 
-memory = JarvisMemory(CONFIG)
+memory = E.V.Memory(CONFIG)
 result = memory.run_maintenance()
 print(result)
 # {"removed": 23, "decayed": 145, "avg_importance": 0.61, "total": 824}
@@ -190,7 +190,7 @@ print(result)
 ### Automatické spuštění
 
 Maintenance běží automaticky každou hodinu přes Scheduler:
-- Poprvé 5 minut po startu JARVIS
+- Poprvé 5 minut po startu E.V.
 - Pak každou hodinu (3600 sekund)
 - **Nikdy neblokuje** uživatelský dotaz — běží v background threadu
 
@@ -217,7 +217,7 @@ Persistentní profil uživatele uložený v `memory_data/user_profile.json`.
 ### Ruční uložení
 
 ```
-"Zapamatuj si, že jsem vývojář v Pythonu a pracuji na JARVIS projektu"
+"Zapamatuj si, že jsem vývojář v Pythonu a pracuji na E.V. projektu"
 ```
 
 ### Injekce do LLM
@@ -228,7 +228,7 @@ Souhrn profilu se přidá do systémového promptu při každém dotazu:
 Profil uživatele:
 - Jméno: Šimon
 - Technologie: Python, FastAPI, React
-- Projekt: JARVIS AI asistent
+- Projekt: E.V. AI asistent
 - Preference: tmavé téma, stručné odpovědi
 ```
 
@@ -239,15 +239,15 @@ Profil uživatele:
 ### Uložení
 
 ```python
-from memory import JarvisMemory
+from memory import E.V.Memory
 from config import CONFIG
 
-memory = JarvisMemory(CONFIG)
+memory = E.V.Memory(CONFIG)
 
 # Uloží konverzaci
 memory.store_conversation(
     user_text="Jak se jmenuješ?",
-    response="Jmenuji se JARVIS.",
+    response="Jmenuji se E.V..",
     importance=0.6  # 0.0–1.0
 )
 
@@ -266,7 +266,7 @@ memory.store_fact(
 context = memory.recall_context("python projekt", top_k=5)
 print(context)
 # "Uživatel pracuje jako Python developer (důležitost: 0.9)
-#  Pracuji na JARVIS projektu (0.8)
+#  Pracuji na E.V. projektu (0.8)
 #  ..."
 
 # Přímý SQL dotaz (pokročilé)
@@ -278,7 +278,7 @@ rows = store.recall(query="python", top_k=10, min_importance=0.5)
 
 ## Work Timeline
 
-Kromě konverzační paměti JARVIS sleduje **pracovní aktivitu** na počítači.
+Kromě konverzační paměti E.V. sleduje **pracovní aktivitu** na počítači.
 
 ### Úložiště
 
@@ -302,7 +302,7 @@ Kromě konverzační paměti JARVIS sleduje **pracovní aktivitu** na počítač
 ```
 "Co jsem dělal dnes?"
 "Na čem jsem skončil?"
-"Kolik času jsem strávil na projektu Jarvis?"
+"Kolik času jsem strávil na projektu E.V.?"
 "Jaké bugy jsem řešil?"
 ```
 

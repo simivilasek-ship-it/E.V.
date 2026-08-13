@@ -34,15 +34,15 @@ def _wait_for(condition_fn, timeout=2.0, interval=0.02) -> bool:
 
 
 def _make_lightweight_runtime(config: dict):
-    """Minimal JarvisApp shell — real CommandRouter + LocalRouter, no Ollama/GUI."""
-    from app_core import JarvisApp, _HeadlessGUI
+    """Minimal EVApp shell — real CommandRouter + LocalRouter, no Ollama/GUI."""
+    from app_core import EVApp, _HeadlessGUI
     from commands import CommandExecutor
     from event_bus import get_event_bus
     from local_router import LocalRouter
     from routing import CommandRouter
     from security_v2 import get_security_manager
 
-    app_obj = JarvisApp.__new__(JarvisApp)
+    app_obj = EVApp.__new__(EVApp)
     app_obj.gui = _HeadlessGUI()
     app_obj.cmds = CommandExecutor(config)
     app_obj.security = get_security_manager()
@@ -63,7 +63,7 @@ def _make_lightweight_runtime(config: dict):
     app_obj.llm = llm
 
     app_obj._router = CommandRouter(app_obj)
-    app_obj._execute_result = JarvisApp._execute_result.__get__(app_obj, JarvisApp)
+    app_obj._execute_result = EVApp._execute_result.__get__(app_obj, EVApp)
     app_obj._gui = lambda fn: fn()
     app_obj._ollama_reachable = lambda: False
     return app_obj

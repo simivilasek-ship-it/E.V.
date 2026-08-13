@@ -1,4 +1,4 @@
-"""E2E testy pro JARVIS API — testují skutečné FastAPI handlery bez mock."""
+"""E2E testy pro E.V. API — testují skutečné FastAPI handlery bez mock."""
 import pytest
 from fastapi.testclient import TestClient
 

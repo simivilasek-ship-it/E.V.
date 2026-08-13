@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useJarvis, type Message, type MessageMode } from '@/store/jarvis'
+import { useEV, type Message, type MessageMode } from '@/store/ev'
 import { Icons } from './Icons'
 import HeroPanel from './HeroPanel'
 
@@ -252,7 +252,7 @@ function MessageBubble({ msg }: { msg: Message }) {
       </div>
       <div className="flex-1 min-w-0 max-w-[min(740px,95%)]">
         <div className="flex items-center gap-2 mb-1.5">
-          <span className="font-medium text-xs" style={{ color: 'var(--text-secondary)' }}>JARVIS</span>
+          <span className="font-medium text-xs" style={{ color: 'var(--text-secondary)' }}>E.V.</span>
           {badge && (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-medium"
               style={{ color: badge.color, background: badge.bg }}>
@@ -282,8 +282,8 @@ function MessageBubble({ msg }: { msg: Message }) {
 }
 
 function InstallProgressBar() {
-  const activeInstall = useJarvis(s => s.activeInstall)
-  const cancelInstall = useJarvis(s => s.cancelInstall)
+  const activeInstall = useEV(s => s.activeInstall)
+  const cancelInstall = useEV(s => s.cancelInstall)
   if (!activeInstall) return null
   const pct = Math.min(100, Math.max(0, activeInstall.progress))
   return (
@@ -312,13 +312,13 @@ function InstallProgressBar() {
 
 export default function ChatPanel() {
   const [input, setInput] = useState('')
-  const messages  = useJarvis(s => s.messages)
-  const sendCmd   = useJarvis(s => s.sendCommand)
-  const clearMsgs = useJarvis(s => s.clearMessages)
-  const addMessage = useJarvis(s => s.addMessage)
-  const orbState  = useJarvis(s => s.orbState)
-  const isMicActive = useJarvis(s => s.isMicActive)
-  const toggleMic = useJarvis(s => s.toggleMic)
+  const messages  = useEV(s => s.messages)
+  const sendCmd   = useEV(s => s.sendCommand)
+  const clearMsgs = useEV(s => s.clearMessages)
+  const addMessage = useEV(s => s.addMessage)
+  const orbState  = useEV(s => s.orbState)
+  const isMicActive = useEV(s => s.isMicActive)
+  const toggleMic = useEV(s => s.toggleMic)
   const bottomRef = useRef<HTMLDivElement>(null)
   const taRef     = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -336,7 +336,7 @@ export default function ChatPanel() {
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.ok && data.briefing) {
-          addMessage(data.briefing, 'jarvis')
+          addMessage(data.briefing, 'ev')
         }
       })
       .catch(() => {})

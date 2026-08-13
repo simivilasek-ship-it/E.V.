@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, lazy, Suspense } from 'react'
-import { useJarvis } from '@/store/jarvis'
+import { useEV } from '@/store/ev'
 
 const WeatherWidget = lazy(() => import('./widgets/WeatherWidget'))
 const SystemWidget  = lazy(() => import('./widgets/SystemWidget'))
@@ -56,8 +56,8 @@ export default function Spotlight({ open, onClose, onCommand }: SpotlightProps) 
   const [intent, setIntent]   = useState<WidgetType>(null)
   const [widgetQuery, setWidgetQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-  const sendCommand = useJarvis(s => s.sendCommand)
-  const addToQuickHistory = useJarvis(s => s.addToQuickHistory)
+  const sendCommand = useEV(s => s.sendCommand)
+  const addToQuickHistory = useEV(s => s.addToQuickHistory)
 
   // Focus on open
   useEffect(() => {

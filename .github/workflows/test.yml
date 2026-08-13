@@ -66,9 +66,9 @@ jobs:
           python -m pytest tests/ -m integration -q --timeout=60 -v
         env:
           DISPLAY: ":99"
-          JARVIS_TEST_MODE: "1"
-          JARVIS_ACTIVITY_DB: /tmp/jarvis-test-activity.db
-          JARVIS_MISSIONS_DB: /tmp/jarvis-test-missions.db
+          E.V._TEST_MODE: "1"
+          E.V._ACTIVITY_DB: /tmp/jarvis-test-activity.db
+          E.V._MISSIONS_DB: /tmp/jarvis-test-missions.db
 
       - name: Upload coverage
         if: always()
@@ -169,11 +169,11 @@ jobs:
       - name: Run E2E tests (Playwright starts backend)
         run: npx playwright test --reporter=github
         env:
-          JARVIS_TEST_MODE: "1"
-          JARVIS_BIND_HOST: "0.0.0.0"
-          JARVIS_API_AUTH_REQUIRED: "0"
-          JARVIS_ACTIVITY_DB: /tmp/jarvis-test-activity.db
-          JARVIS_MISSIONS_DB: /tmp/jarvis-test-missions.db
+          E.V._TEST_MODE: "1"
+          E.V._BIND_HOST: "0.0.0.0"
+          E.V._API_AUTH_REQUIRED: "0"
+          E.V._ACTIVITY_DB: /tmp/jarvis-test-activity.db
+          E.V._MISSIONS_DB: /tmp/jarvis-test-missions.db
           DISPLAY: ":99"
 
       - name: Upload Playwright report
@@ -195,8 +195,8 @@ jobs:
       - name: Run container health check
         run: |
           docker run -d --name jarvis_smoke \
-            -e JARVIS_BIND_HOST=0.0.0.0 \
-            -e JARVIS_API_AUTH_REQUIRED=0 \
+            -e E.V._BIND_HOST=0.0.0.0 \
+            -e E.V._API_AUTH_REQUIRED=0 \
             -p 8002:8002 \
             jarvis:smoke
           # Wait for the container to start

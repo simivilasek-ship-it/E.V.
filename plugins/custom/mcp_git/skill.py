@@ -1,5 +1,5 @@
 """
-JARVIS Skill — MCP Git
+E.V. Skill — MCP Git
 Čtení a analýza git repozitářů přes MCP server.
 Bez API klíče — pracuje s lokálními repozitáři.
 
@@ -18,7 +18,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 _bridge = None
-_DEFAULT_REPO = os.path.expanduser("~/Stažené/nepojmenovaná složka")  # JARVIS repo
+_DEFAULT_REPO = os.path.expanduser("~/Stažené/nepojmenovaná složka")  # E.V. repo
 
 
 def _get_bridge():

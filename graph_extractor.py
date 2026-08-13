@@ -1,12 +1,12 @@
 """
-JARVIS — Graph Extractor (GraphRAG vrstva)
+E.V. — Graph Extractor (GraphRAG vrstva)
 Automaticky extrahuje entity a vztahy z konverzací a ukládá do memory_graph.
 
 Extrakce probíhá ve dvou módech:
   1. Regex/heuristika (rychlý, bez LLM) — jména, projekty, data, preference
   2. LLM extraction (pomalejší, přesnější) — přes cloud nebo Ollama
 
-Výsledek: při každém dotazu JARVIS dostane kontext jako:
+Výsledek: při každém dotazu E.V. dostane kontext jako:
   "Petr pracuje na projektu Alpha. Alpha má deadline 15.6. Ty preferuješ tmavé téma."
 """
 from __future__ import annotations
@@ -61,7 +61,7 @@ _STOPWORDS = {
     "Ahoj", "Dobry", "Dobré", "Prosim", "Prosím", "Nevim", "Nevím",
     "Umis", "Umíš", "Pokud", "Kdyz", "Když", "Takze", "Takže",
     "Napiš", "Napíš", "Otevři", "Spusť", "Zkus", "Můžeš", "Chceš",
-    "Jarvis", "JARVIS", "Yes", "Okay", "Thanks",
+    "Jarvis", "E.V.", "Yes", "Okay", "Thanks",
 }
 
 

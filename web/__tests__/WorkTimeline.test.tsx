@@ -9,8 +9,8 @@ vi.mock('@/lib/api', () => ({
   apiUrl: (p: string) => p,
 }))
 
-vi.mock('@/store/jarvis', () => ({
-  useJarvis: (selector: (s: Record<string, unknown>) => unknown) =>
+vi.mock('@/store/ev', () => ({
+  useEV: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({ addToast: vi.fn() }),
 }))
 

@@ -1,5 +1,5 @@
 """
-JARVIS — Task Scheduler
+E.V. — Task Scheduler
 Plánování úloh v čase — jednoduché i opakující se.
 """
 

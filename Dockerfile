@@ -1,4 +1,4 @@
-# JARVIS v5.15.0 — Headless Docker image
+# E.V. v5.15.0 — Headless Docker image
 # Spustí FastAPI backend (port 8002) + React web UI (/app)
 # Bez Tkinter GUI, bez zvuku — vhodné pro server/NAS/cloud
 
@@ -30,7 +30,7 @@ COPY --chown=jarvis:jarvis . .
 
 # Ollama konfigurace
 ENV OLLAMA_HOST=http://ollama:11434
-ENV JARVIS_HEADLESS=1
+ENV E.V._HEADLESS=1
 
 USER jarvis
 EXPOSE 8002

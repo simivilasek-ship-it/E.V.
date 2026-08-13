@@ -1,5 +1,5 @@
 """
-JARVIS Skill — MCP Sequential Thinking
+E.V. Skill — MCP Sequential Thinking
 Krok-za-krokem přemýšlení pro složité úkoly přes MCP server.
 
 Příkazy:

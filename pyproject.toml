@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.backends.legacy:build"
 
 [project]
-name = "jarvis-assistant"
+name = "ev-assistant"
 version = "5.19.0"
 description = "Lokální AI asistent — ovládej celý PC hlasem nebo textem, 100 % offline"
 readme = "README.md"
@@ -64,7 +64,7 @@ docs = [
     "python-docx>=1.1.0",
 ]
 full = [
-    "jarvis-assistant[desktop,web,memory,voice,vision,mcp]",
+    "ev-assistant[desktop,web,memory,voice,vision,mcp]",
     "sentence-transformers>=2.2.0",
     "rapidfuzz>=3.0.0",
     "vosk>=0.3.45",
@@ -91,6 +91,7 @@ dev = [
 
 [project.scripts]
 jarvis         = "jarvis:main"
+ev             = "jarvis:main"
 jarvis-desktop = "app_desktop:main"
 jarvis-setup   = "setup_wizard:run"
 jarvis-dash    = "dashboard:run_dashboard"
@@ -110,10 +111,10 @@ fail_under = 70
 show_missing = true
 
 [project.urls]
-Homepage     = "https://github.com/simivilasek-ship-it/Jarvis"
-Repository   = "https://github.com/simivilasek-ship-it/Jarvis"
-"Bug Tracker"= "https://github.com/simivilasek-ship-it/Jarvis/issues"
-Changelog    = "https://github.com/simivilasek-ship-it/Jarvis/blob/main/CHANGELOG.md"
+Homepage     = "https://github.com/simivilasek-ship-it/E.V."
+Repository   = "https://github.com/simivilasek-ship-it/E.V."
+"Bug Tracker"= "https://github.com/simivilasek-ship-it/E.V./issues"
+Changelog    = "https://github.com/simivilasek-ship-it/E.V./blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["."]

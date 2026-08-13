@@ -1,4 +1,4 @@
-# JARVIS v5.9 — Benchmarky
+# E.V. v5.9 — Benchmarky
 
 Měřeno na: **Intel i7, 30 GB RAM, Ubuntu 24.04 LTS**  
 Datum: 2026-06-03 · Branch: security/headless-confirm-fix
@@ -157,7 +157,7 @@ Celkem od konce věty po začátek odpovědi:   ~580 ms
 ## Jak zreplikovat benchmarky
 
 ```bash
-cd Jarvis
+cd E.V.
 python3 -c "
 import time, requests, psutil
 

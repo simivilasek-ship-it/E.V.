@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Nahlášení chyby v JARVIS
+about: Nahlášení chyby v E.V.
 title: '[BUG] '
 labels: bug
 assignees: ''
@@ -22,7 +22,7 @@ assignees: ''
 ## Prostředí
 - OS: <!-- Ubuntu 22.04 / Fedora ... -->
 - Python: <!-- python3 --version -->
-- JARVIS verze: <!-- cat config.py | grep __version__ -->
+- E.V. verze: <!-- cat config.py | grep __version__ -->
 - Ollama model: <!-- ollama list -->
 
 ## Logy

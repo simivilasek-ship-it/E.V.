@@ -1,4 +1,4 @@
-"""JARVIS core orchestrator and lifecycle management.
+"""E.V. core orchestrator and lifecycle management.
 Integrates plugin system, async operations, and robust error handling."""
 
 import logging
@@ -100,12 +100,12 @@ class _StubRoot:
         pass
 
 
-class JarvisApp:
+class EVApp:
     """Orchestrátor — propojuje GUI s backend moduly."""
 
     def __init__(self):
         setup_logging()
-        logger.info(f"Spouštím JARVIS v{__version__}...")
+        logger.info(f"Spouštím E.V. v{__version__}...")
 
         # Inicializace nových systémů (async, error handling, plugins)
         self._init_new_systems()
@@ -122,7 +122,7 @@ class JarvisApp:
             self.error_handler.log_error(
                 severity=ErrorSeverity.CRITICAL,
                 category=ErrorCategory.SYSTEM,
-                source="JarvisApp.__init__",
+                source="EVApp.__init__",
                 message=f"Inicializace backendu selhala: {e}",
                 exception=e,
             )
@@ -156,7 +156,7 @@ class JarvisApp:
         if not CONFIG.get("web_mode", False):
             self.gui.root.after(800, self._check_ollama)
         self._schedule_memory_maintenance()
-        logger.info("JARVIS připraven.")
+        logger.info("E.V. připraven.")
 
     def _init_new_systems(self):
         """Inicializuje všechny systémy."""
@@ -259,7 +259,7 @@ class JarvisApp:
                 try:
                     if self._notif_engine:
                         self._notif_engine.notify(
-                            title="JARVIS — Automatická detekce",
+                            title="E.V. — Automatická detekce",
                             body=msg,
                             urgency=urgency,
                         )
@@ -286,7 +286,7 @@ class JarvisApp:
             def _mission_notify(msg: str, urgency: str):
                 try:
                     if self._notif_engine:
-                        self._notif_engine.notify(title="JARVIS — Mise", body=msg, urgency=urgency)
+                        self._notif_engine.notify(title="E.V. — Mise", body=msg, urgency=urgency)
                     self.bus.emit("mission_event", {"message": msg, "urgency": urgency})
                 except Exception:
                     pass
@@ -763,7 +763,7 @@ class JarvisApp:
         self._shutdown()
 
     def _shutdown(self):
-        logger.info("Ukončuji JARVIS...")
+        logger.info("Ukončuji E.V....")
 
         # Ulož konverzační historii
         try:
@@ -803,7 +803,7 @@ class JarvisApp:
         except Exception:
             pass
 
-        logger.info("JARVIS ukončen")
+        logger.info("E.V. ukončen")
 
     def run(self):
         try:
@@ -815,8 +815,11 @@ class JarvisApp:
             self.error_handler.log_error(
                 severity=ErrorSeverity.CRITICAL,
                 category=ErrorCategory.SYSTEM,
-                source="JarvisApp.run",
+                source="EVApp.run",
                 message=f"Nezachytitelná chyba: {e}",
                 exception=e,
             )
             self._shutdown()
+
+
+JarvisApp = EVApp
