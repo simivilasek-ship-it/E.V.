@@ -30,7 +30,8 @@ COPY --chown=jarvis:jarvis . .
 
 # Ollama konfigurace
 ENV OLLAMA_HOST=http://ollama:11434
-ENV E.V._HEADLESS=1
+ENV JARVIS_HEADLESS=1
+ENV JARVIS_BIND_HOST=0.0.0.0
 
 USER jarvis
 EXPOSE 8002

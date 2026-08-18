@@ -219,19 +219,25 @@ def register(app):
 
     @app.get("/api/agents")
     async def agents_status():
-        result = {}
+        """Always return a list of {name, running, interval} for the web UI."""
         try:
             from agents import AgentManager
             mgr = AgentManager.get_instance()
             if mgr:
-                result = mgr.status()
+                data = mgr.status()
+                if isinstance(data, list) and data:
+                    return data
+                if isinstance(data, dict) and data:
+                    return [
+                        {"name": k, **(v if isinstance(v, dict) else {"value": v})}
+                        for k, v in data.items()
+                    ]
         except Exception:
             pass
-        if not result:
-            # Fallback — zjisti alespoň co jsou to za procesy
-            for name in ("cpu_monitor", "ram_monitor", "disk_monitor"):
-                result[name] = {"running": logger_module_available, "interval": 30}
-        return result
+        return [
+            {"name": name, "running": logger_module_available, "interval": 30}
+            for name in ("cpu_monitor", "ram_monitor", "disk_monitor")
+        ]
 
     @app.get("/api/scheduler")
     async def scheduler_tasks():

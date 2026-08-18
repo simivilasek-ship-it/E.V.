@@ -24,6 +24,33 @@ export function parseStatusToMode(status: string): MessageMode | null {
   return null
 }
 
+export interface AgentInfo {
+  name: string
+  running?: boolean
+  interval?: number
+  type?: string
+  [key: string]: unknown
+}
+
+export function normalizeAgents(data: unknown): AgentInfo[] {
+  if (Array.isArray(data)) {
+    return data.map((item, i) => {
+      if (item && typeof item === 'object') {
+        const rec = item as Record<string, unknown>
+        return { ...rec, name: String(rec.name ?? rec.type ?? `agent_${i}`) }
+      }
+      return { name: `agent_${i}` }
+    })
+  }
+  if (data && typeof data === 'object') {
+    return Object.entries(data as Record<string, unknown>).map(([name, v]) => {
+      const rec = v && typeof v === 'object' ? (v as Record<string, unknown>) : {}
+      return { ...rec, name: String(rec.name ?? name) }
+    })
+  }
+  return []
+}
+
 export interface SystemMetrics {
   cpu: number; ram: number; disk: number
   cpu_temp: number | null
@@ -47,7 +74,7 @@ interface EVState {
   logs:        Array<{ text: string; ts: number }>
   toasts:      Array<{ id: number; message: string; type: string; duration: number }>
   system:      SystemMetrics
-  agents:      Record<string, unknown>
+  agents:      AgentInfo[]
   plugins:     unknown[]
   currentModel: string
   isConnected: boolean
@@ -100,7 +127,7 @@ interface EVState {
   removeToast:    (id: number) => void
   setOrbState:    (s: OrbState) => void
   setSystem:      (data: Partial<SystemMetrics>) => void
-  setAgents:      (data: Record<string, unknown>) => void
+  setAgents:      (data: AgentInfo[] | Record<string, unknown>) => void
   setPlugins:     (data: unknown[]) => void
   setModel:       (model: string) => void
   addToQuickHistory: (cmd: string) => void
@@ -140,7 +167,7 @@ const getApiBase = () => {
 export const useEV = create<EVState>((set, get) => ({
   orbState: 'idle', messages: [], logs: [], toasts: [],
   system: { cpu: 0, ram: 0, disk: 0, cpu_temp: null, net: null, gpu: null },
-  agents: {}, plugins: [], currentModel: '',
+  agents: [], plugins: [], currentModel: '',
   isConnected: false, connStatus: 'disconnected', connError: null, isMicActive: false,
   duplexVoice: false,
   pendingConfirm: null,
@@ -495,7 +522,7 @@ export const useEV = create<EVState>((set, get) => ({
   removeToast(id) { set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })) },
   setOrbState(s)  { set({ orbState: s }) },
   setSystem(data) { set(s => ({ system: { ...s.system, ...data } })) },
-  setAgents(data) { set({ agents: data }) },
+  setAgents(data) { set({ agents: normalizeAgents(data) }) },
   setPlugins(data){ set({ plugins: data }) },
   setModel(model) { set({ currentModel: model }) },
   addToQuickHistory(cmd) {

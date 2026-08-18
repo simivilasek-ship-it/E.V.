@@ -26,7 +26,7 @@ if HAS_FASTAPI:
     app = FastAPI(
         title="E.V. API",
         version=__version__,
-        docs_url="/api/docs" if _dev_mode else None,
+        docs_url="/api/swagger" if _dev_mode else None,
         redoc_url="/api/redoc" if _dev_mode else None,
         openapi_url="/api/openapi.json" if _dev_mode else None,
     )

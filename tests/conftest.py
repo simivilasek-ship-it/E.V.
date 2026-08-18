@@ -2,11 +2,19 @@
 E.V. pytest configuration and fixtures
 """
 
+import os
+import tempfile
+from pathlib import Path
+
+# Isolate all Path.home() / expanduser("~") writes from the real user home.
+# Must run before test modules import project code that caches home paths.
+_TEST_HOME = Path(tempfile.mkdtemp(prefix="ev-test-home-"))
+(_TEST_HOME / ".jarvis").mkdir(parents=True, exist_ok=True)
+os.environ["HOME"] = str(_TEST_HOME)
+os.environ.setdefault("JARVIS_TEST_MODE", "1")
+
 import pytest
 import json
-import tempfile
-import os
-from pathlib import Path
 from typing import Dict, Any
 from unittest.mock import MagicMock, patch
 

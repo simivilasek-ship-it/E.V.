@@ -100,11 +100,11 @@ class MorningBriefing:
 
         hour = now.hour
         if hour < 12:
-            greeting = f"## Dobré ráno, Simone. Systémy E.V. jsou online. ☀️"
+            greeting = f"## Dobré ráno, {user_name}. Systémy E.V. jsou online. ☀️"
         elif hour < 18:
-            greeting = f"## Odpolední aktualizace systémů. 🌤️"
+            greeting = f"## Odpolední aktualizace systémů, {user_name}. 🌤️"
         else:
-            greeting = f"## Večerní přehled. Systémy E.V. v nočním módu. 🌙"
+            greeting = f"## Večerní přehled, {user_name}. Systémy E.V. v nočním módu. 🌙"
 
         narrative_parts = [
             greeting,

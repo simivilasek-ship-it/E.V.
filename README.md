@@ -186,7 +186,7 @@ After `./install.sh` and `python3 dashboard.py`, these work **without extra conf
 | **Voice input (Whisper)** | Whisper model download on first use; mic permissions |
 | **Background workers** | `.env` tokens for Slack, email (IMAP), GitHub, calendar |
 | **Screen / UI automation** | Opt-in: `computer_use_enabled=true` in `config.json` (AT-SPI on Linux) |
-| **LAN dashboard access** | `E.V._BIND_HOST=0.0.0.0` + `E.V._API_AUTH_REQUIRED=1` + token |
+| **LAN dashboard access** | `JARVIS_BIND_HOST=0.0.0.0` + `JARVIS_API_AUTH_REQUIRED=1` + token |
 
 API binds to **`127.0.0.1` by default** — not exposed on your network unless you change it.
 
@@ -335,14 +335,14 @@ Light theme (`data-theme="light"`) works across **all** panels.
 
 ## Security
 
-- API listens on **`127.0.0.1` by default** — override with `E.V._BIND_HOST` only if you need LAN access
-- When binding to `0.0.0.0`, set **`E.V._API_AUTH_REQUIRED=1`** and a strong `E.V._API_TOKEN`
+- API listens on **`127.0.0.1` by default** — override with `JARVIS_BIND_HOST` only if you need LAN access
+- When binding to `0.0.0.0`, set **`JARVIS_API_AUTH_REQUIRED=1`** and a strong `JARVIS_API_TOKEN`
 - Shell commands go through a **blacklist** (`rm -rf /`, `dd`, reverse shells, fork bombs — always blocked)
 - Agent actions require **permission levels** — destructive ops need user confirmation
 - **Web UI confirmation modal** — when the browser is connected, ELEVATED actions wait for approve/deny (`/ws/confirm`)
 - Every action is **audit-logged** to `~/.jarvis_audit.jsonl`
-- Headless/CI without web client blocks `ELEVATED` by default (opt-in: `E.V._HEADLESS_APPROVE_ELEVATED=1`)
-- **Docker:** `docker-compose.yml` enables API auth by default — set `E.V._API_TOKEN` in `.env`
+- Headless/CI without web client blocks `ELEVATED` by default (opt-in: `JARVIS_HEADLESS_APPROVE_ELEVATED=1`)
+- **Docker:** `docker-compose.yml` enables API auth by default — set `JARVIS_API_TOKEN` in `.env`
 - **Docker hardening** — `cap_drop: ALL`, `no-new-privileges`, tmpfs for `/tmp`, memory + CPU limits
 - **Token generator** — `python scripts/generate_token.py --write` creates a cryptographically secure API token
 - **systemd isolation** — service loads secrets from `~/.config/jarvis/.env` (not the project root)

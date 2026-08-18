@@ -10,7 +10,7 @@ vi.mock('@/lib/api', () => ({
 
 const baseState = {
   system: { cpu: 42.5, ram: 61.0, disk: 30.2, load: 1.5 },
-  agents: {},
+  agents: [],
   addToast: vi.fn(),
 }
 

@@ -6,7 +6,7 @@ const SAMPLE_RATE = 16000
 /** RMS energy threshold for local barge-in during TTS playback */
 const BARGE_IN_RMS = 0.02
 
-function downsampleTo16k(input: Float32Array, inputRate: number): Int16Array {
+export function downsampleTo16k(input: Float32Array, inputRate: number): Int16Array {
   if (inputRate === SAMPLE_RATE) {
     const out = new Int16Array(input.length)
     for (let i = 0; i < input.length; i++) {
@@ -26,7 +26,7 @@ function downsampleTo16k(input: Float32Array, inputRate: number): Int16Array {
   return out
 }
 
-function pcmRms(input: Float32Array): number {
+export function pcmRms(input: Float32Array): number {
   let sum = 0
   for (let i = 0; i < input.length; i++) {
     sum += input[i] * input[i]

@@ -6,9 +6,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=@E.V._DIR@
+WorkingDirectory=@EV_DIR@
 EnvironmentFile=-%h/.config/jarvis/.env
-ExecStart=@E.V._DIR@/venv/bin/python dashboard.py --no-open
+ExecStart=@EV_DIR@/venv/bin/python dashboard.py --no-open
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1

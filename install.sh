@@ -3,7 +3,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
-E.V._VERSION=$(python3 -c "from config import __version__; print(__version__)" 2>/dev/null || echo "5.4.0")
+EV_VERSION=$(python3 -c "from config import __version__; print(__version__)" 2>/dev/null || echo "5.4.0")
 DEFAULT_MODEL="qwen2.5:3b"
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -15,7 +15,7 @@ warn() { echo -e "${YELLOW}  ! $1${NC}"; }
 err()  { echo -e "${RED}  ✗ $1${NC}"; }
 
 echo "============================================"
-echo "  E.V. v${E.V._VERSION} — Instalace"
+echo "  E.V. v${EV_VERSION} — Instalace"
 echo "============================================"
 echo
 
@@ -108,7 +108,7 @@ UNIT_DIR="$HOME/.config/systemd/user"
 UNIT_DEST="$UNIT_DIR/jarvis.service"
 if [ -f "desktop/jarvis.service" ]; then
     mkdir -p "$UNIT_DIR"
-    sed "s|@E.V._DIR@|${SCRIPT_DIR}|g" desktop/jarvis.service > "$UNIT_DEST"
+    sed "s|@EV_DIR@|${SCRIPT_DIR}|g" desktop/jarvis.service > "$UNIT_DEST"
     ok "Unit zapsán → $UNIT_DEST"
     echo "    systemctl --user enable --now jarvis.service   # autostart"
     echo "    systemctl --user status jarvis.service"

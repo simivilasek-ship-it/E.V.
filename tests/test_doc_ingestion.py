@@ -18,6 +18,9 @@ def isolated_store(tmp_path, monkeypatch):
     docs_dir = tmp_path / "docs"
     docs_dir.mkdir()
     index_file = docs_dir / "index.json"
+    import src.doc_ingestion as src_docs
+    monkeypatch.setattr(src_docs, "_DOCS_DIR", docs_dir)
+    monkeypatch.setattr(src_docs, "_INDEX_FILE", index_file)
     monkeypatch.setattr(doc_ingestion, "_DOCS_DIR", docs_dir)
     monkeypatch.setattr(doc_ingestion, "_INDEX_FILE", index_file)
     yield docs_dir

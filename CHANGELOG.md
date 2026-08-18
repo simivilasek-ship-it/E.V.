@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [Unreleased]
+
+### Fixed
+- **Env var rebrand** — CI, Docker, install.sh and docs used invalid `E.V._*` names that Python never reads. Canonical names are `JARVIS_*` (see `.env.example`).
+- **install.sh** — `E.V._VERSION` is not a valid bash identifier; install aborted immediately under `set -e`.
+- **Morning briefing** — greeting now uses the `user_name` argument instead of a hardcoded name.
+- **Makefile help** — unclosed quote broke `make help`.
+- **Swagger vs RAG** — OpenAPI UI moved to `/api/swagger` so `GET /api/docs` stays the document list.
+- **`GET /api/agents`** — always returns a list of `{name, running, interval}` (empty list no longer becomes a dict).
+
+### Added
+- Unit tests for error handling, morning briefing, user profile, cloud router, scheduler, missions store, config env, shell scripts, agents, duplex audio, whisper live, and autonomous workers.
+- Frontend unit tests for `apiUrl`, `parseStatusToMode`, `normalizeAgents`, and audio PCM helpers.
+
 ## [5.19.0] - 2026-06-14
 
 ### Added — 8.5/10 parity push

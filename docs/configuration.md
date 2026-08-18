@@ -70,7 +70,7 @@ UI: panel **Mise** (Alt+M)
 | Klíč / Env | Výchozí | Popis |
 |------------|---------|-------|
 | `audio_ws_enabled` | `true` | WebSocket `/ws/audio` pro VAD/duplex |
-| `E.V._HEADLESS_APPROVE_ELEVATED` | *(unset)* | Opt-in auto-schválení ELEVATED v headless bez web UI |
+| `JARVIS_HEADLESS_APPROVE_ELEVATED` | *(unset)* | Opt-in auto-schválení ELEVATED v headless bez web UI |
 
 Pokud je otevřený web dashboard, nebezpečné akce čekají na modal v prohlížeči (`/ws/confirm`).
 
@@ -217,7 +217,7 @@ Pokud je otevřený web dashboard, nebezpečné akce čekají na modal v prohlí
 ```bash
 # Ve výchozím nastavení jsou ELEVATED akce v headless režimu ZAMÍTNUTY.
 # Pro povolení (jen na důvěryhodných serverech):
-export E.V._HEADLESS_APPROVE_ELEVATED=1
+export JARVIS_HEADLESS_APPROVE_ELEVATED=1
 ```
 
 ---

@@ -178,18 +178,15 @@ DEFAULT_CONFIG = {
 
 def _load_env() -> Dict[str, Any]:
     """
-    Načte konfiguraci z .env souboru
-    Vrátí slovník s env proměnnými
+    Načte konfiguraci z prostředí.
+
+    `.env` je volitelný overlay. Už nastavené process env (Docker, systemd, CI)
+    mají přednost — proto override=False.
     """
-    if not HAS_DOTENV:
-        return {}
-    
-    # Hledej .env v aktuálním adresáři
-    env_path = os.path.join(os.path.dirname(__file__), ".env")
-    if not os.path.exists(env_path):
-        return {}
-    
-    load_dotenv(env_path, override=True)
+    if HAS_DOTENV:
+        env_path = os.path.join(os.path.dirname(__file__), ".env")
+        if os.path.exists(env_path):
+            load_dotenv(env_path, override=False)
     
     # Mapování env proměnných → config klíče
     env_mapping = {

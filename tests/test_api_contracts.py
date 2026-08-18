@@ -196,7 +196,9 @@ class TestMisc:
     def test_agents_status(self, client):
         r = client.get("/api/agents")
         assert r.status_code == 200
-        assert isinstance(r.json(), dict)
+        data = r.json()
+        assert isinstance(data, list)
+        assert all(isinstance(item, dict) and "name" in item for item in data)
 
     def test_mcp_status(self, client):
         r = client.get("/api/mcp/status")

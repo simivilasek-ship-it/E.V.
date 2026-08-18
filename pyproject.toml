@@ -131,12 +131,7 @@ target-version = "py311"
 select = ["F821", "F811", "E711", "E712", "W"]
 ignore = ["E501"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests", "test_jarvis.py"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = "-v --tb=short"
+# Pytest lives in pytest.ini (pytest ignores this table when pytest.ini exists).
 
 [tool.mypy]
 python_version = "3.11"

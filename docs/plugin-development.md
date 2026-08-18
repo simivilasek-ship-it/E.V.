@@ -273,11 +273,11 @@ result = mp.run_sandboxed(
 print(result["stdout"])
 ```
 
-Sandbox nastavuje env proměnnou `E.V._SANDBOX=1` — plugin ji může detekovat:
+Sandbox nastavuje env proměnnou `JARVIS_SANDBOX=1` — plugin ji může detekovat:
 
 ```python
 import os
-if os.environ.get("E.V._SANDBOX"):
+if os.environ.get("JARVIS_SANDBOX"):
     # Omezený režim — nevolat destruktivní operace
     pass
 ```

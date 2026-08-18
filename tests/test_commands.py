@@ -48,16 +48,17 @@ class TestCommandExecutor:
         result = command_executor._cmd_open_app(app="nonexistent_app_xyz")
         assert isinstance(result, str)
     
-    @patch('commands.media.pyautogui.screenshot')
-    def test_screenshot(self, mock_screenshot, command_executor):
+    def test_screenshot(self, command_executor):
         """Test screenshot command"""
-        with patch("commands.media.HAS_PYAUTOGUI", True):
-            # Create mock image with save method
-            mock_img = MagicMock()
-            mock_screenshot.return_value = mock_img
-            
+        mock_pg = MagicMock()
+        mock_img = MagicMock()
+        mock_pg.screenshot.return_value = mock_img
+        with patch("commands.media.HAS_PYAUTOGUI", True), patch(
+            "commands.media.pyautogui", mock_pg
+        ):
             result = command_executor._cmd_screenshot()
-            assert result == "ok" or "Uloženo" in result
+        assert result == "ok" or "Uloženo" in result
+        mock_img.save.assert_called_once()
     
     def test_create_file(self, command_executor):
         """Test file creation"""

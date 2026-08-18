@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import tempfile
 import threading
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -267,8 +268,10 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
 
     # ── Memory MCP — knowledge graph (bez API klíče) ──
     mem_dir = os.path.join(os.path.expanduser("~"), ".jarvis_mcp_memory")
-    mem_dir = os.path.join(os.path.expanduser("~"), ".jarvis_mcp_memory")
-    os.makedirs(mem_dir, exist_ok=True)
+    try:
+        os.makedirs(mem_dir, exist_ok=True)
+    except OSError:
+        mem_dir = tempfile.mkdtemp(prefix="ev-mcp-memory-")
     bridge.register(MCPServerConfig(
         name="mcp-memory",
         command="npx",

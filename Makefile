@@ -10,10 +10,10 @@ help:
 	@echo "  make update   — git pull + reinstall závislostí"
 	@echo "  make stop     — zastavit běžící server"
 	@echo "  make logs     — zobrazit dnešní work log"
-	@echo "  make docker   — spustit přes Docker Compose
-  make test     — spustit Python testy (pytest)
-  make test-front — spustit frontend testy (Vitest)
-  make release  — tag + push + GitHub Release"
+	@echo "  make docker     — spustit přes Docker Compose"
+	@echo "  make test       — spustit Python testy (pytest)"
+	@echo "  make test-front — spustit frontend testy (Vitest)"
+	@echo "  make release    — tag + push + GitHub Release"
 	@echo ""
 
 start:
@@ -38,7 +38,7 @@ docker:
 	docker compose up
 
 test:
-	source venv/bin/activate && pytest tests/ -x -q --tb=short
+	source venv/bin/activate && pytest tests/ test_jarvis.py -q --tb=short
 
 test-front:
 	cd web && npm run test:unit -- --run

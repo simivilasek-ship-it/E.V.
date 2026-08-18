@@ -11,6 +11,7 @@ import sys
 import os
 import time
 import threading
+import importlib.util
 from unittest.mock import patch, MagicMock, call
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -246,6 +247,7 @@ class TestCommands(unittest.TestCase):
         result = self.cmds.execute("volume", {"action": "mute"})
         self.assertTrue(len(result) > 0)  # mute vrátí neprázdný string
 
+    @patch("commands.media.HAS_PYAUTOGUI", True)
     @patch("commands.media.pyautogui")
     def test_screenshot(self, mock_pg):
         mock_img = MagicMock()
@@ -828,6 +830,7 @@ class TestUserProfileExtraction(unittest.TestCase):
 #  GUI — HEADLESS (bez zobrazení okna)
 # ══════════════════════════════════════════════════════
 
+@unittest.skipUnless(importlib.util.find_spec("gui_legacy"), "gui_legacy was removed")
 class TestGUIHeadless(unittest.TestCase):
     """Testy GUI logiky bez otevření okna (mockovaný tkinter)."""
 

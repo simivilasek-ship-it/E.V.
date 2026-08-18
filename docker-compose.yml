@@ -1,7 +1,7 @@
 # E.V. v5.15.0 — Docker Compose
 # Spuštění: docker compose up -d
 # Web UI: http://localhost:8002/app
-# Vyžaduje E.V._API_TOKEN v .env (auth zapnuto ve výchozím stavu)
+# Vyžaduje JARVIS_API_TOKEN v .env (auth zapnuto ve výchozím stavu)
 
 services:
   ollama:
@@ -31,9 +31,9 @@ services:
       - "8002:8002"
     environment:
       - OLLAMA_HOST=http://ollama:11434
-      - E.V._HEADLESS=1
-      - E.V._BIND_HOST=0.0.0.0
-      - E.V._API_AUTH_REQUIRED=1
+      - JARVIS_HEADLESS=1
+      - JARVIS_BIND_HOST=0.0.0.0
+      - JARVIS_API_AUTH_REQUIRED=1
     env_file:
       - .env          # BRAVE_API_KEY atd.
     volumes:
