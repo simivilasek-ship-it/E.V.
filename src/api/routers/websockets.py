@@ -42,18 +42,24 @@ async def _stream_tts(
     voice: str,
     cancel: asyncio.Event,
 ) -> None:
-    """Stream Edge-TTS audio jako binary frames do prohlížeče."""
-    if not text or len(text) > 800:
-        text = (text[:800] + "…") if len(text) > 800 else text
+    """Stream TTS audio jako binary frames do prohlížeče (ElevenLabs → Edge-TTS → espeak)."""
+    from tts import prepare_speech_text, elevenlabs_configured, synthesize_speech
+
+    text = prepare_speech_text(text or "", limit=2500)
+    if not text:
+        return
     try:
-        import edge_tts
-        communicate = edge_tts.Communicate(text, voice)
         await ws.send_text(json.dumps({"type": "tts_start"}))
-        async for chunk in communicate.stream():
-            if cancel.is_set():
-                return
-            if chunk["type"] == "audio":
-                await ws.send_bytes(chunk["data"])
+
+        if elevenlabs_configured():
+            await _stream_elevenlabs(ws, text, cancel)
+        else:
+            loop = asyncio.get_event_loop()
+            data, _mime = await loop.run_in_executor(
+                None, lambda: synthesize_speech(text),
+            )
+            if data and not cancel.is_set():
+                await ws.send_bytes(data)
         if not cancel.is_set():
             await ws.send_text(json.dumps({"type": "tts_end"}))
     except asyncio.CancelledError:
@@ -62,6 +68,52 @@ async def _stream_tts(
         logger.debug(f"ws_audio TTS skip: {e}")
         if not cancel.is_set():
             await ws.send_text(json.dumps({"type": "tts_end"}))
+
+
+async def _stream_elevenlabs(ws: WebSocket, text: str, cancel: asyncio.Event) -> None:
+    loop = asyncio.get_event_loop()
+    q: asyncio.Queue = asyncio.Queue()
+
+    def _produce() -> None:
+        try:
+            from tts import (
+                ELEVENLABS_FEMALE_VOICE_ID,
+                ELEVENLABS_MODEL,
+                _elevenlabs_api_key,
+                iter_elevenlabs_audio,
+            )
+            from config import CONFIG
+
+            buf = bytearray()
+            for chunk in iter_elevenlabs_audio(
+                text,
+                api_key=_elevenlabs_api_key(CONFIG),
+                voice_id=str(CONFIG.get("elevenlabs_voice_id") or ELEVENLABS_FEMALE_VOICE_ID),
+                model_id=str(CONFIG.get("elevenlabs_model") or ELEVENLABS_MODEL),
+            ):
+                if cancel.is_set():
+                    break
+                buf.extend(chunk)
+            if buf and not cancel.is_set():
+                asyncio.run_coroutine_threadsafe(q.put(bytes(buf)), loop).result()
+        except Exception as exc:
+            asyncio.run_coroutine_threadsafe(q.put(exc), loop).result()
+        finally:
+            asyncio.run_coroutine_threadsafe(q.put(None), loop).result()
+
+    worker = loop.run_in_executor(None, _produce)
+    try:
+        while True:
+            item = await q.get()
+            if item is None:
+                break
+            if isinstance(item, Exception):
+                raise item
+            if cancel.is_set():
+                break
+            await ws.send_bytes(item)
+    finally:
+        await worker
 
 
 def _pcm_has_speech(pcm: bytes, vad) -> bool:
@@ -117,9 +169,20 @@ def register(app):
             vad_filter = VADFilter()
             transcriber = WhisperTranscriber(CONFIG)
             if not transcriber.available:
-                transcriber = None
+                await ws.send_text(json.dumps({
+                    "type": "error",
+                    "data": "STT není dostupné — nainstaluj SpeechRecognition (Google) nebo Whisper",
+                }))
+                await ws.close()
+                return
         except Exception as e:
             logger.debug(f"ws_audio STT init: {e}")
+            await ws.send_text(json.dumps({
+                "type": "error",
+                "data": f"STT se nenačetl: {e}",
+            }))
+            await ws.close()
+            return
 
         bus = None
         try:
@@ -129,7 +192,7 @@ def register(app):
             bus = None
 
         loop = asyncio.get_event_loop()
-        voice = CONFIG.get("tts_voice", "cs-CZ-AntoninNeural")
+        voice = CONFIG.get("tts_voice", "cs-CZ-VlastaNeural")
         barge_in = bool(CONFIG.get("duplex_barge_in", True))
 
         barge_vad = None
@@ -142,6 +205,7 @@ def register(app):
 
         current_tts_task: asyncio.Task | None = None
         tts_cancel = asyncio.Event()
+        last_spoken = ""
 
         async def _cancel_tts(*, notify: bool = True) -> None:
             nonlocal current_tts_task
@@ -173,7 +237,8 @@ def register(app):
                     current_tts_task = None
 
         def _start_tts(text: str) -> None:
-            nonlocal current_tts_task
+            nonlocal current_tts_task, last_spoken
+            last_spoken = text or last_spoken
             if current_tts_task and not current_tts_task.done():
                 tts_cancel.set()
                 current_tts_task.cancel()
@@ -184,10 +249,18 @@ def register(app):
             if not pcm or not transcriber:
                 return
             try:
-                from whisper_live import pcm_to_wav
+                from whisper_live import pcm_to_wav, looks_like_echo
                 wav = pcm_to_wav(pcm)
                 text = await loop.run_in_executor(None, lambda: transcriber.transcribe(wav))
                 if not text or len(text.strip()) < 2:
+                    if len(pcm) > 16000 * 2 * 1:
+                        await ws.send_text(json.dumps({
+                            "type": "error",
+                            "data": "Nerozuměla jsem. Zkus to ještě jednou, nebo napiš do chatu.",
+                        }))
+                    return
+                if looks_like_echo(text, last_spoken):
+                    logger.debug("ws_audio: ignoruji echo vlastní řeči")
                     return
                 await ws.send_text(json.dumps({"type": "transcript", "text": text.strip()}))
 
@@ -235,20 +308,23 @@ def register(app):
                 if not frame:
                     continue
 
+                tts_busy = bool(current_tts_task and not current_tts_task.done())
                 if (
                     barge_in
-                    and current_tts_task
-                    and not current_tts_task.done()
+                    and tts_busy
                     and _pcm_has_speech(frame, barge_vad)
                 ):
                     await _cancel_tts()
+                    tts_busy = False
+                    if bus:
+                        try:
+                            bus.emit(EventType.AUDIO_SPEECH, {"ts": time.time(), "n": len(frame)},
+                                     source="ws_audio")
+                        except Exception:
+                            pass
 
-                if bus:
-                    try:
-                        bus.emit(EventType.AUDIO_SPEECH, {"ts": time.time(), "n": len(frame)},
-                                 source="ws_audio")
-                    except Exception:
-                        pass
+                if tts_busy:
+                    continue
 
                 if vad_filter is not None:
                     utterance = vad_filter.feed(frame)

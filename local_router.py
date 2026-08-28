@@ -38,6 +38,7 @@ from router.apps import (
 from router.media import route_music, route_vision
 from router.system import route_system, route_files
 from router.memory_routes import route_memory
+from router.cursor import route_cursor
 
 try:
     from rapidfuzz import fuzz as _fuzz
@@ -60,6 +61,7 @@ def _parse_args(command: str, args: str) -> dict:
             "weather":        lambda: {"city": a},
             "vscode_open":    lambda: {"path": os.path.expanduser(a)},
             "open_file":      lambda: {"path": os.path.expanduser(a)},
+            "ask_cursor":     lambda: {"prompt": a},
             "create_folder":  lambda: {"path": os.path.expanduser(a)},
             "create_file":    lambda: {"path": os.path.expanduser(a)},
             "delete_file":    lambda: {"path": os.path.expanduser(a)},
@@ -214,6 +216,11 @@ class LocalRouter:
 
         # Neural memory (recall / store / stats / maintenance)
         result = route_memory(text, t)
+        if result[1] is not None:
+            return result
+
+        # Cursor — až po desktop příkazech, ať „otevři chrome“ nejde do IDE
+        result = route_cursor(text, t)
         if result[1] is not None:
             return result
 

@@ -16,6 +16,7 @@ class TestTTSSpeakStreaming:
         cfg = {"tts_enabled": False}   # worker se nespustí — jen testujeme logiku
         e = TTSEngine(cfg)
         e.enabled = True
+        e._elevenlabs_key = ""
         e.speak = MagicMock()
         return e
 

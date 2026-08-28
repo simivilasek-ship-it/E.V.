@@ -120,12 +120,19 @@ class ActivityCollector:
                         pass
                 return ""
             elif system == "Linux":
-                r = subprocess.run(
-                    ["xdotool", "getactivewindow", "getwindowname"],
-                    capture_output=True, text=True, timeout=1,
-                )
-                if r.returncode == 0:
-                    return r.stdout.strip()[:120]
+                try:
+                    r = subprocess.run(
+                        ["xdotool", "getactivewindow", "getwindowname"],
+                        capture_output=True, text=True, timeout=1,
+                    )
+                    if r.returncode == 0 and r.stdout.strip():
+                        return r.stdout.strip()[:120]
+                except Exception:
+                    pass
+                from window_info import get_desktop_windows
+                title, _ = get_desktop_windows()
+                if title:
+                    return title[:120]
             elif system == "Darwin":
                 r = subprocess.run(
                     ["osascript", "-e",

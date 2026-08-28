@@ -19,6 +19,7 @@ qtpy>=2.4.0
 # ── Web dashboard / API ────────────────────────────────
 fastapi>=0.111.0
 uvicorn>=0.29.0
+websockets>=12.0
 
 # ── TTS ────────────────────────────────────────────────
 edge-tts>=7.0.0
@@ -37,8 +38,8 @@ pyperclip>=1.8.2
 # ── YouTube ────────────────────────────────────────────
 yt-dlp>=2024.1.0
 
-# ── MCP ────────────────────────────────────────────────
-mcp>=1.0.0
+# ── Cursor agent (E.V. předá úkol do Cursora) ─────────
+cursor-sdk
 
 # ── Paměť / embeddingy ────────────────────────────────
 sentence-transformers>=2.7.0

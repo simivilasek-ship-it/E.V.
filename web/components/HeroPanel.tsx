@@ -14,17 +14,20 @@ export function EVStatusBar() {
   const connStatus   = useEV(s => s.connStatus)
   const currentModel = useEV(s => s.currentModel)
   const plugins      = useEV(s => s.plugins) as Array<{ status?: string }>
+  const fetchPlugins = useEV(s => s.fetchPlugins)
   const [mcpCount, setMcpCount] = useState('—')
   const [agentStatus] = useState('Ready')
 
   useEffect(() => {
-    fetch('/api/plugins')
+    fetchPlugins()
+    fetch('/api/mcp/status')
       .then(r => r.json())
-      .then((d: { healthy?: number; total?: number }) =>
-        setMcpCount(`${d.healthy ?? '?'}/${d.total ?? '?'}`)
-      )
+      .then((d: { summary?: { ready_total?: number; enabled_total?: number } }) => {
+        const s = d.summary
+        setMcpCount(s ? `${s.ready_total ?? 0}/${s.enabled_total ?? 0}` : '—')
+      })
       .catch(() => setMcpCount('—'))
-  }, [])
+  }, [fetchPlugins])
 
   const online = connStatus === 'connected'
 

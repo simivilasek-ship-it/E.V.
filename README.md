@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="jarvis.png" width="90" alt="E.V." />
+<img src="ev-icon.svg" width="112" alt="E.V. — electric blue mark" />
 
 # E.V.
 
-**Local AI assistant for Linux — chat, system commands, and optional autonomous control.**
+**Lokální hlasová AI parťačka pro Linux.** Řekneš to nahlas — ona to udělá, nebo to předá Cursorovi.
 
-> **Why E.V. exists:** Your desktop already knows which window is active, what's eating RAM, and which apps are open — but cloud assistants don't. E.V. runs on your machine, turns that live context into answers and actions, and keeps everyday commands on a sub-millisecond local router so you are not sending your screen to someone else's API.
+> **Why E.V. exists:** Your desktop already knows which window is active, what's eating RAM, and which apps are open — but cloud assistants don't. E.V. runs on your machine, turns that live context into answers and actions, and keeps everyday commands on a local router so you are not sending your screen to someone else's API.
 
 <br/>
 
@@ -45,10 +45,13 @@ docker compose up -d                    # Docker
 systemctl --user enable jarvis.service  # autostart při přihlášení
 ```
 
-**Přidat cloud LLM (rychlejší odpovědi)** — bezplatný klíč na [console.groq.com](https://console.groq.com):
+**Chat přes GPT-4o-mini** — klíč z [platform.openai.com/api-keys](https://platform.openai.com/api-keys):
 ```bash
-echo "GROQ_API_KEY=gsk_..." >> .env
+echo "OPENAI_API_KEY=sk-..." >> .env
+echo "OPENAI_MODEL=gpt-4o-mini" >> .env
 ```
+
+Kódové úkoly jdou do **Cursor agenta** (`CURSOR_API_KEY`). Ollama (`qwen2.5:3b`) zůstává fallback, když cloud spadne.
 
 </details>
 
@@ -68,13 +71,15 @@ echo "GROQ_API_KEY=gsk_..." >> .env
 
 | Feature | Status | How to use |
 |---------|--------|-----------|
-| 💬 Local chat (Ollama) | ✅ | Type in web UI or `jarvis chat` |
-| 🖥 Desktop context (X11) | ✅ | Automatic — active window injected |
+| 💬 Chat (GPT-4o-mini) | ✅ | Web chat — OpenAI key in `.env`; Ollama as fallback |
+| ⚡ Local commands | ✅ | „otevři Chrome“, „kolik je hodin“ — bez LLM |
+| 🎙 Voice | ✅ | Pozdrav + duplex mic na `/app`; ElevenLabs Lily |
+| 🧩 Cursor handoff | ✅ | „Řekni Cursoru, ať…“ — kód řeší Cursor agent |
+| 🖥 Desktop context | ✅ | Active window injected into chat |
 | 📋 Work timeline | ✅ | Web → Work tab or `jarvis log --today` |
-| 🎙 Voice (Vosk/Whisper) | ⚙ opt-in | Enable in Settings → Voice panel |
 | 🤖 Agents | ✅ | Web → Agents tab |
 | 🔌 MCP servers | ✅ | Web → Settings → MCP |
-| 🌅 Morning briefing | ✅ | `jarvis briefing` or auto at 8:00 |
+| 🌅 Morning briefing | ✅ | Spoken hello + briefing on start |
 | 🔒 API auth token | ✅ | `python scripts/generate_token.py --write` |
 | 🐳 Docker | ✅ | `docker compose up` |
 
@@ -84,8 +89,8 @@ echo "GROQ_API_KEY=gsk_..." >> .env
 
 | You are… | E.V. gives you… |
 |----------|-------------------|
-| **Linux daily driver** | Czech/English chat, open apps, weather, hardware info — no ChatGPT tab, no copy-paste |
-| **Developer on local-first** | Ollama + optional Groq, agent graph for multi-step tasks, MCP/plugins when you need them |
+| **Linux daily driver** | Czech voice + chat, open apps, weather, hardware — no extra ChatGPT tab |
+| **Developer on local-first** | GPT-4o-mini for talk, Cursor for code, local router for the desktop |
 | **Power user tired of cloud context** | Live PC context (active window, CPU/RAM, open apps) injected into every reply |
 | **Cautious about automation** | Computer use and UI clicks are **opt-in**; vision sandbox previews before execute |
 | **Tinkerer** | Workflows, missions, GraphRAG memory, background workers — all on your disk |
@@ -142,7 +147,7 @@ E.V.: Opening Chrome...                      ✓  0.3s
 
 ## What else it does
 
-- **Voice in web UI** — mic button / duplex stream (`/ws/audio`); Whisper STT when configured
+- **Voice in web UI** — pozdrav při startu, duplex `/ws/audio`, ElevenLabs Lily; Whisper/Google STT
 - **Wake word** (“jarvis”) — desktop app only
 - **Long-term memory** — GraphRAG knowledge graph (SQLite MVP)
 - **Work Timeline + Memory** — tracks apps, git, Docker, builds; answers *"What did I do last week?"* (`/api/activity/query`)
@@ -241,13 +246,14 @@ Several MCP servers ship with the repo (filesystem, git, fetch, …). Availabili
 
 ## Copilot · Agent · PC Manager
 
-One chat, three automatic modes:
+One chat, four automatic modes:
 
 | Mode | When | Examples |
 |------|------|----------|
-| **Copilot** | Conversation, code, explanations | *"Explain asyncio"*, *"What am I working on?"* |
-| **Action** | OS commands (regex router, &lt;1 ms) | *"Open Firefox"*, *"Screenshot"*, *"Weather in Prague"*, *"What time is it?"* |
-| **Agent** | Multi-step tasks (needs LLM) | *"Find X and save a note"*, *"Check repo and summarize"* |
+| **Copilot** | Conversation (GPT-4o-mini) | *"Jak se máš?"*, *"Vysvětli asyncio"* |
+| **Action** | OS commands (regex router, &lt;1 ms) | *"Otevři Firefox"*, *"Screenshot"*, *"Počasí Praha"* |
+| **Cursor** | Code in the project | *"Řekni Cursoru, ať opraví greeting"* |
+| **Agent** | Multi-step tasks | *"Find X and save a note"*, *"Check repo and summarize"* |
 
 E.V. injects **live PC context** — active window, open apps, CPU/RAM/disk — into Copilot replies when available.
 
@@ -264,8 +270,8 @@ E.V. injects **live PC context** — active window, open apps, CPU/RAM/disk — 
 | What | How fast |
 |------|----------|
 | OS command (`open Firefox`) | **< 1 ms** — regex, no LLM |
-| Chat response (Ollama, warm) | **~120 ms+** — depends on model/GPU |
-| Chat response (Groq cloud) | **~200 ms** — LLaMA 3.3 70B |
+| Chat response (GPT-4o-mini) | **~1–3 s** — OpenAI API |
+| Chat response (Ollama fallback) | **~120 ms+** — depends on model/GPU |
 | Voice transcription (Whisper) | **~200 ms+** — first run downloads model |
 | Screen click via OCR | **~50 ms** — when vision pipeline enabled |
 
@@ -276,20 +282,20 @@ RAM: **~34 MB** idle backend · **~650 MB+** with Ollama loaded · runs on any m
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    E.V. v5.16                      │
-│                                                     │
-│  ┌──────────┐    ┌─────────────┐    ┌───────────┐  │
-│  │ Next.js  │◄──►│  FastAPI    │◄──►│  Ollama   │  │
-│  │  Web UI  │    │  Backend    │    │  (Local)  │  │
-│  └──────────┘    └──────┬──────┘    └───────────┘  │
-│                         │                           │
-│              ┌──────────▼──────────┐                │
-│              │    Core Modules     │                │
-│              │  memory · activity  │                │
-│              │  agents · MCP tools │                │
-│              └─────────────────────┘                │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                       E.V. v5.19                         │
+│                                                          │
+│  ┌──────────┐    ┌─────────────┐    ┌─────────────────┐ │
+│  │ Next.js  │◄──►│  FastAPI    │◄──►│ GPT-4o-mini     │ │
+│  │  Web UI  │    │  Backend    │    │ Cursor · Ollama │ │
+│  └──────────┘    └──────┬──────┘    └─────────────────┘ │
+│                         │                                │
+│              ┌──────────▼──────────┐                     │
+│              │    Core Modules     │                     │
+│              │  voice · router     │                     │
+│              │  memory · agents    │                     │
+│              └─────────────────────┘                     │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ```
@@ -306,7 +312,7 @@ web/           Next.js 16 — Chat, Dnes, Feed, Checklist (Alt+W/F/C/D)
 
 Backend: **FastAPI** (`src/api/`) · Frontend: **Next.js** · CLI: **`jarvis log`**
 
-**Web dashboard (v5.16):** Work Timeline, Activity Feed, daily summary (Alt+D), proactive AI + desktop notify, unified runtime, onboarding, install UX, missions + checklist, live PC context, voice in chat.
+**Web dashboard (v5.19):** hlasový start, GPT chat, předání do Cursora, Work Timeline, Activity Feed, daily summary (Alt+D), live PC context.
 
 → **[docs/index.md](docs/index.md)** · **[docs/mcp-servers.md](docs/mcp-servers.md)** · **[docs/CANONICAL.md](docs/CANONICAL.md)** · **[docs/api-reference.md](docs/api-reference.md)** · **[web/README.md](web/README.md)**
 

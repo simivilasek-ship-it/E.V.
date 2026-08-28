@@ -47,12 +47,12 @@ interface AgentInfo {
 }
 
 function AgentStatus() {
-  const agents = useEV(s => s.agents) as Record<string, { status?: string; last?: string }>
+  const agents = useEV(s => s.agents)
 
-  const list: AgentInfo[] = Object.entries(agents).slice(0, 4).map(([name, v]) => ({
-    name,
-    status: v?.status ?? 'unknown',
-    lastRun: v?.last,
+  const list: AgentInfo[] = agents.slice(0, 4).map(a => ({
+    name: a.name,
+    status: a.running ? 'running' : String(a.status ?? 'idle'),
+    lastRun: typeof a.last === 'string' ? a.last : undefined,
   }))
 
   const fallback: AgentInfo[] = [

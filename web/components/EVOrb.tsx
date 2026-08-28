@@ -32,7 +32,7 @@ export default function EVOrb({ state = 'idle', size = 'sm' }: EVOrbProps) {
           className="absolute inset-0 rounded-full"
           style={{
             background:
-              'conic-gradient(from 0deg, transparent 60%, rgba(99,102,241,.8) 80%, rgba(167,139,250,.9) 92%, transparent 100%)',
+              'conic-gradient(from 0deg, transparent 60%, rgba(59,158,255,.85) 80%, rgba(126,200,255,.95) 92%, transparent 100%)',
             animation: 'ev-think 0.9s linear infinite',
           }}
         />
@@ -72,7 +72,7 @@ export default function EVOrb({ state = 'idle', size = 'sm' }: EVOrbProps) {
                 height: '100%',
                 borderRadius: s.ring,
                 background:
-                  'linear-gradient(to top, rgba(99,102,241,.3), rgba(129,140,248,.85))',
+                  'linear-gradient(to top, rgba(37,99,235,.35), rgba(126,200,255,.95))',
                 animation: 'ev-wave 0.5s ease-in-out infinite',
                 animationDelay: `${i * 0.13}s`,
               }}
@@ -93,17 +93,18 @@ export default function EVOrb({ state = 'idle', size = 'sm' }: EVOrbProps) {
           width: s.inner,
           height: s.inner,
           background:
-            'linear-gradient(135deg, var(--accent) 0%, #4f46e5 55%, #7c3aed 100%)',
+            'linear-gradient(135deg, var(--accent) 0%, #2563eb 55%, #1d4ed8 100%)',
           borderRadius: '50%',
         }}
       >
         <span
-          className="font-bold text-white select-none"
+          className="font-bold select-none"
           style={{
             fontSize: s.font,
             letterSpacing: size === 'lg' ? '0.06em' : '0.02em',
             fontFamily: 'var(--font-display, Inter, sans-serif)',
             lineHeight: 1,
+            color: '#041018',
           }}
         >
           EV

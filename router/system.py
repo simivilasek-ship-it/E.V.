@@ -22,13 +22,18 @@ def route_system(text: str, t: str, dt: datetime | None = None) -> tuple:
     if dt is None:
         dt = datetime.now()
 
-    # Time
-    if re.search(r"\b(kolik je|jaky je|cas|hodin|time)\b", t) and \
-       not re.search(r"\b(pracovni|volny|cas na)\b", t):
+    # Time — jen explicitní dotaz na hodiny, ne „jaký je smysl“ / „jak se máš“
+    if re.search(
+        r"\b(kolik\s+je(?:\s+hodin)?|jaky\s+je\s+cas|co\s+je\s+za\s+cas|"
+        r"kolik\s+je\s+hodin|what\s+time)\b",
+        t,
+    ) and not re.search(r"\b(pracovni|volny|cas na)\b", t):
         return f"Je {dt.strftime('%H:%M:%S')}.", {"action": "get_time", "params": {}}
 
-    # Date
-    if re.search(r"\b(datum|dnes|jaky den|ktery den|date)\b", t):
+    # Date — „dnes“ samo o sobě ano, „jak se dnes cítíš“ ne
+    if re.search(r"\b(jake?\s+je\s+)?datum\b|\b(jaky|ktery)\s+den\s+(je|dnes|mam)\b|\bdate\b", t):
+        return f"Dnes je {dt.strftime('%-d. %-m. %Y')}.", {"action": "get_date", "params": {}}
+    if re.search(r"^\s*(co\s+je\s+)?dnes(ka)?(\s+za\s+den)?\s*[?!.]*\s*$", t):
         return f"Dnes je {dt.strftime('%-d. %-m. %Y')}.", {"action": "get_date", "params": {}}
 
     # Screenshot

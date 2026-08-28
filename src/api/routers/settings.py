@@ -37,58 +37,99 @@ else:
         raise RuntimeError("security unavailable")
 
 
+MCP_SERVERS = [
+    ("filesystem", "npx", "mcp_filesystem_enabled", None),
+    ("git", "uvx", "mcp_git_enabled", None),
+    ("mcp-memory", "npx", "mcp_memory_enabled", None),
+    ("fetch", "uvx", "mcp_fetch_enabled", None),
+    ("brave-search", "npx", "mcp_brave_enabled", "BRAVE_API_KEY"),
+    ("playwright", "npx", "mcp_playwright_enabled", None),
+    ("github", "npx", "mcp_github_enabled", "GITHUB_TOKEN"),
+    ("youtube-transcript", "npx", "mcp_youtube_transcript_enabled", None),
+    ("google-maps", "npx", "mcp_google_maps_enabled", "GOOGLE_MAPS_API_KEY"),
+    ("slack", "npx", "mcp_slack_enabled", "SLACK_BOT_TOKEN"),
+    ("sequential-thinking", "npx", "mcp_sequential_thinking_enabled", None),
+    ("puppeteer", "npx", "mcp_puppeteer_enabled", None),
+    ("computer-control", "uvx", "mcp_computer_control_enabled", None),
+    ("time", "uvx", "mcp_time_enabled", None),
+]
+
+_MCP_ENV_CONFIG_KEYS = {
+    "BRAVE_API_KEY": ("brave_api_key",),
+    "GITHUB_TOKEN": ("github_token",),
+    "GOOGLE_MAPS_API_KEY": ("google_maps_api_key",),
+    "SLACK_BOT_TOKEN": ("slack_bot_token",),
+}
+
+
+def _mcp_env_present(env_key: str | None, config: dict) -> bool:
+    if not env_key:
+        return True
+    if os.environ.get(env_key):
+        return True
+    if env_key == "GITHUB_TOKEN" and os.environ.get("GH_TOKEN"):
+        return True
+    for cfg_key in _MCP_ENV_CONFIG_KEYS.get(env_key, ()):
+        if config.get(cfg_key):
+            return True
+    if env_key == "GITHUB_TOKEN":
+        try:
+            from config import github_token_from_gh
+            return bool(github_token_from_gh())
+        except Exception:
+            return False
+    return False
+
+
+def collect_mcp_status(config: dict) -> tuple[list[dict], dict]:
+    """Status MCP serverů. Servery bez povinného klíče se nepočítají do enabled_total."""
+    servers: list[dict] = []
+    enabled_total = 0
+    ready_total = 0
+    for srv_name, cmd, cfg_key, env_key in MCP_SERVERS:
+        config_enabled = bool(config.get(cfg_key, True))
+        command_found = shutil.which(cmd) is not None
+        key_present = _mcp_env_present(env_key, config)
+        runnable = config_enabled and key_present
+        is_ready = runnable and command_found
+        if runnable:
+            enabled_total += 1
+            if is_ready:
+                ready_total += 1
+        if not config_enabled:
+            hint = "vypnuto v nastavení"
+        elif not key_present:
+            hint = f"chybí {env_key}"
+        elif not command_found:
+            hint = f"příkaz `{cmd}` není v PATH"
+        else:
+            hint = ""
+        servers.append(
+            {
+                "name": srv_name,
+                "enabled": config_enabled,
+                "command": cmd,
+                "command_found": command_found,
+                "config_key": cfg_key,
+                "requires_env": env_key,
+                "env_present": key_present,
+                "ready": is_ready,
+                "hint": hint,
+            }
+        )
+
+    score = int(round((ready_total / enabled_total) * 100)) if enabled_total else 100
+    summary = {
+        "enabled_total": enabled_total,
+        "ready_total": ready_total,
+        "score": score,
+    }
+    return servers, summary
+
+
 def register(app):
     def _collect_mcp_status(config: dict) -> tuple[list[dict], dict]:
-        _MCP_SERVERS = [
-            ("filesystem", "npx", "mcp_filesystem_enabled", None),
-            ("git", "uvx", "mcp_git_enabled", None),
-            ("mcp-memory", "npx", "mcp_memory_enabled", None),
-            ("fetch", "uvx", "mcp_fetch_enabled", None),
-            ("brave-search", "npx", "mcp_brave_enabled", "BRAVE_API_KEY"),
-            ("playwright", "npx", "mcp_playwright_enabled", None),
-            ("github", "npx", "mcp_github_enabled", "GITHUB_TOKEN"),
-            ("youtube-transcript", "npx", "mcp_youtube_transcript_enabled", None),
-            ("google-maps", "npx", "mcp_google_maps_enabled", "GOOGLE_MAPS_API_KEY"),
-            ("slack", "npx", "mcp_slack_enabled", "SLACK_BOT_TOKEN"),
-            ("sequential-thinking", "npx", "mcp_sequential_thinking_enabled", None),
-            ("puppeteer", "npx", "mcp_puppeteer_enabled", None),
-            ("computer-control", "uvx", "mcp_computer_control_enabled", None),
-            ("time", "uvx", "mcp_time_enabled", None),
-        ]
-
-        servers: list[dict] = []
-        enabled_total = 0
-        ready_total = 0
-        for srv_name, cmd, cfg_key, env_key in _MCP_SERVERS:
-            enabled = bool(config.get(cfg_key, True))
-            command_found = shutil.which(cmd) is not None
-            key_present = True if not env_key else bool(os.environ.get(env_key))
-            is_ready = enabled and command_found and key_present
-            if enabled:
-                enabled_total += 1
-                if is_ready:
-                    ready_total += 1
-
-            servers.append(
-                {
-                    "name": srv_name,
-                    "enabled": enabled,
-                    "command": cmd,
-                    "command_found": command_found,
-                    "config_key": cfg_key,
-                    "requires_env": env_key,
-                    "env_present": key_present,
-                    "ready": is_ready,
-                }
-            )
-
-        score = int(round((ready_total / enabled_total) * 100)) if enabled_total else 100
-        summary = {
-            "enabled_total": enabled_total,
-            "ready_total": ready_total,
-            "score": score,
-        }
-        return servers, summary
+        return collect_mcp_status(config)
 
     def _health_snapshot(config: dict) -> dict:
         try:
@@ -126,6 +167,28 @@ def register(app):
             if not item["ok"]
         ]
 
+        tts_engine = "none"
+        tts_ok = False
+        tts_voice_label = None
+        try:
+            from tts import active_tts_engine, ELEVENLABS_VOICE_NAME
+            tts_engine = active_tts_engine(config)
+            tts_ok = tts_engine != "none"
+            if tts_engine == "elevenlabs":
+                tts_voice_label = ELEVENLABS_VOICE_NAME
+        except Exception:
+            pass
+
+        stt_engine = str(config.get("stt_engine") or "none")
+        stt_ok = False
+        try:
+            from whisper_live import WhisperTranscriber
+            transcriber = WhisperTranscriber(config)
+            stt_engine = transcriber._backend
+            stt_ok = transcriber.available
+        except Exception:
+            pass
+
         return {
             "score": score,
             "checks_ok": checks_ok,
@@ -135,22 +198,25 @@ def register(app):
             "mcp": {"servers": servers, **mcp_summary},
             "voice": {
                 "stt": {
-                    "engine": config.get("stt_engine", "google"),
+                    "engine": stt_engine,
                     "language": config.get("stt_language", "cs-CZ"),
-                    "available": shutil.which("vosk") is not None or True,
+                    "available": stt_ok,
                 },
                 "tts": {
-                    "engine": config.get("tts_engine", "pyttsx3"),
-                    "voice": config.get("tts_voice", "czech"),
+                    "engine": tts_engine,
+                    "voice": tts_voice_label or config.get("tts_voice", "czech"),
                     "rate": config.get("tts_rate", 160),
-                    "available": True,
+                    "available": tts_ok,
                 },
                 "wake_word": {
                     "enabled": config.get("wake_word_enabled", False),
                     "available": True,
                 },
                 "duplex": {
-                    "enabled": config.get("duplex_audio_enabled", False),
+                    "enabled": bool(
+                        config.get("audio_ws_enabled", False)
+                        or config.get("duplex_audio_enabled", False)
+                    ),
                 },
             },
         }
@@ -270,9 +336,20 @@ def register(app):
                     if locale in ("cs-CZ", "en-US", "en-GB"):
                         voices.append({"name": name, "locale": locale, "gender": gender})
         except FileNotFoundError:
-            return {"voices": [], "error": "edge-tts není nainstalován (pip install edge-tts)"}
+            voices = []
         except Exception as e:
             return {"voices": [], "error": str(e)}
+        try:
+            from config import CONFIG
+            has_el = bool(os.environ.get("ELEVENLABS_API_KEY") or CONFIG.get("elevenlabs_api_key"))
+        except Exception:
+            has_el = bool(os.environ.get("ELEVENLABS_API_KEY"))
+        if has_el:
+            voices.insert(0, {
+                "name": "ElevenLabs Lily (teplý ženský hlas)",
+                "locale": "cs-CZ",
+                "gender": "Female",
+            })
         return {"voices": voices}
 
     @app.get("/api/mcp/status")

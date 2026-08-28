@@ -18,6 +18,70 @@ from src.api.paths import ROOT
 PID_FILE = Path.home() / ".jarvis" / "dashboard.pid"
 
 
+def _user_node_bin_dirs(home: Path) -> list[Path]:
+    """Usual user-local Node.js locations (not always on PATH)."""
+    dirs = [
+        home / ".local" / "node" / "bin",
+        home / ".local" / "nodejs" / "bin",
+        home / ".fnm" / "current" / "bin",
+    ]
+    nvm_root = home / ".nvm" / "versions" / "node"
+    if nvm_root.is_dir():
+        dirs.extend(sorted((p / "bin" for p in nvm_root.iterdir() if p.is_dir()), reverse=True))
+    return dirs
+
+
+def ensure_runtime_path(*, home: Path | None = None) -> None:
+    """Prepend venv, ~/.local/bin and Node so MCP (npx/uvx) inherits a usable PATH."""
+    home = home or Path.home()
+    extra = [
+        ROOT / "venv" / "bin",
+        home / ".local" / "bin",
+        *(_user_node_bin_dirs(home)),
+    ]
+    current = os.environ.get("PATH", "")
+    parts = [str(p) for p in extra if p.is_dir() and str(p) not in current.split(os.pathsep)]
+    if parts:
+        os.environ["PATH"] = os.pathsep.join(parts + [current]) if current else os.pathsep.join(parts)
+
+
+def ensure_voice_deps() -> None:
+    """Doinstaluje TTS/STT balíčky, bez kterých mikrofon a hlas mlčí."""
+    missing: list[str] = []
+    for module, spec in (
+        ("edge_tts", "edge-tts>=7.0.0"),
+        ("speech_recognition", "SpeechRecognition>=3.10.0"),
+    ):
+        try:
+            __import__(module)
+        except ImportError:
+            missing.append(spec)
+    if not missing:
+        return
+    print(f"==> Doinstalovávám hlasové závislosti: {', '.join(missing)}")
+    for spec in missing:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-q", spec],
+            check=False,
+        )
+        if result.returncode != 0:
+            print(f"⚠ Nepodařilo se nainstalovat {spec} — pokračuji bez něj")
+
+
+def ensure_node_on_path(*, home: Path | None = None) -> Path | None:
+    """Put user-local npm on PATH. Returns the npm executable or None."""
+    ensure_runtime_path(home=home)
+    found = shutil.which("npm")
+    if found:
+        return Path(found)
+    for bin_dir in _user_node_bin_dirs(home or Path.home()):
+        npm = bin_dir / "npm"
+        if npm.is_file() or npm.is_symlink():
+            os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
+            return npm
+    return None
+
+
 def ensure_web_dist(*, force: bool = False) -> bool:
     """Build Next.js static export into web_dist/ when missing."""
     web_dist = ROOT / "web_dist"
@@ -29,8 +93,9 @@ def ensure_web_dist(*, force: bool = False) -> bool:
         print("⚠ Složka web/ neexistuje — UI nebude dostupné.")
         return False
 
-    if shutil.which("npm") is None:
+    if ensure_node_on_path() is None:
         print("⚠ npm není v PATH — nainstaluj Node.js pro webové UI.")
+        print("  např. do ~/.local/node  nebo: sudo dnf install nodejs")
         return False
 
     print("==> Sestavuji frontend (první spuštění trvá ~1 minutu)...")
@@ -191,6 +256,17 @@ def _free_port(port: int) -> None:
 def _open_browser(url: str, delay: float = 1.2) -> None:
     def _go() -> None:
         time.sleep(delay)
+        for cmd in (
+            ["chromium-browser", "--autoplay-policy=no-user-gesture-required", "--new-window", url],
+            ["chromium", "--autoplay-policy=no-user-gesture-required", "--new-window", url],
+            ["google-chrome", "--autoplay-policy=no-user-gesture-required", "--new-window", url],
+        ):
+            if shutil.which(cmd[0]):
+                try:
+                    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return
+                except Exception:
+                    continue
         try:
             webbrowser.open(url)
         except Exception:
@@ -212,19 +288,28 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
+    ensure_runtime_path()
+    ensure_voice_deps()
+
+    web_ok = (ROOT / "web_dist" / "index.html").is_file()
+
     if args.restart:
         _restart_from_pid_file()
         if _port_in_use(args.port):
             _free_port(args.port)
     elif _port_in_use(args.port):
-        owner = _port_owner_pid(args.port)
-        url = f"http://localhost:{args.port}/app"
-        if owner:
-            print(f"⚠ Port {args.port} už běží (PID {owner}) → {url}")
+        if not web_ok or args.rebuild:
+            print("==> Web UI chybí — restartuji server a sestavím frontend…")
+            _free_port(args.port)
         else:
-            print(f"⚠ Port {args.port} už běží → {url}")
-        print(f"  Pro restart: python3 dashboard.py --restart")
-        return
+            owner = _port_owner_pid(args.port)
+            url = f"http://localhost:{args.port}/app"
+            if owner:
+                print(f"⚠ Port {args.port} už běží (PID {owner}) → {url}")
+            else:
+                print(f"⚠ Port {args.port} už běží → {url}")
+            print("  Pro restart: python3 dashboard.py --restart")
+            return
 
     if not args.no_build:
         ensure_web_dist(force=args.rebuild)

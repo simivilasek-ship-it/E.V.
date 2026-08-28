@@ -3,11 +3,12 @@ import { useState, useEffect } from 'react'
 import { useEV } from '@/store/ev'
 import { Icons } from './Icons'
 
-export type Tab = 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'WORK' | 'FEED' | 'CHECKLIST' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW' | 'MISSIONS' | 'VISION' | 'VOICE'
+export type Tab = 'HOME' | 'CHAT' | 'SYSTEM' | 'PLUGINS' | 'SKILL' | 'AGENT' | 'WORK' | 'FEED' | 'CHECKLIST' | 'TIMELINE' | 'MEMORY' | 'DASHBOARD' | 'SETTINGS' | 'WORKFLOW' | 'MISSIONS' | 'VISION' | 'VOICE'
 
 interface NavItem { id: Tab; label: string; icon: React.ReactNode; key: string; advanced?: boolean }
 
 const ALL_NAV: NavItem[] = [
+  { id: 'HOME', label: 'Domů', icon: Icons.home, key: 'g' },
   { id: 'CHAT', label: 'Chat', icon: Icons.chat, key: '1' },
   { id: 'VOICE', label: 'Hlas', icon: Icons.mic, key: 'h' },
   { id: 'SYSTEM', label: 'Systém', icon: Icons.system, key: '2' },
@@ -82,13 +83,14 @@ interface SidebarProps {
   setPaletteOpen: (v: boolean) => void
   setSpotlightOpen?: (v: boolean) => void
   clearMessages: () => void
+  onOpenChat?: () => void
   theme: string
   toggleTheme: () => void
   isOpen?: boolean
   onClose?: () => void
 }
 
-export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen, clearMessages, theme, toggleTheme, isOpen = false, onClose }: SidebarProps) {
+export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen, clearMessages, onOpenChat, theme, toggleTheme, isOpen = false, onClose }: SidebarProps) {
   const [advanced, setAdvanced] = useLocalStorage<boolean>('ev_advanced_mode', false)
   const connStatus = useEV(s => s.connStatus)
   const retry      = useEV(s => s.retry)
@@ -114,23 +116,30 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
     >
       {/* Brand */}
       <div className="flex items-center gap-3 px-4 py-5 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
-        <div
-          className="flex items-center justify-center shrink-0 rounded-xl anim-orb-glow"
-          style={{
-            width: 44, height: 44,
-            background: 'linear-gradient(135deg, var(--accent) 0%, #4f46e5 50%, #7c3aed 100%)',
-          }}
+        <button
+          type="button"
+          onClick={() => { setTab('HOME'); onClose?.() }}
+          className="flex items-center gap-3 flex-1 text-left min-w-0"
+          aria-label="Domů"
         >
-          <span className="font-display text-lg font-bold text-white">J</span>
-        </div>
-        <div className="flex-1">
-          <div className="font-display text-base font-bold tracking-tight" style={{ color: 'var(--text)' }}>
-            E.V.
+          <div
+            className="flex items-center justify-center shrink-0 rounded-xl anim-orb-glow"
+            style={{
+              width: 44, height: 44,
+              background: 'linear-gradient(135deg, var(--accent) 0%, #2563eb 50%, #1d4ed8 100%)',
+            }}
+          >
+            <span className="font-display text-lg font-bold" style={{ color: '#041018' }}>EV</span>
           </div>
-          <div className="text-[11px] font-mono" style={{ color: 'var(--muted)' }}>
-            v5.15 · Work OS
+          <div className="flex-1 min-w-0">
+            <div className="font-display text-base font-bold tracking-tight" style={{ color: 'var(--text)' }}>
+              E.V.
+            </div>
+            <div className="text-[11px] font-mono" style={{ color: 'var(--muted)' }}>
+              v5.15 · Work OS
+            </div>
           </div>
-        </div>
+        </button>
         <button
           onClick={onClose}
           className="md:hidden btn-ghost w-7 h-7 flex items-center justify-center text-base shrink-0"
@@ -193,7 +202,12 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
       {/* New chat */}
       <div className="px-3 pt-3 pb-1 shrink-0">
         <button
-          onClick={() => { setTab('CHAT'); clearMessages(); onClose?.() }}
+          onClick={() => {
+            if (onOpenChat) onOpenChat()
+            else setTab('CHAT')
+            clearMessages()
+            onClose?.()
+          }}
           className="btn-primary flex items-center justify-center gap-2 w-full py-2.5 text-sm"
         >
           {Icons.plus}
@@ -216,7 +230,7 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
         </button>
         {setSpotlightOpen && (
           <button onClick={() => setSpotlightOpen(true)} className="btn-ghost flex items-center gap-2 w-full px-3 py-2 text-xs">
-            <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono" style={{ background: 'rgba(99,102,241,.1)', border: '1px solid var(--border-accent)', color: 'var(--accent-light)' }}>Alt+Space</kbd>
+            <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono" style={{ background: 'rgba(59,158,255,.1)', border: '1px solid var(--border-accent)', color: 'var(--accent-light)' }}>Alt+Space</kbd>
             Spotlight
           </button>
         )}
@@ -225,7 +239,7 @@ export default function Sidebar({ tab, setTab, setPaletteOpen, setSpotlightOpen,
           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors"
           style={{
             color: 'var(--muted)',
-            background: advanced ? 'rgba(99,102,241,.08)' : 'transparent',
+            background: advanced ? 'rgba(59,158,255,.08)' : 'transparent',
           }}
         >
           <span>{advanced ? '⚙ Pokročilý režim' : '◎ Jednoduchý režim'}</span>

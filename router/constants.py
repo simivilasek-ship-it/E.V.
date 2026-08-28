@@ -32,7 +32,7 @@ _SITES = {
 _APPS = {
     "chrome": "chrome", "chromium": "chromium", "firefox": "firefox",
     "discord": "discord", "spotify": "spotify", "steam": "steam",
-    "vscode": "code", "code": "code", "telegram": "telegram", "vlc": "vlc",
+    "vscode": "code", "code": "code", "cursor": "cursor", "telegram": "telegram", "vlc": "vlc",
     "kalkulačka": "calc", "calc": "calc", "notepad": "notepad",
     "průzkumník": "nautilus", "soubory": "nautilus", "nautilus": "nautilus",
     "gimp": "gimp", "inkscape": "inkscape", "blender": "blender",

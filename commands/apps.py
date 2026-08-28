@@ -198,6 +198,7 @@ APP_MAP.update({
     "gedit":       ["gedit", "textový editor"],
     "tilix":       ["tilix", "terminál", "terminal"],
     "calc":        ["kalkulačka", "calc"],
+    "cursor":      ["cursor"],
     "inkscape":    ["inkscape"],
     "blender":     ["blender"],
 })

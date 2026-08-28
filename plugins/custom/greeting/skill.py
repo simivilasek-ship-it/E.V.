@@ -16,12 +16,15 @@ _GOODBYES = [
 ]
 
 _GREETING_RE = re.compile(
-    r"\b(ahoj|nazdar|cau|zdravim|dobry\s+den|dobre\s+rano|dobre\s+odpoledne|dobrou\s+noc)\b",
-    re.IGNORECASE,
+    r"^\s*(?:ahoj|nazdar|čau|cau|zdravím|zdravim|"
+    r"dobrý\s+den|dobry\s+den|dobré\s+ráno|dobre\s+rano|"
+    r"dobré\s+odpoledne|dobre\s+odpoledne)"
+    r"(?:\s+[A-Za-zÁ-ž]{2,16})?\s*[!.]*\s*$",
+    re.IGNORECASE | re.UNICODE,
 )
 _GOODBYE_RE = re.compile(
-    r"\b(nashle|na\s+shledanou|cau|bye|goodbye|dobrou\s+noc)\b",
-    re.IGNORECASE,
+    r"^\s*(?:nashle|na\s+shledanou|čau\s+čau|cau\s+cau|bye|goodbye|dobrou\s+noc)\s*[!.]*\s*$",
+    re.IGNORECASE | re.UNICODE,
 )
 
 

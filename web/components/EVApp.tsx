@@ -11,6 +11,12 @@ import ConfirmModal from './ConfirmModal'
 import OnboardingWizard from './OnboardingWizard'
 import dynamic from 'next/dynamic'
 import { EVStatusBar } from './HeroPanel'
+import HomePanel from './HomePanel'
+import { apiUrl } from '@/lib/api'
+import { playReplySpeech, unlockAudio, prepareReplySpeech, playPreparedSpeech } from '@/lib/tts'
+
+/** One hello per page load — React Strict Mode must not replay it. */
+let helloBooted = false
 
 // Lazy load heavy panels
 const SystemPanel  = dynamic(() => import('./SystemPanel'),  { ssr: false })
@@ -30,7 +36,7 @@ const MissionChecklist = dynamic(() => import('./MissionChecklist'), { ssr: fals
 const VoicePanel       = dynamic(() => import('./VoicePanel'),       { ssr: false })
 
 const NAV_KEYS: Record<string, Tab> = {
-  '1': 'CHAT', '2': 'SYSTEM', '3': 'PLUGINS', '4': 'SKILL',
+  'g': 'HOME', '1': 'CHAT', '2': 'SYSTEM', '3': 'PLUGINS', '4': 'SKILL',
   '5': 'AGENT', '6': 'TIMELINE', '7': 'MEMORY', '8': 'DASHBOARD',
   '9': 'SETTINGS', '0': 'WORKFLOW', 'm': 'MISSIONS', 'v': 'VISION',
   'w': 'WORK', 'f': 'FEED', 'c': 'CHECKLIST', 'h': 'VOICE',
@@ -59,12 +65,20 @@ export default function EVApp() {
   const connectMetrics = useEV(s => s.connectMetrics)
   const connectChat    = useEV(s => s.connectChat)
   const connectConfirm = useEV(s => s.connectConfirm)
+  const fetchPlugins   = useEV(s => s.fetchPlugins)
+  const fetchAgents    = useEV(s => s.fetchAgents)
   const connError      = useEV(s => s.connError)
   const clearMessages  = useEV(s => s.clearMessages)
   const addMessage     = useEV(s => s.addMessage)
   const addToast       = useEV(s => s.addToast)
   const retry          = useEV(s => s.retry)
-  const [tab, setTab]  = useState<Tab>('CHAT')
+  const fetchDuplexFlag = useEV(s => s.fetchDuplexFlag)
+  const startMic       = useEV(s => s.startMic)
+  const setOrbState    = useEV(s => s.setOrbState)
+  const [tab, setTab]  = useState<Tab>('HOME')
+  const [chatOpen, setChatOpen] = useState(false)
+  const [briefing, setBriefing] = useState('')
+  const [needsTap, setNeedsTap] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [spotlightOpen, setSpotlightOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -72,14 +86,121 @@ export default function EVApp() {
 
   useEffect(() => {
     connect(); connectMetrics(); connectChat(); connectConfirm()
-  }, [connect, connectMetrics, connectChat, connectConfirm])
+    fetchPlugins(); fetchAgents()
+    fetchDuplexFlag()
+  }, [connect, connectMetrics, connectChat, connectConfirm, fetchPlugins, fetchAgents, fetchDuplexFlag])
+
+  useEffect(() => {
+    if (helloBooted) {
+      setNeedsTap(false)
+      void startMic()
+      return
+    }
+    let cancelled = false
+    let started = false
+    let pendingTap = false
+    let hello = 'Čau. Jsem tady.'
+    let prepared: HTMLAudioElement | null = null
+
+    const finishBoot = async () => {
+      helloBooted = true
+      if (cancelled) return
+      addMessage(hello, 'ev')
+      try {
+        const br = await fetch(apiUrl('/api/voice/briefing'))
+        const bd = await br.json()
+        if (!cancelled && bd?.text) {
+          setBriefing(`${hello} ${bd.text}`)
+          setOrbState('speaking')
+          await playReplySpeech(bd.text)
+        }
+      } catch { /* briefing optional */ }
+      if (cancelled) return
+      await startMic()
+      setOrbState('listening')
+    }
+
+    const playHelloNow = async () => {
+      if (started || cancelled || !prepared) return
+      started = true
+      unlockAudio()
+      setNeedsTap(false)
+      setOrbState('speaking')
+      const ok = await playPreparedSpeech(prepared)
+      if (!ok) {
+        started = false
+        setNeedsTap(true)
+        setOrbState('idle')
+        return
+      }
+      helloBooted = true
+      prepared = null
+      window.removeEventListener('pointerdown', onTap)
+      await finishBoot()
+    }
+
+    const onTap = () => {
+      pendingTap = true
+      unlockAudio()
+      void playHelloNow()
+    }
+
+    ;(async () => {
+      try {
+        const r = await fetch(apiUrl('/api/voice/greeting'))
+        const d = await r.json()
+        if (cancelled) return
+        hello = (d.hello || d.text || hello).trim()
+        setBriefing(hello)
+        prepared = await prepareReplySpeech(hello)
+        if (cancelled || !prepared) {
+          setNeedsTap(true)
+          return
+        }
+        if (pendingTap) {
+          await playHelloNow()
+          return
+        }
+        started = true
+        const ok = await playPreparedSpeech(prepared).catch(() => false)
+        if (cancelled) return
+        if (ok) {
+          helloBooted = true
+          prepared = null
+          setNeedsTap(false)
+          setOrbState('speaking')
+          window.removeEventListener('pointerdown', onTap)
+          await finishBoot()
+          return
+        }
+        started = false
+        if (pendingTap) {
+          await playHelloNow()
+        } else {
+          setNeedsTap(true)
+        }
+      } catch {
+        setNeedsTap(true)
+      }
+    })()
+
+    window.addEventListener('pointerdown', onTap)
+    return () => {
+      cancelled = true
+      window.removeEventListener('pointerdown', onTap)
+    }
+  }, [addMessage, startMic, setOrbState])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setPaletteOpen(p => !p) }
       // Alt+Space → Spotlight (kdekoliv v OS přes web)
       if (e.altKey && e.code === 'Space') { e.preventDefault(); setSpotlightOpen(p => !p) }
-      if (e.key === 'Escape') { setPaletteOpen(false); setSpotlightOpen(false) }
+      if (e.key === 'Escape') {
+        setPaletteOpen(false)
+        setSpotlightOpen(false)
+        setChatOpen(false)
+      }
       if (e.altKey && !e.ctrlKey && NAV_KEYS[e.key]) { e.preventDefault(); setTab(NAV_KEYS[e.key]) }
       if (e.altKey && e.key === 'd') {
         e.preventDefault()
@@ -114,10 +235,11 @@ export default function EVApp() {
         )}
 
         <Sidebar
-          tab={tab} setTab={setTab}
+          tab={tab} setTab={(t) => { setTab(t); if (t !== 'HOME') setChatOpen(false) }}
           setPaletteOpen={setPaletteOpen}
           setSpotlightOpen={setSpotlightOpen}
           clearMessages={clearMessages}
+          onOpenChat={() => { setTab('HOME'); setChatOpen(true) }}
           theme={theme} toggleTheme={toggleTheme}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
@@ -134,10 +256,12 @@ export default function EVApp() {
             ☰
           </button>
 
-          {/* Status Bar */}
-          <div className="shrink-0 px-4 pt-3 pb-0 pl-14 md:pl-4">
-            <EVStatusBar />
-          </div>
+          {/* Status Bar — not on cinematic home */}
+          {tab !== 'HOME' && (
+            <div className="shrink-0 px-4 pt-3 pb-0 pl-14 md:pl-4">
+              <EVStatusBar />
+            </div>
+          )}
 
           {/* Error banner */}
           {connError && (
@@ -151,7 +275,27 @@ export default function EVApp() {
           )}
 
           {/* Pages */}
-          <div className="flex-1 overflow-hidden flex">
+          <div className="flex-1 overflow-hidden flex relative">
+            {tab === 'HOME' && (
+              <>
+                <ErrorBoundary>
+                  <HomePanel
+                    onOpenChat={() => setChatOpen(true)}
+                    dimmed={chatOpen}
+                    briefing={briefing}
+                    needsTap={needsTap}
+                    onStartVoice={() => unlockAudio()}
+                  />
+                </ErrorBoundary>
+                {chatOpen && (
+                  <div className="home-chat-sheet" data-testid="home-chat-sheet">
+                    <ErrorBoundary>
+                      <ChatPanel onClose={() => setChatOpen(false)} />
+                    </ErrorBoundary>
+                  </div>
+                )}
+              </>
+            )}
             {tab === 'CHAT' && (
               <>
                 <ErrorBoundary><ChatPanel /></ErrorBoundary>
@@ -232,7 +376,7 @@ export default function EVApp() {
       <Spotlight
         open={spotlightOpen}
         onClose={() => setSpotlightOpen(false)}
-        onCommand={() => { setTab('CHAT'); setSpotlightOpen(false) }}
+        onCommand={() => { setTab('HOME'); setChatOpen(true); setSpotlightOpen(false) }}
       />
         {paletteOpen && (
           <div className="fixed inset-0 z-50 flex items-start justify-center pt-24"

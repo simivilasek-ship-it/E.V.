@@ -53,11 +53,22 @@ def register(app):
         except Exception:
             pass
 
+        ws_lib = False
+        try:
+            import websockets  # noqa: F401
+            ws_lib = True
+        except ImportError:
+            try:
+                import wsproto  # noqa: F401
+                ws_lib = True
+            except ImportError:
+                pass
+
         status = "healthy" if ram.percent < 90 else "degraded"
         return JSONResponse({
             "status": status,
             "ok": True,                      # jednoduché pole pro frontend
-            "ws": "running",                 # WebSocket server běží
+            "ws": "running" if ws_lib else "unavailable",
             "uptime_s": uptime,
             "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "version": __version__,
@@ -70,6 +81,11 @@ def register(app):
             },
             "logging": "loguru" if HAS_LOGURU else "stdlib",
         }, status_code=200 if status == "healthy" else 503)
+
+    @app.get("/api/health")
+    async def api_health():
+        """Alias /health — některé klienty volají /api/health."""
+        return await health()
 
     @app.get("/", include_in_schema=False)
     async def root():

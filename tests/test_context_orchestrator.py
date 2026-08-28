@@ -29,21 +29,12 @@ def test_get_clipboard_empty_on_error(orch):
 
 
 def test_get_active_window_empty_on_error(orch):
-    # Mockujeme ewmh i subprocess — oba failnou → prázdný string
-    with patch("subprocess.run", side_effect=Exception("no xdotool")), \
+    with patch.object(orch, "_xlib_desktop_windows", return_value=("", [])), \
+         patch("window_info.get_desktop_windows", return_value=("", [])), \
+         patch("subprocess.run", side_effect=Exception("no xdotool")), \
          patch.dict("sys.modules", {"ewmh": None}):
-        # Resetuj případný cache importu ewmh
-        import sys
-        ewmh_mod = sys.modules.pop("ewmh", None)
-        try:
-            result = orch._get_active_window()
-        except Exception:
-            result = ""
-        finally:
-            if ewmh_mod is not None:
-                sys.modules["ewmh"] = ewmh_mod
-    # Pokud ewmh je nainstalováno a dostupný display, vrátí skutečné okno — test akceptuje obě
-    assert isinstance(result, str)
+        result = orch._get_active_window()
+    assert result == ""
 
 
 def test_format_minimal(orch):

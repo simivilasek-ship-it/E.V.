@@ -35,6 +35,14 @@ class TestHealth:
         assert r.status_code == 200
         data = r.json()
         assert isinstance(data, dict)
+        assert "ws" in data
+
+    def test_api_health_alias(self, client):
+        r = client.get("/api/health")
+        assert r.status_code == 200
+        data = r.json()
+        assert data.get("ok") is True
+        assert "ws" in data
 
     def test_health_check(self, client):
         r = client.get("/api/health/check")
@@ -169,6 +177,19 @@ class TestChat:
         assert "response" in data
         assert isinstance(data["response"], str)
         assert len(data["response"]) > 0
+
+    def test_tts_audio_rejects_empty(self, client):
+        r = client.post("/api/tts/audio", json={"text": ""})
+        assert r.status_code == 400
+
+    def test_voice_greeting(self, client):
+        r = client.get("/api/voice/greeting")
+        assert r.status_code == 200
+        data = r.json()
+        assert data.get("text")
+        assert isinstance(data["text"], str)
+        assert "Čau" in data["text"]
+        assert data.get("hello") == data["text"]
 
 
 # ---------------------------------------------------------------------------

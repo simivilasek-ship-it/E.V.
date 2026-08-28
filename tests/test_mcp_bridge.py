@@ -15,6 +15,9 @@ def _mcp_installed(monkeypatch):
     monkeypatch.setattr("mcp_bridge.stdio_client", MagicMock(), raising=False)
     monkeypatch.setattr("mcp_bridge.ClientSession", MagicMock(), raising=False)
     monkeypatch.setattr("mcp_bridge.StdioServerParameters", MagicMock(), raising=False)
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    monkeypatch.setattr("config.github_token_from_gh", lambda: "")
 
 
 # ── Pomocné ──────────────────────────────────────────────────────
@@ -54,6 +57,24 @@ class TestMCPBridgeRegistration:
     def test_brave_vypnut_pres_config(self):
         bridge = _make_bridge(brave_enabled=False)
         assert "brave-search" not in bridge.get_server_names()
+
+    def test_github_registrovan_z_gh_cli(self, monkeypatch):
+        monkeypatch.setattr("config.github_token_from_gh", lambda: "gho_test")
+        from mcp_bridge import create_mcp_bridge
+        bridge = create_mcp_bridge({
+            "mcp_filesystem_enabled": False,
+            "mcp_git_enabled": False,
+            "mcp_memory_enabled": False,
+            "mcp_fetch_enabled": False,
+            "mcp_playwright_enabled": False,
+            "mcp_sequential_thinking_enabled": False,
+            "mcp_puppeteer_enabled": False,
+            "mcp_time_enabled": False,
+            "mcp_computer_control_enabled": False,
+            "mcp_brave_enabled": False,
+            "mcp_github_enabled": True,
+        })
+        assert "github" in bridge.get_server_names()
 
     def test_server_nenalezen_vrati_chybu(self):
         from mcp_bridge import MCPBridge

@@ -466,6 +466,9 @@ class EVApp:
 
     def _on_audio_speech(self, event: Event):
         """Barge-in: if user starts speaking while TTS is active, stop TTS immediately."""
+        from config import CONFIG
+        if CONFIG.get("web_mode"):
+            return
         try:
             logger.info("VAD: detekována řeč — přerušuji TTS")
             self.tts.stop()
@@ -650,6 +653,7 @@ class EVApp:
                 # Fallback na CommandExecutor
                 result = self.cmds.execute(action, params)
                 if result and result != "ok":
+                    self._gui(lambda r=result: self.gui.add_message(r, "jarvis"))
                     self._gui(lambda r=result: self.gui.set_status(f"↳ {r}"))
                     logger.info("Výsledek: %s", result)
             except Exception as e:
@@ -671,10 +675,12 @@ class EVApp:
             pass
 
     def _speak(self, text: str):
-        has_code = any(k in text for k in ("```", "def ", "import ", "class "))
-        if not has_code and len(text) < 400:
-            self._gui(lambda: self.gui.set_state("speaking"))
-            self.tts.speak(text)  # neblokující — přidá do fronty workeru
+        from tts import prepare_speech_text
+        spoken = prepare_speech_text(text)
+        if not spoken:
+            return
+        self._gui(lambda: self.gui.set_state("speaking"))
+        self.tts.speak(spoken)
 
     def _ollama_reachable(self) -> bool:
         """Rychlá kontrola dostupnosti Ollama (cachováno na 15s)."""

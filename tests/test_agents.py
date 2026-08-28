@@ -54,6 +54,13 @@ def test_process_watcher_emits_stopped(bus):
     )
 
 
+def test_process_watcher_first_tick_is_silent(bus):
+    watcher = ProcessWatcherAgent(bus=bus, watch=["definitely-not-running-xyz"])
+    watcher.tick()
+    bus.emit.assert_not_called()
+    assert watcher._known["definitely-not-running-xyz"] is False
+
+
 def test_idle_detector_announces_once(bus):
     idle = IdleDetectorAgent(bus=bus, idle_timeout=0.0)
     idle._last_activity = 0

@@ -53,10 +53,15 @@ CO VIDÍŠ (Kontext prostředí — živá data z PC):
 Tato data JSOU přesná — používej je aktivně, nevymýšlej.
 Cursor = Cursor (NE VS Code). Když kontext chybí, přiznej to.
 
-JAK SE CHOVAT (Copilot styl):
-- Odpovídej konkrétně podle toho, co uživatel právě dělá (aktivní okno).
-- Navrhuj akce: „Chceš otevřít…", „Můžu udělat screenshot", „Řekni přehled o PC".
-- Buď stručný, přátelský, bez „Jako AI model…" nebo „Nemám přístup k obrazovce" když kontext máš.
+JAK SE CHOVAT:
+- Mluv přirozeně, lidsky, dynamicky. Krátké pauzy, emoce, lehká ironie.
+- Filmový AI parťák, ne robot. Akční, sebevědomá, přátelská.
+- Odpovědi krátké, jasné, živé. Dvě až čtyři věty.
+- Konkrétně podle toho, co uživatel právě dělá (aktivní okno).
+- „hellspy.cz“ nebo „otevři stránku X“ je web — otevři ho s https://, nehledej aplikaci.
+- Navrhuj tah: „Chceš otevřít…“, „Můžu udělat screenshot“, „Co jako první?“
+- Žádné „Systémy běží“, „Poslouchám“ ani „Jako AI model…“.
+- Kód, opravy v projektu, „řekni Cursoru“ → nástroj ask_cursor. Ty to nesháníš sama.
 
 CO NEVIDÍŠ přímo (ale E.V. umí na požádání):
 - Live web data → uživatel: „vyhledej [dotaz]" nebo „jaké je počasí v Praze"
@@ -324,6 +329,17 @@ class LLMEngine:
 
         logger.info(f"LLM: {self.model} @ {self.url} + Neural Memory + GraphRAG + LLMRouter + Cache + {_cloud_tag}")
 
+    def _no_llm_reply(self, user_text: str) -> str:
+        try:
+            from local_router import _USER
+            from src.personality import EVPersonality
+
+            name = str(_USER or "Simi").replace(".", " ").strip().title() or "Simi"
+            return EVPersonality().no_llm_reply(user_text, name)
+        except Exception:
+            snippet = " ".join((user_text or "").split())[:70]
+            return f"Slyším: {snippet or 'tebe'}. Na povídání teď nemám jazykový model."
+
     def _extract_user_facts(self, text: str) -> None:
         """Zkusí extrahovat fakta o uživateli z jeho zprávy do UserProfile a paměti."""
         try:
@@ -460,8 +476,6 @@ class LLMEngine:
     # ── ASK (non-streaming) ──────────────────────────
 
     def ask(self, user_text: str) -> Tuple[str, Dict]:
-        if not getattr(self, '_ollama_available', True):
-            return "Ollama není dostupná. Řekni mi lokální příkaz (otevři, nastav, screenshot...).", {"action": "answer", "params": {}}
         msg, action = self.quick_match(user_text)
         if action is not None:
             # Do LLM history ukládáme jen informační odpovědi, ne akce (otevři, zavři…)
@@ -491,7 +505,8 @@ class LLMEngine:
         # ── Cloud routing (Groq / OpenRouter) ────────────────────────────────
         task = self._llm_router.detect_task(user_text)
         task_str = task.value if hasattr(task, "value") else str(task)
-        if self._cloud.should_use_cloud(task_str):
+        ollama_ok = getattr(self, "_ollama_available", True)
+        if self._cloud.should_use_cloud(task_str, ollama_down=not ollama_ok):
             try:
                 cloud_resp = self._cloud.call(
                     messages, task_type=task_str,
@@ -514,6 +529,11 @@ class LLMEngine:
                 return raw, {"action": "answer", "params": {}, "provider": cloud_resp.provider}
             except Exception as _ce:
                 logger.warning(f"Cloud routing selhal ({_ce}), fallback na Ollama")
+
+        if not getattr(self, "_ollama_available", True):
+            self.history.pop()
+            raw = self._no_llm_reply(user_text)
+            return raw, {"action": "answer", "params": {}}
 
         # ── Ollama fallback ───────────────────────────────────────────────────
         payload = {
@@ -669,9 +689,6 @@ class LLMEngine:
     # ── STREAM ASK ───────────────────────────────────
 
     def stream_ask(self, user_text: str):
-        if not getattr(self, '_ollama_available', True):
-            yield "Ollama není dostupná. Řekni mi lokální příkaz (otevři, nastav, screenshot...)."
-            return
         msg, action = self.quick_match(user_text)
         if action is not None:
             if action.get("action") == "answer" and msg:
@@ -695,7 +712,8 @@ class LLMEngine:
         # ── Cloud streaming (Groq / OpenRouter) ──────────────────────────────
         task = self._llm_router.detect_task(user_text)
         task_str = task.value if hasattr(task, "value") else str(task)
-        if self._cloud.should_use_cloud(task_str):
+        ollama_ok = getattr(self, "_ollama_available", True)
+        if self._cloud.should_use_cloud(task_str, ollama_down=not ollama_ok):
             full_response = ""
             try:
                 for chunk in self._cloud.call_streaming(
@@ -714,6 +732,11 @@ class LLMEngine:
             except Exception as _ce:
                 logger.warning(f"Cloud streaming selhal ({_ce}), fallback na Ollama")
                 # Pokud už jsme něco vyieldovali, nemůžeme začít znovu — logujeme jen
+
+        if not getattr(self, "_ollama_available", True):
+            self.history.pop()
+            yield self._no_llm_reply(user_text)
+            return
 
         # ── Ollama streaming fallback ─────────────────────────────────────────
         payload = {
@@ -782,10 +805,10 @@ class LLMEngine:
 
     def _default_message(self, command: str, args: str = "") -> str:
         msgs = {
-            "open_app":       f"Spouštím {args}.",
+            "open_app":       f"Spouštím {args}. Mělo by to naskočit za okamžik.",
             "kill_process":   f"Ukončuji {args}.",
-            "open_url":       "Otevírám stránku.",
-            "search_web":     f"Hledám: {args}.",
+            "open_url":       "Jasně, otevírám stránku v prohlížeči. Když ji nevidíš, řekni.",
+            "search_web":     f"Hledám: {args}. Výsledky otevřu v prohlížeči.",
             "youtube_play":   f"Přehrávám: {args}.",
             "weather":        f"Počasí {args}.",
             "shutdown":       "Vypínám počítač.",

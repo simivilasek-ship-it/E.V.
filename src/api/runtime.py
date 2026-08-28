@@ -81,3 +81,16 @@ def process_chat(
         on_agent_step=on_agent_step,
         on_status=on_status,
     )
+
+
+def speak_web_reply(text: str) -> None:
+    """Po webovém příkazu přečte odpověď. V dashboardu mluví prohlížeč (/api/tts/audio)."""
+    if not text or not is_ready():
+        return
+    try:
+        from config import CONFIG
+        if CONFIG.get("web_mode"):
+            return
+        get_runtime()._speak(text)
+    except Exception as e:
+        logger.debug(f"speak_web_reply: {e}")

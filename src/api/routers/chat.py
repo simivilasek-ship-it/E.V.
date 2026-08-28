@@ -5,6 +5,7 @@ import asyncio
 import json
 
 from fastapi import WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse, Response
 
 from src.api.deps import logger
 from src.api.ws import ws_mgr
@@ -33,6 +34,53 @@ def register(app):
         except Exception as e:
             return {"error": str(e)}
 
+    @app.post("/api/tts/audio")
+    async def tts_audio(body: dict):
+        """Syntetizuje řeč a vrátí MP3/WAV pro přehrání v prohlížeči."""
+        text = (body.get("text") or "").strip()
+        if not text:
+            return JSONResponse({"error": "Prázdný text"}, status_code=400)
+        try:
+            from config import CONFIG
+            from tts import synthesize_speech
+
+            data, mime = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: synthesize_speech(text, CONFIG),
+            )
+            return Response(content=data, media_type=mime)
+        except Exception as e:
+            logger.warning(f"/api/tts/audio: {e}")
+            return JSONResponse({"error": str(e)}, status_code=503)
+
+    @app.get("/api/voice/greeting")
+    async def voice_greeting():
+        """Krátký pozdrav při startu — bez čekání na počasí."""
+        try:
+            from local_router import _USER
+            from src.morning_briefing import spoken_hello
+
+            name = str(_USER or "Simone").replace(".", " ").strip().title() or "Simone"
+            hello = spoken_hello(name)
+            return {"hello": hello, "text": hello, "name": name}
+        except Exception as e:
+            return {"text": "Čau. Jsem tady.", "hello": "Čau. Jsem tady.", "name": "Simone", "error": str(e)}
+
+    @app.get("/api/voice/briefing")
+    async def voice_briefing():
+        """Počasí a kalendář — po úvodním pozdravu."""
+        try:
+            from local_router import _USER
+            from src.morning_briefing import spoken_home_briefing
+
+            name = str(_USER or "Simone").replace(".", " ").strip().title() or "Simone"
+            loop = asyncio.get_event_loop()
+            text = await loop.run_in_executor(
+                None, lambda: spoken_home_briefing(name, include_hello=False),
+            )
+            return {"text": text, "name": name}
+        except Exception as e:
+            return {"text": "", "error": str(e)}
+
     @app.post("/api/chat")
     async def chat_rest(body: dict):
         text = body.get("text", "").strip()
@@ -44,32 +92,31 @@ def register(app):
             response = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: process_chat(text),
             )
+            try:
+                from src.api.runtime import speak_web_reply
+                speak_web_reply(response)
+            except Exception:
+                pass
             return {"response": response}
         except Exception as e:
             return {"response": f"Chyba: {e}"}
 
     @app.post("/api/chat/message")
     async def chat_message(body: dict):
-        """Odešle zprávu přes LocalRouter (local first), fallback na Ollama."""
+        """Stejná pipeline jako /api/chat — local first, pak LLM/cloud."""
         text = (body.get("text") or "").strip()
         if not text:
             return {"response": "Prázdná zpráva", "source": "local"}
         try:
             from local_router import LocalRouter
-            from config import CONFIG
-            lr = LocalRouter(CONFIG)
-            match = lr.route(text)
-            if match:
-                response, _meta = match
-                return {"response": response, "source": "local"}
-        except Exception:
-            pass
-        try:
             from src.api.runtime import process_chat
+
+            _, action = LocalRouter().route(text)
+            source = "local" if action is not None else "llm"
             response = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: process_chat(text),
             )
-            return {"response": response, "source": "llm"}
+            return {"response": response, "source": source}
         except Exception as e:
             return {"response": f"Chyba: {e}", "source": "llm"}
 
@@ -116,9 +163,11 @@ def register(app):
                                 q.put({"type": "status", "data": status}), loop,
                             )
 
+                    result_box = {"text": ""}
+
                     def _run():
                         try:
-                            process_chat(
+                            result_box["text"] = process_chat(
                                 text,
                                 on_chunk=on_chunk,
                                 on_agent_step=on_agent_step,
@@ -138,6 +187,11 @@ def register(app):
                         await send(msg)
 
                     await send({"type": "done"})
+                    try:
+                        from src.api.runtime import speak_web_reply
+                        speak_web_reply(result_box.get("text") or "")
+                    except Exception:
+                        pass
 
                 except Exception as e:
                     logger.error(f"ws_chat chyba: {e}")

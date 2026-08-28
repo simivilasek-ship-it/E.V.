@@ -193,6 +193,9 @@ class CommandExecutor:
     def _cmd_uninstall_app(self, name="", **_):      return cmd_uninstall_app(name)
     def _cmd_run_script(self, path="", **_):         return cmd_run_script(path)
     def _cmd_vscode_open(self, path="", **_):        return cmd_vscode_open(path)
+    def _cmd_ask_cursor(self, prompt="", **_):
+        from cursor_bridge import ask_cursor
+        return ask_cursor(prompt, config=self.config)
 
     # ── files ────────────────────────────────────────
     def _cmd_open_url(self, url="", **_):            return cmd_open_url(url)

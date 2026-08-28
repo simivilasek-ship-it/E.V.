@@ -217,11 +217,25 @@ class ContextOrchestrator:
         if active:
             return active
 
+        # 5. Wayland / AT-SPI / GUI procesy (GNOME bez xdotool)
+        try:
+            from window_info import get_desktop_windows
+            active, _ = get_desktop_windows()
+            if active:
+                return active[:100]
+        except Exception:
+            pass
+
         return ""
 
     def _get_open_windows(self) -> list[str]:
         """Vrátí seznam názvů otevřených oken (bez systémových panelů)."""
         names: list[str] = []
+
+        def _add(title: str) -> None:
+            title = (title or "").strip()[:80]
+            if title and title not in names and not self._should_ignore_window(title):
+                names.append(title)
 
         # 1. ewmh
         for disp in [os.environ.get("DISPLAY", ""), ":0.0", ":0", ":1"]:
@@ -234,13 +248,11 @@ class ContextOrchestrator:
                 e = _ewmh.EWMH(_display=d)
                 for w in e.getClientList():
                     try:
-                        name = self._decode_wm_name(e.getWmName(w))
-                        if name and not self._should_ignore_window(name):
-                            names.append(name[:80])
+                        _add(self._decode_wm_name(e.getWmName(w)))
                     except Exception:
                         pass
                 if names:
-                    return names
+                    break
             except Exception:
                 pass
 
@@ -255,16 +267,23 @@ class ContextOrchestrator:
                 for line in r.stdout.strip().splitlines():
                     parts = line.split(None, 3)
                     if len(parts) >= 4:
-                        name = parts[3].strip()
-                        if not self._should_ignore_window(name):
-                            names.append(name[:80])
+                        _add(parts[3].strip())
         except Exception:
             pass
 
         # 3. čistě Xlib
-        _, names = self._xlib_desktop_windows()
-        if names:
-            return names
+        _, xnames = self._xlib_desktop_windows()
+        for title in xnames:
+            _add(title)
+
+        # 4. Wayland / AT-SPI / GUI procesy
+        try:
+            from window_info import get_desktop_windows
+            _, extra = get_desktop_windows()
+            for title in extra:
+                _add(title)
+        except Exception:
+            pass
 
         return names
 

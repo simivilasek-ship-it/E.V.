@@ -41,13 +41,8 @@ vi.mock('@/store/ev', () => ({
   useEV: (selector: (s: typeof baseState) => unknown) => selector(baseState),
 }))
 
-// HeroPanel is rendered when messages is empty — provide a simple stub
 vi.mock('@/components/HeroPanel', () => ({
-  default: ({ onSend }: { onSend: (cmd: string) => void }) => (
-    <div data-testid="hero-panel">
-      <button onClick={() => onSend('test quick')}>Quick Action</button>
-    </div>
-  ),
+  default: () => null,
   EVStatusBar: () => null,
 }))
 
@@ -134,10 +129,10 @@ describe('ChatPanel', () => {
     expect(mockClearMessages).toHaveBeenCalled()
   })
 
-  it('renders HeroPanel when there are no messages', async () => {
+  it('renders empty state when there are no messages', async () => {
     const { default: ChatPanel } = await import('@/components/ChatPanel')
     render(<ChatPanel />)
 
-    expect(screen.getByTestId('hero-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('chat-empty')).toBeInTheDocument()
   })
 })

@@ -3,7 +3,12 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'E.V. — AI Asistent',
-  description: 'Lokální AI asistent — Copilot, Agent a správa PC',
+  description: 'Lokální hlasová AI parťačka — chat, správa PC a předání úkolu Cursorovi',
+  icons: {
+    icon: '/ev-logo.svg',
+    shortcut: '/ev-logo.svg',
+    apple: '/ev-logo.svg',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -29,19 +29,20 @@ test.describe('E.V. — full-stack E2E', () => {
     await expect(chatNav).toBeVisible();
   });
 
-  test('chat input exists and is interactable', async ({ page }) => {
+  test('home core is visible and chat opens from the corner', async ({ page }) => {
     await page.goto('/app');
     await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('[data-testid="home-stage"]')).toBeVisible();
+    await expect(page.locator('[data-testid="open-chat"]')).toBeVisible();
+    await page.locator('[data-testid="open-chat"]').click();
 
     const input = page.locator('[data-testid="chat-input"]');
     await expect(input).toBeVisible();
     await expect(input).toBeEnabled();
-
-    // Should accept keyboard input
     await input.click();
     await input.fill('test message');
     await expect(input).toHaveValue('test message');
-    // Clear input
     await input.fill('');
   });
 

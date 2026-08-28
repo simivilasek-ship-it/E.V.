@@ -133,14 +133,20 @@ class TestCommandExecutor:
         # Should contain some system info keywords
         assert any(kw in result.lower() for kw in ["cpu", "ram", "disk", "%"])
     
-    @patch('commands.apps.webbrowser.open')
+    @patch('commands.files.open_in_browser', return_value=True)
     def test_cmd_open_url(self, mock_browser, command_executor):
         """Test open_url command"""
         result = command_executor._cmd_open_url(url="https://example.com")
         mock_browser.assert_called_once_with("https://example.com")
         assert result == "ok"
+
+    @patch('commands.files.open_in_browser', return_value=True)
+    def test_cmd_open_url_adds_https(self, mock_browser, command_executor):
+        result = command_executor._cmd_open_url(url="hellspy.cz")
+        mock_browser.assert_called_once_with("https://hellspy.cz")
+        assert result == "ok"
     
-    @patch('commands.apps.webbrowser.open')
+    @patch('commands.files.open_in_browser', return_value=True)
     def test_cmd_search_web(self, mock_browser, command_executor):
         """Test search_web command"""
         result = command_executor._cmd_search_web(query="Python programming")

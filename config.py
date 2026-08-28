@@ -8,6 +8,8 @@ __version__ = "5.19.0"
 
 import os
 import json
+import shutil
+import subprocess
 from typing import Dict, Any
 
 try:
@@ -32,8 +34,15 @@ DEFAULT_CONFIG = {
     "web_mode": False,
     "missions_enabled": True,
     "tts_enabled": True,
-    "tts_voice": "cs-CZ-AntoninNeural",
+    "tts_voice": "cs-CZ-VlastaNeural",
     "tts_rate": 170,
+    "tts_engine": "auto",
+    "elevenlabs_voice_id": "pFZP5JQG7iQjIQuC4Bku",
+    "elevenlabs_model": "eleven_v3",
+    "elevenlabs_api_key": "",
+    "cursor_api_key": "",
+    "cursor_workspace": "",
+    "cursor_model": "composer-2.5",
     "history_size": 20,
     "window_size": "560x760",
     "log_level": "INFO",
@@ -83,12 +92,12 @@ DEFAULT_CONFIG = {
     "mcp_playwright_enabled": False,
     "mcp_result_limit": 32_000,   # max znaků z MCP nástroje před zkrácením
     # Nové MCP servery v4.5
-    "mcp_github_enabled": True,             # vyžaduje GITHUB_TOKEN v .env
+    "mcp_github_enabled": True,             # GITHUB_TOKEN v .env, nebo `gh auth token`
     "mcp_sqlite_enabled": False,            # opt-in (E.V. má vlastní memory API)
     "mcp_youtube_transcript_enabled": True, # bez API klíče
     "mcp_everything_enabled": False,        # opt-in desktop search
-    "mcp_google_maps_enabled": True,        # vyžaduje GOOGLE_MAPS_API_KEY v .env
-    "mcp_slack_enabled": True,              # vyžaduje SLACK_BOT_TOKEN v .env
+    "mcp_google_maps_enabled": False,       # vyžaduje GOOGLE_MAPS_API_KEY v .env
+    "mcp_slack_enabled": False,             # vyžaduje SLACK_BOT_TOKEN v .env
     # Agent graph
     "agent_max_steps": 8,         # max Executor volání celkem
     "agent_max_retries": 2,       # max opakování jednoho kroku při chybě
@@ -156,17 +165,21 @@ DEFAULT_CONFIG = {
     "imap_user": "",                # nebo IMAP_USER v .env
     "imap_pass": "",                # nebo IMAP_PASS v .env
     "calendar_ical_url": "",        # nebo CALENDAR_ICAL_URL v .env
+    "weather_city": "Praha",
     "slack_bot_token": "",          # nebo SLACK_BOT_TOKEN v .env
     "github_token": "",             # nebo GITHUB_TOKEN v .env
 
-    # Cloud Routing (Groq / OpenRouter)
+    # Cloud Routing (OpenAI / Groq / OpenRouter)
     "cloud_routing_enabled": True,
-    # threshold: 'complex' = cloud jen pro kód/reasoning/agenty (doporučeno)
+    # threshold: 'complex' = cloud jen pro kód/reasoning/agenty (bez OpenAI)
     #            'always'  = vždy cloud (Ollama = fallback)
     #            'simple'  = cloud jen pro rychlé dotazy
+    # S OPENAI_API_KEY jde do GPT i běžný chat, bez ohledu na threshold.
     "cloud_routing_threshold": "complex",
     "groq_api_key": "",           # nebo GROQ_API_KEY v .env
     "openrouter_api_key": "",     # nebo OPENROUTER_API_KEY v .env
+    "openai_api_key": "",         # nebo OPENAI_API_KEY v .env — GPT-4o-mini
+    "openai_model": "gpt-4o-mini",
 
     # Shadow Mode (developer assistant)
     "shadow_mode_enabled": False,
@@ -195,6 +208,10 @@ def _load_env() -> Dict[str, Any]:
         "TTS_ENABLED": ("tts_enabled", lambda x: x.lower() == "true"),
         "TTS_VOICE": "tts_voice",
         "TTS_RATE": ("tts_rate", int),
+        "ELEVENLABS_API_KEY": "elevenlabs_api_key",
+        "ELEVENLABS_VOICE_ID": "elevenlabs_voice_id",
+        "CURSOR_API_KEY": "cursor_api_key",
+        "CURSOR_WORKSPACE": "cursor_workspace",
         "STT_LANGUAGE": "stt_language",
         "STT_ENERGY_THRESHOLD": ("stt_energy_threshold", int),
         "STT_TIMEOUT": ("stt_timeout", int),
@@ -221,8 +238,14 @@ def _load_env() -> Dict[str, Any]:
         ),
         "MEMORY_DIR": "memory_dir",
         "BRAVE_API_KEY": "brave_api_key",
+        "GH_TOKEN": "github_token",
+        "GITHUB_TOKEN": "github_token",
         "GROQ_API_KEY": "groq_api_key",
         "OPENROUTER_API_KEY": "openrouter_api_key",
+        "OPENAI_API_KEY": "openai_api_key",
+        "OPENAI_MODEL": "openai_model",
+        "CALENDAR_ICAL_URL": "calendar_ical_url",
+        "WEATHER_CITY": "weather_city",
         "CLOUD_ROUTING_ENABLED": ("cloud_routing_enabled", lambda x: x.lower() == "true"),
         "CLOUD_ROUTING_THRESHOLD": "cloud_routing_threshold",
         "MCP_FILESYSTEM_ENABLED": ("mcp_filesystem_enabled", lambda x: x.lower() == "true"),
@@ -282,11 +305,48 @@ def load_config() -> Dict[str, Any]:
     # Aplikuj ENV konfiguraci (nejvyšší priorita)
     env_config = _load_env()
     config.update(env_config)
+
+    _hydrate_github_token(config)
     
     # Validace
     _validate_config(config)
 
     return config
+
+
+def github_token_from_gh() -> str:
+    """OAuth token z `gh auth token`, pokud je GitHub CLI přihlášené."""
+    gh = shutil.which("gh")
+    if not gh:
+        return ""
+    try:
+        result = subprocess.run(
+            [gh, "auth", "token"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if result.returncode == 0:
+            return (result.stdout or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _hydrate_github_token(config: Dict[str, Any]) -> None:
+    """Doplní GITHUB_TOKEN z gh CLI do prostředí (neukládá se do config.json)."""
+    existing = (
+        str(config.get("github_token") or "").strip()
+        or os.environ.get("GITHUB_TOKEN", "").strip()
+        or os.environ.get("GH_TOKEN", "").strip()
+    )
+    if existing:
+        if not os.environ.get("GITHUB_TOKEN"):
+            os.environ["GITHUB_TOKEN"] = existing
+        return
+    token = github_token_from_gh()
+    if token:
+        os.environ["GITHUB_TOKEN"] = token
 
 
 def _validate_config(config: Dict[str, Any]) -> None:

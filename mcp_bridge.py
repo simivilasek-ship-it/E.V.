@@ -332,7 +332,20 @@ def create_mcp_bridge(config: Dict[str, Any]) -> MCPBridge:
 
     # ── GitHub MCP — issues, PRs, code search, commits ──
     # Vyžaduje GITHUB_TOKEN (Settings → Developer → Personal access tokens)
-    github_token = config.get("github_token") or os.environ.get("GITHUB_TOKEN") or ""
+    github_token = (
+        config.get("github_token")
+        or os.environ.get("GITHUB_TOKEN")
+        or os.environ.get("GH_TOKEN")
+        or ""
+    )
+    if not github_token:
+        try:
+            from config import github_token_from_gh
+            github_token = github_token_from_gh()
+        except Exception:
+            github_token = ""
+    if github_token and not os.environ.get("GITHUB_TOKEN"):
+        os.environ["GITHUB_TOKEN"] = github_token
     bridge.register(MCPServerConfig(
         name="github",
         command="npx",

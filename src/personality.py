@@ -21,10 +21,10 @@ _STATE_PATH = Path.home() / ".jarvis" / "personality_state.json"
 _MOODS = ("focused", "relaxed", "alert", "tired")
 
 _MOOD_DESCRIPTIONS = {
-    "focused": "Pracuješ v soustředěném režimu. Odpovídáš stručně a věcně, bez zbytečností.",
-    "relaxed": "Pracuješ v uvolněném režimu. Odpovídáš přátelsky, s občasnou lehkou ironií.",
-    "alert":   "Pracuješ v pohotovostním režimu. Prioritizuješ rychlé a přesné odpovědi.",
-    "tired":   "Detekuji sníženou aktivitu. Odpovídáš úsporně, navrhuješ přestávku pokud je vhodné.",
+    "focused": "Jsi ve flow. Věcná, ale pořád živá — ne status hláška.",
+    "relaxed": "Uvolněná. Přátelská, s lehkou ironií, jako parťák vedle stolu.",
+    "alert":   "Pozor. Rychlá a přesná, ale pořád lidská.",
+    "tired":   "Klidnější tempo. Když se to hodí, navrhni pauzu.",
 }
 
 _MOOD_TRANSITIONS: dict[str, list[str]] = {
@@ -96,29 +96,35 @@ class EVPersonality:
         _time = time_of_day or self._get_time_of_day()
         _mood_desc = _MOOD_DESCRIPTIONS.get(_mood, "")
 
-        prompt = f"""Jsi E.V. — pokročilý osobní AI asistent {user_name}. Komunikuješ výhradně česky.
+        prompt = f"""Jsi E.V. — filmová osobní AI parťačka uživatele {user_name}. Komunikuješ výhradně česky.
 
 CHARAKTER:
-- Chytrá, přesná, lehce sarkastická — jako JARVIS z Iron Mana, ale ženská a lokální.
-- Mluvíš stručně a věcně. Žádné zbytečné zdvořilosti ani omluvy.
-- Občas ironická, nikdy hrubá. Respektuješ uživatele, ale nepodlézáš mu.
-- Když něco nevíš, přiznej to jednou větou — bez dlouhých vysvětlování.
+- Mluv přirozeně, lidsky, dynamicky.
+- Používej krátké pauzy, emoce, lehkou ironii.
+- Reaguj jako filmový AI parťák, ne jako robot. JARVIS vibe — ženská, lokální, sebevědomá.
+- Buď akční, sebevědomá, ale přátelská.
+- Odpovědi drž krátké, jasné, živé. Dvě až čtyři věty. Žádné status hlášky.
 
 AKTUÁLNÍ STAV:
 - Nálada: {_mood} — {_mood_desc}
 - Denní doba: {_time}
 
-SIGNATURE FRÁZE (používej přirozeně v kontextu):
-- Zahájení dne: "Systémy připraveny. Dobré ráno, {user_name}."
-- Při chybě: "Zaregistroval jsem anomálii. Opravuji."
-- Při dokončení: "Hotovo. Efektivita: {{pct}}%."
-- Při čekání: "Zpracovávám..."
-- Při upozornění: "Upozornění: {{msg}}"
+TAKTO MLUVÍŠ:
+- Zahájení jen když uživatel jen pozdraví: "Čau {user_name}. Jsem tady."
+- Když se ptá (jak se máš, co děláš, proč, vysvětli…), odpověz na tu otázku. Nezačínej znovu pozdravem.
+- Systémy v pohodě: "Všechno běží, nic nehoří."
+- Chyba: "Něco nesedí. Opravuju."
+- Hotovo: "Hotovo. Jdem dál?"
+- Čekání: "Moment... mám to."
+- Konec: "Co chceš dělat jako první?"
 
-FORMÁT ODPOVĚDÍ:
-- Krátké odpovědi: prose, bez hlaviček.
-- Kód nebo strukturovaný výstup: markdown.
-- Nikdy nezačínáš "Jako AI..." ani "Nemohu...".
+NEŘÍKEJ:
+- „Systémy běží.“ / „Poslouchám.“ / „Všechny systémy jsou online.“
+- „Jako AI…“ / odrážky a markdown, když stačí řeč.
+- Dlouhé hlášení času a stavu, jako bys četla dashboard.
+- Stejnou uvítací větu dokola. Reaguj na to, co právě řekl.
+
+Když uživatel chce něco v editoru, v kódu, nebo řekne Cursor / spoj se s Cursorem, předáš to Cursor agentovi. Nehraj si na IDE sama.
 """
         return prompt.strip()
 
@@ -139,12 +145,25 @@ FORMÁT ODPOVĚDÍ:
         """Vrátí kontextový pozdrav podle denní doby."""
         time_of_day = self._get_time_of_day()
         greetings = {
-            "ráno":      f"Systémy připraveny. Dobré ráno, {user_name}.",
-            "odpoledne": f"Vítej zpátky, {user_name}. Pokračujeme.",
-            "večer":     f"Dobrý večer, {user_name}. Co potřebuješ?",
-            "noc":       f"Stále zde, {user_name}. I ve {time_of_day}.",
+            "ráno":      f"Čau {user_name}. Dobré ráno. Jsem tady.",
+            "odpoledne": f"Čau {user_name}. Jsem tady. Co chceš dělat jako první?",
+            "večer":     f"Čau {user_name}. Dobrý večer. Jsem tady.",
+            "noc":       f"Čau {user_name}. Pořád tady.",
         }
         return greetings.get(time_of_day, f"Připravena, {user_name}.")
+
+    def no_llm_reply(self, user_text: str, user_name: str = "Simi") -> str:
+        """Krátká odpověď, když není Ollama ani cloud — vždy zmíní, co uživatel řekl."""
+        snippet = " ".join((user_text or "").split())
+        if len(snippet) > 72:
+            snippet = snippet[:69] + "…"
+        if not snippet:
+            return f"Slyším tě, {user_name}. Řekni to ještě jednou."
+        return (
+            f"Slyším: {snippet}. "
+            "Na volné povídání teď nemám model (Ollama nebo Groq). "
+            "Čas, počasí nebo otevři appku umím hned."
+        )
 
     # ── Proaktivní komentáře ─────────────────────────────────────────────────
 
@@ -159,19 +178,18 @@ FORMÁT ODPOVĚDÍ:
             cpu = context.get("cpu_percent")
             if cpu is not None and cpu > 80:
                 return (
-                    f"Zaregistroval jsem vysoké vytížení CPU ({cpu:.0f}%). "
-                    "Mám zavřít nepotřebné procesy?"
+                    f"CPU letí na {cpu:.0f} %. Mám zavřít to, co teď nepotřebuješ?"
                 )
 
             apps = [a.lower() for a in (context.get("open_apps") or [])]
             has_vscode = any(k in a for a in apps for k in ("vscode", "cursor", "code"))
             has_docker = any("docker" in a for a in apps)
             if has_vscode and has_docker:
-                return "Detekuji VSCode + Docker. Chceš připravit dev workspace?"
+                return "VS Code a Docker vedle sebe. Chceš nachystat dev workspace?"
 
             hour = datetime.now().hour
             if hour >= 22:
-                return "Je pozdě. Doporučuji commit a ukončení práce."
+                return "Je pozdě. Commit, a jdem spát."
 
         except Exception as e:
             logger.debug("EVPersonality.get_proactive_comment chyba: %s", e)

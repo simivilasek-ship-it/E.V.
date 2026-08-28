@@ -4,10 +4,12 @@ Hybridní přepínač: jednoduché dotazy → Ollama (lokálně),
 komplexní/kódovací/reasoning → Groq nebo OpenRouter (500+ tok/s).
 
 Konfigurace v .env nebo config.json:
+  OPENAI_API_KEY=sk-...           # GPT-4o-mini — chat
   GROQ_API_KEY=gsk_...
   OPENROUTER_API_KEY=sk-or-...
   CLOUD_ROUTING_ENABLED=true
   CLOUD_ROUTING_THRESHOLD=complex   # simple|complex|always
+  # s OpenAI klíčem jde do cloudu i běžný chat (ne jen kód)
 """
 from __future__ import annotations
 
@@ -45,7 +47,7 @@ OPENROUTER_MODELS = {
 @dataclass
 class CloudResponse:
     content: str
-    provider: str           # "groq" | "openrouter" | "ollama"
+    provider: str           # "openai" | "groq" | "openrouter" | "ollama"
     model: str
     latency_ms: float
     tokens_used: int = 0
@@ -92,11 +94,18 @@ class CloudRouter:
         self._stats  = CloudStats()
         self._groq_key       = config.get("groq_api_key") or os.getenv("GROQ_API_KEY", "")
         self._openrouter_key = config.get("openrouter_api_key") or os.getenv("OPENROUTER_API_KEY", "")
+        self._openai_key     = config.get("openai_api_key") or os.getenv("OPENAI_API_KEY", "")
+        self._openai_model   = (
+            str(config.get("openai_model") or os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()
+            or "gpt-4o-mini"
+        )
         self._enabled        = self._resolve_enabled(config)
         self._threshold      = config.get("cloud_routing_threshold", "complex").lower()
 
         if self._enabled:
             providers = []
+            if self._openai_key:
+                providers.append("OpenAI")
             if self._groq_key:
                 providers.append("Groq")
             if self._openrouter_key:
@@ -104,7 +113,7 @@ class CloudRouter:
             if providers:
                 logger.info(f"CloudRouter aktivní — providery: {', '.join(providers)}, threshold={self._threshold}")
             else:
-                logger.warning("CloudRouter: žádný API klíč nenalezen (GROQ_API_KEY / OPENROUTER_API_KEY)")
+                logger.warning("CloudRouter: žádný API klíč nenalezen (OPENAI_API_KEY / GROQ_API_KEY / OPENROUTER_API_KEY)")
                 self._enabled = False
         else:
             logger.info("CloudRouter: vypnutý (CLOUD_ROUTING_ENABLED=false)")
@@ -115,10 +124,12 @@ class CloudRouter:
     def enabled(self) -> bool:
         return self._enabled
 
-    def should_use_cloud(self, task_type: str) -> bool:
+    def should_use_cloud(self, task_type: str, *, ollama_down: bool = False) -> bool:
         """Rozhodne, zda má jít dotaz do cloudu."""
         if not self._enabled:
             return False
+        if ollama_down or self._openai_key:
+            return True
         if self._threshold == "always":
             return True
         if self._threshold == "complex":
@@ -136,12 +147,21 @@ class CloudRouter:
         stream: bool = False,
     ) -> CloudResponse:
         """
-        Zavolá cloud provider (Groq → OpenRouter → fallback error).
-        Při selhání Groq automaticky zkusí OpenRouter.
+        Zavolá cloud provider (OpenAI → Groq → OpenRouter).
         """
         t0 = time.monotonic()
 
-        # 1) Groq (nejrychlejší — LLaMA3 500+ tok/s)
+        if self._openai_key:
+            try:
+                result = self._call_openai(messages, task_type, temperature, max_tokens)
+                ms = (time.monotonic() - t0) * 1000
+                self._stats.record("openai", ms, result.tokens_used)
+                result.latency_ms = ms
+                return result
+            except Exception as e:
+                logger.warning(f"OpenAI selhal ({e}), zkouším další provider...")
+
+        # Groq (nejrychlejší Llama)
         if self._groq_key:
             try:
                 result = self._call_groq(messages, task_type, temperature, max_tokens, stream)
@@ -168,6 +188,12 @@ class CloudRouter:
     def call_streaming(self, messages: list[dict], task_type: str = "standard",
                        temperature: float = 0.7, max_tokens: int = 1000):
         """Generator yielding text chunks ze streaming cloud API."""
+        if self._openai_key:
+            try:
+                yield from self._stream_openai(messages, temperature, max_tokens)
+                return
+            except Exception as e:
+                logger.warning(f"OpenAI streaming selhal ({e}), zkouším další provider...")
         if self._groq_key:
             try:
                 yield from self._stream_groq(messages, task_type, temperature, max_tokens)
@@ -193,7 +219,70 @@ class CloudRouter:
             "provider_calls": self._stats.provider_calls,
             "groq_available": bool(self._groq_key),
             "openrouter_available": bool(self._openrouter_key),
+            "openai_available": bool(self._openai_key),
+            "openai_model": self._openai_model,
         }
+
+    # ── OpenAI API (GPT-4o-mini) ──────────────────────────────────────────────
+
+    def _call_openai(self, messages: list[dict], task_type: str,
+                     temperature: float, max_tokens: int) -> CloudResponse:
+        model = self._openai_model
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": False,
+        }
+        headers = {
+            "Authorization": f"Bearer {self._openai_key}",
+            "Content-Type":  "application/json",
+        }
+        resp = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            json=payload, headers=headers, timeout=45,
+        )
+        resp.raise_for_status()
+        data    = resp.json()
+        content = data["choices"][0]["message"]["content"].strip()
+        tokens  = data.get("usage", {}).get("total_tokens", 0)
+        return CloudResponse(content=content, provider="openai", model=model,
+                             latency_ms=0.0, tokens_used=tokens)
+
+    def _stream_openai(self, messages: list[dict], temperature: float, max_tokens: int):
+        import json as _json
+        model = self._openai_model
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+        headers = {
+            "Authorization": f"Bearer {self._openai_key}",
+            "Content-Type":  "application/json",
+        }
+        with requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            json=payload, headers=headers, stream=True, timeout=45,
+        ) as resp:
+            resp.raise_for_status()
+            for line in resp.iter_lines():
+                if not line:
+                    continue
+                text = line.decode("utf-8")
+                if text.startswith("data: "):
+                    text = text[6:]
+                if text.strip() == "[DONE]":
+                    break
+                try:
+                    chunk = _json.loads(text)["choices"][0]["delta"].get("content", "")
+                    if chunk:
+                        yield chunk
+                except Exception:
+                    continue
 
     # ── Groq API ──────────────────────────────────────────────────────────────
 

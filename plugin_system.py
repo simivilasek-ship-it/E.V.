@@ -311,7 +311,7 @@ def _check_imports(source: str, permissions: List[str], plugin_name: str) -> Opt
     allowed = set(_SAFE_IMPORTS)
     for perm in permissions:
         extra = _PERMISSION_MODULES.get(perm)
-        if extra:
+        if extra is not None:
             allowed.update(extra)
         else:
             logger.warning(f"Plugin '{plugin_name}': neznámá permission '{perm}'")

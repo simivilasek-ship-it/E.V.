@@ -27,12 +27,46 @@ import io
 import logging
 import os
 import queue
+import re
 import threading
 import time
 import wave
 from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def looks_like_echo(transcript: str, last_spoken: str) -> bool:
+    """True když STT nejspíš zachytilo její vlastní TTS, ne uživatele."""
+    from commands.utils import normalize_text as _norm
+
+    def _words(s: str) -> str:
+        cleaned = re.sub(r"[^\w\s]", " ", _norm(s or ""), flags=re.UNICODE)
+        return " ".join(cleaned.split())
+
+    a = _words(transcript)
+    b = _words(last_spoken)
+    if len(a) < 4 or len(b) < 4:
+        return False
+    if a in b or b in a:
+        return True
+    aw = set(a.split())
+    bw = set(b.split())
+    if not aw:
+        return False
+    return (len(aw & bw) / len(aw)) >= 0.7
+
+
+def _rms_int16(pcm: bytes) -> float:
+    """RMS energie int16 PCM bez numpy."""
+    n = len(pcm) // 2
+    if n <= 0:
+        return 0.0
+    total = 0
+    for i in range(n):
+        sample = int.from_bytes(pcm[i * 2:i * 2 + 2], "little", signed=True)
+        total += sample * sample
+    return (total / n) ** 0.5
 
 # ── Detekce dostupných backendů ───────────────────────────────────────────────
 
@@ -66,6 +100,12 @@ try:
 except ImportError:
     HAS_OPENAI_WHISPER = False
 
+try:
+    import speech_recognition as _sr  # noqa: F401
+    HAS_SPEECH_RECOGNITION = True
+except ImportError:
+    HAS_SPEECH_RECOGNITION = False
+
 
 # ── VAD (Voice Activity Detection) ───────────────────────────────────────────
 
@@ -77,7 +117,9 @@ class VADFilter:
 
     SAMPLE_RATE = 16000
     FRAME_MS    = 30       # webrtcvad vyžaduje 10/20/30ms
-    SILENCE_FRAMES = 30    # 30 × 30ms = 0.9s ticha = konec utterance
+    SILENCE_FRAMES = 25    # 25 × 30ms ≈ 0.75s ticha = konec utterance
+    MIN_SPEECH_FRAMES = 8  # ignoruj krátké cvaknutí (~240 ms)
+    ENERGY_RMS = 900       # int16 RMS práh, když chybí webrtcvad
 
     def __init__(self, aggressiveness: int = 2):
         self._vad = None
@@ -89,13 +131,21 @@ class VADFilter:
         self._silence_count = 0
         self._in_speech = False
 
+    def _frame_is_speech(self, frame: bytes) -> bool:
+        if self._vad:
+            try:
+                return self._vad.is_speech(frame, self.SAMPLE_RATE)
+            except Exception:
+                pass
+        return _rms_int16(frame) >= self.ENERGY_RMS
+
     def feed(self, pcm_bytes: bytes) -> Optional[bytes]:
         """
         Přijme surová PCM data (int16, mono, 16kHz).
         Vrátí kompletní utterance bytes nebo None pokud ještě probíhá.
         """
-        if not self._vad or not HAS_NUMPY:
-            return pcm_bytes  # bez VAD: vracíme vše
+        if not pcm_bytes:
+            return None
 
         frame_bytes = self._frame_size * 2  # int16 = 2 bytes
 
@@ -107,10 +157,7 @@ class VADFilter:
             frame = bytes(self._buffer[:frame_bytes])
             self._buffer = self._buffer[frame_bytes:]
 
-            try:
-                is_speech = self._vad.is_speech(frame, self.SAMPLE_RATE)
-            except Exception:
-                is_speech = True
+            is_speech = self._frame_is_speech(frame)
 
             if is_speech:
                 self._in_speech = True
@@ -120,8 +167,8 @@ class VADFilter:
                 self._silence_count += 1
                 self._speech_frames.append(frame)
                 if self._silence_count >= self.SILENCE_FRAMES:
-                    # Konec utterance
-                    result = b"".join(self._speech_frames)
+                    if len(self._speech_frames) >= self.MIN_SPEECH_FRAMES:
+                        result = b"".join(self._speech_frames)
                     self._speech_frames = []
                     self._silence_count = 0
                     self._in_speech = False
@@ -147,6 +194,7 @@ class WhisperTranscriber:
         self.config      = config
         self._groq_key   = config.get("groq_api_key") or os.getenv("GROQ_API_KEY", "")
         self._language   = config.get("stt_language", "cs-CZ").replace("-", "_").split("_")[0]
+        self._locale     = config.get("stt_language", "cs-CZ")
         self._fw_model   = None
         self._ow_model   = None
         self._backend    = self._detect_backend()
@@ -159,6 +207,8 @@ class WhisperTranscriber:
             return "faster_whisper"
         if HAS_OPENAI_WHISPER:
             return "openai_whisper"
+        if HAS_SPEECH_RECOGNITION:
+            return "google"
         return "none"
 
     def _init_faster_whisper(self):
@@ -192,6 +242,8 @@ class WhisperTranscriber:
             return self._transcribe_faster_whisper(audio_bytes)
         elif self._backend == "openai_whisper":
             return self._transcribe_openai_whisper(audio_bytes)
+        elif self._backend == "google":
+            return self._transcribe_google(audio_bytes)
         return ""
 
     def _transcribe_groq(self, wav_bytes: bytes) -> str:
@@ -247,6 +299,19 @@ class WhisperTranscriber:
             return result.get("text", "").strip()
         except Exception as e:
             logger.error(f"openai-whisper transkripce selhal: {e}")
+            return ""
+
+    def _transcribe_google(self, wav_bytes: bytes) -> str:
+        """Google Web Speech přes SpeechRecognition — funguje bez Whisper modelu."""
+        try:
+            import speech_recognition as sr
+            recognizer = sr.Recognizer()
+            with sr.AudioFile(io.BytesIO(wav_bytes)) as source:
+                audio = recognizer.record(source)
+            text = recognizer.recognize_google(audio, language=self._locale)
+            return (text or "").strip()
+        except Exception as e:
+            logger.warning(f"Google STT selhal: {e}")
             return ""
 
     @property
@@ -498,28 +563,45 @@ class RealDuplexEngine:
             logger.error(f"TTS chyba: {e}")
 
     def _tts_streaming(self, text: str, interrupt_event=None):
-        """Edge-TTS streaming s přerušením."""
+        """ElevenLabs nebo Edge-TTS streaming s přerušením."""
         try:
-            import edge_tts
-            import asyncio
-            import tempfile
+            voice = self.config.get("tts_voice", "cs-CZ-VlastaNeural")
 
-            voice = self.config.get("tts_voice", "cs-CZ-AntoninNeural")
+            from tts import elevenlabs_configured, iter_elevenlabs_audio, _elevenlabs_api_key
+            from tts import ELEVENLABS_FEMALE_VOICE_ID, ELEVENLABS_MODEL
 
-            async def _speak() -> bytes:
-                communicate = edge_tts.Communicate(text, voice)
+            if elevenlabs_configured(self.config):
                 buf = io.BytesIO()
-                async for chunk in communicate.stream():
-                    if chunk["type"] == "audio":
-                        if interrupt_event and interrupt_event.is_set():
-                            logger.info("TTS přerušen (barge-in)")
-                            return b""
-                        buf.write(chunk["data"])
-                return buf.getvalue()
+                for chunk in iter_elevenlabs_audio(
+                    text,
+                    api_key=_elevenlabs_api_key(self.config),
+                    voice_id=str(self.config.get("elevenlabs_voice_id") or ELEVENLABS_FEMALE_VOICE_ID),
+                    model_id=str(self.config.get("elevenlabs_model") or ELEVENLABS_MODEL),
+                ):
+                    if interrupt_event and interrupt_event.is_set():
+                        logger.info("TTS přerušen (barge-in)")
+                        return
+                    buf.write(chunk)
+                audio_data = buf.getvalue()
+            else:
+                import edge_tts
+                import asyncio
+                import tempfile
 
-            loop = asyncio.new_event_loop()
-            audio_data = loop.run_until_complete(_speak())
-            loop.close()
+                async def _speak() -> bytes:
+                    communicate = edge_tts.Communicate(text, voice)
+                    audio_buf = io.BytesIO()
+                    async for chunk in communicate.stream():
+                        if chunk["type"] == "audio":
+                            if interrupt_event and interrupt_event.is_set():
+                                logger.info("TTS přerušen (barge-in)")
+                                return b""
+                            audio_buf.write(chunk["data"])
+                    return audio_buf.getvalue()
+
+                loop = asyncio.new_event_loop()
+                audio_data = loop.run_until_complete(_speak())
+                loop.close()
 
             if not audio_data:
                 return

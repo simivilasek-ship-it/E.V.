@@ -10,12 +10,28 @@ from whisper_live import VADFilter, WhisperTranscriber, pcm_to_wav
 pytestmark = [pytest.mark.unit]
 
 
-def test_vad_without_backend_returns_input():
+def test_energy_vad_ignores_silence():
     vad = VADFilter()
     vad._vad = None
-    payload = b"\x00\x01" * 16
-    assert vad.feed(payload) == payload
+    silence = b"\x00\x00" * vad._frame_size
+    assert vad.feed(silence) is None
     assert vad.flush() is None
+
+
+def test_energy_vad_emits_after_speech_and_silence():
+    import struct
+
+    vad = VADFilter()
+    vad._vad = None
+    amp = 9000
+    speech = b"".join(
+        struct.pack("<h", amp if i % 2 == 0 else -amp) for i in range(vad._frame_size)
+    )
+    silence = b"\x00\x00" * vad._frame_size
+    assert vad.feed(speech * 8) is None
+    out = vad.feed(silence * vad.SILENCE_FRAMES)
+    assert out is not None
+    assert len(out) >= len(speech) * vad.MIN_SPEECH_FRAMES
 
 
 def test_vad_flush_returns_buffered_speech():
@@ -42,9 +58,21 @@ def test_transcriber_backend_none_without_keys(monkeypatch):
     import whisper_live as wl
     monkeypatch.setattr(wl, "HAS_FASTER_WHISPER", False)
     monkeypatch.setattr(wl, "HAS_OPENAI_WHISPER", False)
+    monkeypatch.setattr(wl, "HAS_SPEECH_RECOGNITION", False)
     t = WhisperTranscriber({"stt_language": "cs-CZ"})
     assert t._backend == "none"
     assert t.available is False
+
+
+def test_transcriber_uses_google_without_whisper(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    import whisper_live as wl
+    monkeypatch.setattr(wl, "HAS_FASTER_WHISPER", False)
+    monkeypatch.setattr(wl, "HAS_OPENAI_WHISPER", False)
+    monkeypatch.setattr(wl, "HAS_SPEECH_RECOGNITION", True)
+    t = WhisperTranscriber({"stt_language": "cs-CZ"})
+    assert t._backend == "google"
+    assert t.available is True
 
 
 def test_transcriber_prefers_groq_key(monkeypatch):
@@ -52,3 +80,13 @@ def test_transcriber_prefers_groq_key(monkeypatch):
     t = WhisperTranscriber({"groq_api_key": "gsk_test"})
     assert t._backend == "groq"
     assert t.available is True
+
+
+def test_looks_like_echo_of_greeting():
+    from whisper_live import looks_like_echo
+
+    spoken = "Čau Simi. Dobrý večer. Jsem tady."
+    assert looks_like_echo("Čau Simi dobrý večer jsem tady", spoken)
+    assert looks_like_echo("cau simi. dobry vecer", spoken)
+    assert not looks_like_echo("kolik je hodin", spoken)
+    assert not looks_like_echo("ahoj", spoken)

@@ -140,16 +140,17 @@ export default function DashboardPanel() {
       </div>
 
       {/* ── Monitoring agents ──────────────────────────────── */}
-      {agents && Object.keys(agents).length > 0 && (
+      {agents.length > 0 && (
         <div>
           <SectionHead title="Monitoring Agents" />
           <div className="panel" style={{ padding: '10px 14px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {Object.entries(agents).map(([name, st]: [string, unknown]) => (
-              <AgentBadge key={name} name={name} status={String((st as {status?: string})?.status ?? 'ok')} />
+            {agents.map(a => (
+              <AgentBadge
+                key={a.name}
+                name={a.name}
+                status={a.running ? 'running' : String(a.status ?? 'ok')}
+              />
             ))}
-            {Object.keys(agents).length === 0 && (
-              <span style={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic' }}>No agents running</span>
-            )}
           </div>
         </div>
       )}

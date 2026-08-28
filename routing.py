@@ -135,36 +135,32 @@ class CommandRouter:
                 app._execute_result(offline, {"action": "answer", "params": {}}, speak=False)
                 return offline
 
-            if not app._ollama_reachable():
-                msg = (
-                    "Ollama není dostupná. Lokální příkazy fungují — "
-                    "zkus 'kolik je hodin', 'otevři chrome' nebo 'co mám na obrazovce'."
-                )
-                if on_chunk:
-                    on_chunk(msg)
-                return msg
+            reachable = app._ollama_reachable()
+            if hasattr(app.llm, "_ollama_available"):
+                app.llm._ollama_available = reachable
 
             if on_status:
                 on_status(_MODE_STATUS["copilot"])
 
-            from agent_tools import build_copilot_registry
+            if reachable:
+                from agent_tools import build_copilot_registry
 
-            copilot_reg = build_copilot_registry(
-                app.cmds, getattr(app, "mcp", None))
-            tools_schema = copilot_reg.ollama_tools_schema()
+                copilot_reg = build_copilot_registry(
+                    app.cmds, getattr(app, "mcp", None))
+                tools_schema = copilot_reg.ollama_tools_schema()
 
-            def _on_tool_call(name: str, args: dict) -> str:
-                tool = copilot_reg.get(name)
-                if tool is None:
-                    return f"Nástroj '{name}' neexistuje"
-                return tool.call(**args)
+                def _on_tool_call(name: str, args: dict) -> str:
+                    tool = copilot_reg.get(name)
+                    if tool is None:
+                        return f"Nástroj '{name}' neexistuje"
+                    return tool.call(**args)
 
-            tool_result = app.llm.try_copilot_tools(
-                text, tools_schema, _on_tool_call)
-            if tool_result is not None:
-                if on_chunk:
-                    on_chunk(tool_result)
-                return tool_result
+                tool_result = app.llm.try_copilot_tools(
+                    text, tools_schema, _on_tool_call)
+                if tool_result is not None:
+                    if on_chunk:
+                        on_chunk(tool_result)
+                    return tool_result
 
             full = ""
             for chunk in app.llm.stream_ask(text):
@@ -223,6 +219,9 @@ class CommandRouter:
         def _step_cb(step_text: str, step_type: str = "agent") -> None:
             if on_agent_step and step_text:
                 on_agent_step(step_text)
+
+        if not app._ollama_reachable():
+            return False
 
         from agent_hierarchical import should_handle as _hierarchical_should
         if getattr(app, "hierarchical_agent", None) and _hierarchical_should(text):

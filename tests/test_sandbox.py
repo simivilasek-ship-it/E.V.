@@ -30,6 +30,8 @@ def test_should_isolate_safe():
 def test_mcp_discord_disabled_without_token(monkeypatch):
     """Bez DISCORD_TOKEN nesmí být Discord MCP registrován."""
     monkeypatch.delenv("DISCORD_TOKEN", raising=False)
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setattr("config.github_token_from_gh", lambda: "")
     from mcp_bridge import create_mcp_bridge
     bridge = create_mcp_bridge({})
     assert "discord" not in bridge.get_server_names()
@@ -38,6 +40,8 @@ def test_mcp_discord_disabled_without_token(monkeypatch):
 def test_mcp_notion_disabled_without_token(monkeypatch):
     """Bez NOTION_API_KEY nesmí být Notion MCP registrován."""
     monkeypatch.delenv("NOTION_API_KEY", raising=False)
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setattr("config.github_token_from_gh", lambda: "")
     from mcp_bridge import create_mcp_bridge
     bridge = create_mcp_bridge({})
     assert "notion" not in bridge.get_server_names()

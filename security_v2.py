@@ -65,6 +65,7 @@ ACTION_PERMISSIONS: Dict[str, PermissionLevel] = {
     "find_files":       PermissionLevel.SAFE,
     "open_file":        PermissionLevel.SAFE,
     "vscode_open":      PermissionLevel.SAFE,
+    "ask_cursor":       PermissionLevel.SAFE,
     "calculate":        PermissionLevel.SAFE,
     "translate":        PermissionLevel.SAFE,
     "memory_recall":    PermissionLevel.SAFE,

@@ -30,6 +30,40 @@ def test_threshold_complex(monkeypatch):
     assert router.should_use_cloud("chat") is False
 
 
+def test_openai_key_sends_chat_to_cloud(monkeypatch):
+    monkeypatch.delenv("CLOUD_ROUTING_ENABLED", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    router = CloudRouter({
+        "cloud_routing_enabled": True,
+        "openai_api_key": "sk-test",
+        "cloud_routing_threshold": "complex",
+    })
+    assert router.enabled is True
+    assert router.should_use_cloud("chat") is True
+    assert router.should_use_cloud("standard") is True
+    assert router.stats()["openai_available"] is True
+    assert router.stats()["openai_model"] == "gpt-4o-mini"
+
+
+def test_call_prefers_openai_over_groq(monkeypatch):
+    monkeypatch.delenv("CLOUD_ROUTING_ENABLED", raising=False)
+    router = CloudRouter({
+        "cloud_routing_enabled": True,
+        "openai_api_key": "sk-test",
+        "groq_api_key": "gsk_test",
+    })
+    fake = MagicMock()
+    fake.content = "ahoj"
+    fake.tokens_used = 4
+    with patch.object(router, "_call_openai", return_value=fake) as openai_call, \
+         patch.object(router, "_call_groq") as groq_call:
+        result = router.call([{"role": "user", "content": "ahoj"}])
+    assert result.content == "ahoj"
+    openai_call.assert_called_once()
+    groq_call.assert_not_called()
+    assert router.should_use_cloud("chat", ollama_down=True) is True
+
+
 def test_threshold_always_and_simple(monkeypatch):
     monkeypatch.delenv("CLOUD_ROUTING_ENABLED", raising=False)
     always = CloudRouter({

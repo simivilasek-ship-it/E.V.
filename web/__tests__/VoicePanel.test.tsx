@@ -13,7 +13,7 @@ const mockAddToast = vi.fn()
 
 vi.mock('@/store/ev', () => ({
   useEV: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ addToast: mockAddToast }),
+    selector({ addToast: mockAddToast, toggleMic: vi.fn(), startMic: vi.fn(), fetchDuplexFlag: vi.fn() }),
 }))
 
 // ── Fetch helpers ──────────────────────────────────────────────────────────────

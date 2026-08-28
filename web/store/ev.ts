@@ -81,6 +81,7 @@ interface EVState {
   connStatus:  ConnStatus
   connError:   string | null
   isMicActive: boolean
+  micWanted: boolean
   duplexVoice: boolean
   pendingConfirm: PendingConfirm | null
   quickActionHistory: string[]
@@ -117,7 +118,9 @@ interface EVState {
   fetchWorkSummary: () => Promise<void>
   connectConfirm: () => void
   respondConfirm: (approved: boolean) => void
-  toggleMic:      () => void
+  toggleMic:      () => Promise<void>
+  startMic:       () => Promise<void>
+  resumeListening: () => void
   sendCommand:    (text: string) => Promise<void>
   addMessage:     (text: string, sender: 'user' | 'ev', extra?: Partial<Message>) => void
   updateLastMessage: (patch: Partial<Message>) => void
@@ -169,6 +172,7 @@ export const useEV = create<EVState>((set, get) => ({
   system: { cpu: 0, ram: 0, disk: 0, cpu_temp: null, net: null, gpu: null },
   agents: [], plugins: [], currentModel: '',
   isConnected: false, connStatus: 'disconnected', connError: null, isMicActive: false,
+  micWanted: false,
   duplexVoice: false,
   pendingConfirm: null,
   quickActionHistory: [],
@@ -190,7 +194,7 @@ export const useEV = create<EVState>((set, get) => ({
     const { _ws, _attempt } = get()
     if (_ws?.readyState === WebSocket.OPEN) return
     if (_attempt >= MAX_ATTEMPTS) {
-      set({ connStatus: 'failed', connError: `Backend nedostupný po ${MAX_ATTEMPTS} pokusech. Spusť: python3 dashboard.py` })
+      set({ connStatus: 'failed', connError: `Připojení selhalo po ${MAX_ATTEMPTS} pokusech. Spusť znovu: ./start.sh` })
       return
     }
     if (_attempt === 0) {
@@ -221,6 +225,9 @@ export const useEV = create<EVState>((set, get) => ({
       get().connectActivity()
       get().fetchWorkSummary()
       get().fetchDuplexFlag()
+      get().fetchPlugins()
+      get().fetchAgents()
+      get().fetchSystem()
     }
     ws.onclose = (ev) => {
       clearTimeout(timeout)
@@ -453,7 +460,14 @@ export const useEV = create<EVState>((set, get) => ({
             if (last?.streaming) msgs[msgs.length - 1] = { ...last, streaming: false }
             return { messages: msgs }
           })
-          get().setOrbState('idle')
+          get().setOrbState(get().micWanted ? 'listening' : 'idle')
+          const last = get().messages[get().messages.length - 1]
+          if (last?.sender === 'ev' && last.text) {
+            void import('@/lib/tts').then(async ({ playReplySpeech }) => {
+              await playReplySpeech(last.text)
+              get().resumeListening()
+            })
+          }
         } else if (msg.type === 'error') {
           get().updateLastMessage({ text: `⚠ ${msg.text || msg.data}`, streaming: false, error: true })
           get().setOrbState('idle')
@@ -489,6 +503,12 @@ export const useEV = create<EVState>((set, get) => ({
       }
       const d = await r.json()
       get().updateLastMessage({ text: d.response || 'OK', streaming: false })
+      if (d.response) {
+        await import('@/lib/tts').then(async ({ playReplySpeech }) => {
+          await playReplySpeech(d.response)
+          get().resumeListening()
+        })
+      }
     } catch (e: unknown) {
       const msg = (e as Error).message
       get().updateLastMessage({
@@ -502,7 +522,7 @@ export const useEV = create<EVState>((set, get) => ({
         if (last?.streaming) msgs[msgs.length - 1] = { ...last, streaming: false }
         return { messages: msgs }
       })
-      get().setOrbState('idle')
+      get().setOrbState(get().micWanted ? 'listening' : 'idle')
     }
   },
 
@@ -570,47 +590,76 @@ export const useEV = create<EVState>((set, get) => ({
     }
   },
 
-  async toggleMic() {
-    const { isMicActive, _recognition, _audioDuplex, duplexVoice } = get()
+  async startMic() {
+    if (get().isMicActive) return
+    await get().toggleMic()
+  },
 
-    if (isMicActive) {
-      _recognition?.stop()
+  resumeListening() {
+    const { micWanted, _recognition } = get()
+    if (!micWanted) return
+    set({ isMicActive: true, orbState: 'listening' })
+    if (_recognition) {
+      try { _recognition.start() } catch { /* already started */ }
+    }
+  },
+
+  async toggleMic() {
+    const { isMicActive, _recognition, _audioDuplex, duplexVoice, micWanted } = get()
+
+    if (isMicActive || micWanted) {
+      set({ micWanted: false, isMicActive: false, orbState: 'idle' })
+      try { _recognition?.stop() } catch { /* */ }
       _audioDuplex?.stop()
-      set({ isMicActive: false, _recognition: null, _audioDuplex: null, orbState: 'idle' })
+      set({ _recognition: null, _audioDuplex: null })
       return
     }
 
-    // Duplex: /ws/audio + STT + TTS (backend Whisper/Edge-TTS)
+    set({ micWanted: true, isMicActive: true, orbState: 'listening' })
+
     if (duplexVoice) {
       const duplex = new AudioDuplex(`${getWsBase()}/ws/audio`, {
-        onListening: () => set({ isMicActive: true, orbState: 'listening' }),
+        onListening: () => {
+          if (!get().micWanted) return
+          set({ isMicActive: true, orbState: 'listening' })
+        },
         onTranscript: (text) => get().addMessage(text, 'user'),
         onResponse: (text) => {
           get().addMessage(text, 'ev')
-          get().setOrbState('idle')
+          get().setOrbState('speaking')
         },
         onSpeaking: () => get().setOrbState('speaking'),
-        onIdle: () => set({ isMicActive: false, _audioDuplex: null, orbState: 'idle' }),
+        onIdle: () => {
+          if (get().micWanted) {
+            set({ isMicActive: true, orbState: 'listening' })
+            return
+          }
+          set({ isMicActive: false, _audioDuplex: null, orbState: 'idle' })
+        },
         onError: (msg) => {
           get().addToast(msg, 'error')
+          if (get().micWanted) {
+            set({ isMicActive: true, orbState: 'listening' })
+            return
+          }
           set({ isMicActive: false, _audioDuplex: null, orbState: 'idle' })
         },
       })
       set({ _audioDuplex: duplex })
       const ok = await duplex.start()
-      if (!ok) {
-        set({ _audioDuplex: null })
-        get().addToast('Duplex hlas selhal — zkouším Web Speech API', 'info')
-      } else {
-        return
-      }
+      if (ok) return
+      set({ _audioDuplex: null })
+      get().addToast('Duplex hlas selhal — zkouším Web Speech API', 'info')
     }
 
     const SR = typeof window !== 'undefined'
       ? (window.SpeechRecognition || window.webkitSpeechRecognition)
       : undefined
     if (!SR) {
-      get().addToast('Hlas není podporován v tomto prohlížeči (zkus Chrome)', 'error')
+      if (!get()._audioDuplex) {
+        set({ micWanted: false, isMicActive: false, orbState: 'idle' })
+        get().addToast('Hlas není podporován v tomto prohlížeči (zkus Chrome)', 'error')
+      }
       return
     }
 
@@ -618,24 +667,42 @@ export const useEV = create<EVState>((set, get) => ({
     rec.lang = 'cs-CZ'
     rec.interimResults = false
     rec.maxAlternatives = 1
+    ;(rec as SpeechRecognition & { continuous?: boolean }).continuous = true
 
     rec.onstart = () => {
+      if (!get().micWanted) return
       set({ isMicActive: true, _recognition: rec, orbState: 'listening' })
     }
     rec.onresult = (ev: SpeechRecognitionEvent) => {
-      const text = ev.results?.[0]?.[0]?.transcript?.trim()
+      if (!get().micWanted) return
+      const result = ev.results?.[ev.results.length - 1]
+      if (!result?.isFinal) return
+      const text = result[0]?.transcript?.trim()
       if (text) get().sendCommand(text)
     }
-    rec.onerror = () => {
+    rec.onerror = (ev: Event) => {
+      const err = (ev as { error?: string }).error
+      if (err === 'no-speech' || err === 'aborted' || err === 'network') return
+      if (get().micWanted) return
       set({ isMicActive: false, _recognition: null, orbState: 'idle' })
       get().addToast('Chyba rozpoznávání hlasu', 'error')
     }
     rec.onend = () => {
-      set({ isMicActive: false, _recognition: null, orbState: 'idle' })
+      if (!get().micWanted || get()._recognition !== rec) return
+      try {
+        rec.start()
+      } catch {
+        setTimeout(() => {
+          if (get().micWanted && get()._recognition === rec) {
+            try { rec.start() } catch { /* */ }
+          }
+        }, 250)
+      }
     }
 
     try {
       rec.start()
+      set({ _recognition: rec })
     } catch {
       get().addToast('Mikrofon nelze spustit — zkontroluj oprávnění', 'error')
     }

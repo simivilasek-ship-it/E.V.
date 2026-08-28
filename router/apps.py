@@ -5,6 +5,7 @@ Handles open/close/install commands and website navigation.
 import os
 import re
 
+from commands.files import announce_open_app, announce_open_url, extract_web_url
 from commands.utils import normalize_text as _norm
 from .constants import (
     _SITES, _APPS, _PROC_ALIASES, _CLOSE_TRIGGER, _OPEN_TRIGGER,
@@ -140,45 +141,49 @@ def route_apps(text: str, t: str, sites: dict | None = None) -> tuple:
             return f"Odinstalovávám: {pkg}.", {
                 "action": "uninstall_app", "params": {"name": pkg}}
 
-    # Open trigger: sites, then apps, then raw URL
+    # Open trigger: sites, then URL (hellspy.cz), then apps
     if _OPEN_TRIGGER.search(t):
         for site, url in _s.items():
             if site in t:
-                return f"Otevírám {site.capitalize()}.", {
+                return announce_open_url(url), {
                     "action": "open_url", "params": {"url": url}}
+        found = extract_web_url(text)
+        if found:
+            return announce_open_url(found), {
+                "action": "open_url", "params": {"url": found}}
         for name, cmd in _APPS.items():
             if _norm(name) in t:
-                return f"Spouštím {name}.", {
+                return announce_open_app(name), {
                     "action": "open_app", "params": {"app": cmd}}
-        url_m = re.search(r"(https?://\S+|\w+\.\w{2,}\S*)", text)
-        if url_m:
-            url = url_m.group(1)
-            return f"Otevírám {url}.", {
-                "action": "open_url",
-                "params": {"url": url if url.startswith("http") else "https://" + url}}
 
     return None, None
 
 
 def route_sites(text: str, t: str, sites: dict | None = None) -> tuple:
     """Handles URL navigation and website opening."""
-    # URL with explicit browser intent keyword
-    url_early = re.search(r"(https?://\S+|\b\w[\w.-]+\.\w{2,}\S*)", text)
-    if url_early and re.search(
-        r"\b(spust|otevri|naviguj|jdi\s+na|web|stranku|prohlizec|browser|chromium|firefox|chrome)\b",
-        t,
-    ):
-        url = url_early.group(1)
-        if not url.startswith("http"):
-            url = "https://" + url
-        return f"Otevírám {url}.", {"action": "open_url", "params": {"url": url}}
+    found = extract_web_url(text)
+    if not found:
+        return None, None
 
-    # Fallback: any domain-like URL in text
-    url_fb = re.search(r"(https?://\S+|\b\w[\w.-]+\.(cz|com|org|net|io|sk|de|eu)\S*)", text)
-    if url_fb:
-        url = url_fb.group(1)
-        if not url.startswith("http"):
-            url = "https://" + url
-        return f"Otevírám {url}.", {"action": "open_url", "params": {"url": url}}
+    wants_open = bool(re.search(
+        r"\b(spust|otevri|naviguj|jdi\s+na|web|stranku|prohlizec|browser|"
+        r"chromium|firefox|chrome|ukaz)\b",
+        t,
+    ))
+    leftover = re.sub(
+        r"\b(otevri|spust|open|start|stranku|web|prohlizec|browser|"
+        r"prosim|prosimte|jdi\s+na|naviguj|ukaz|https?)\b",
+        " ",
+        t,
+    )
+    leftover = re.sub(r"\s+", "", leftover).strip(" .,!?/")
+    host = found.split("://", 1)[-1].split("/", 1)[0].lower()
+    spoken = leftover.replace("tecka", ".").replace("dot", ".")
+    bare = leftover in (host, host.replace("www.", ""), host.replace(".", "")) or spoken in (
+        host, host.replace("www.", ""),
+    )
+
+    if wants_open or bare:
+        return announce_open_url(found), {"action": "open_url", "params": {"url": found}}
 
     return None, None

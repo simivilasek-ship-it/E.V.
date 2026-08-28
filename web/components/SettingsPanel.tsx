@@ -31,6 +31,7 @@ interface McpServer {
   env_present?: boolean
   config_key?: string
   command?: string
+  hint?: string
 }
 
 interface HealthCheck {
@@ -610,6 +611,14 @@ export default function SettingsPanel() {
                       >
                         {server.command}
                         {server.requires_env ? ` · ${server.requires_env}` : ''}
+                      </span>
+                    )}
+                    {server.hint && !server.ready && (
+                      <span
+                        className="text-[10px] truncate"
+                        style={{ color: 'var(--amber)' }}
+                      >
+                        {server.hint}
                       </span>
                     )}
                   </div>

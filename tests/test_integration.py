@@ -176,6 +176,10 @@ class TestPluginSandbox:
         source = "import json\nimport re\ndef get_routes(): return []"
         assert self._check(source) is None
 
+    def test_answer_permission_is_known(self):
+        source = "import json\ndef get_routes(): return []"
+        assert self._check(source, permissions=["answer", "safe_eval"]) is None
+
     def test_blocked_import_rejected(self):
         source = "import subprocess\nsubprocess.run(['ls'])"
         result = self._check(source)

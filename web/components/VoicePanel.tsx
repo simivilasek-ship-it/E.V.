@@ -95,6 +95,8 @@ export default function VoicePanel() {
   const analyserRef = useRef<AnalyserNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const addToast = useEV(s => s.addToast)
+  const startMic = useEV(s => s.startMic)
+  const fetchDuplexFlag = useEV(s => s.fetchDuplexFlag)
 
   useEffect(() => {
     const poll = async () => {
@@ -201,7 +203,9 @@ export default function VoicePanel() {
         body: JSON.stringify({ audio_ws_enabled: next, duplex_audio_enabled: next }),
       })
       setDuplex(next)
-      addToast(next ? 'Duplex zapnut' : 'Duplex vypnut', 'success', 2000)
+      await fetchDuplexFlag()
+      addToast(next ? 'Duplex zapnut — poslouchám' : 'Duplex vypnut', 'success', 2000)
+      if (next) await startMic()
     } catch {
       addToast('Chyba při ukládání nastavení', 'error', 3000)
     }

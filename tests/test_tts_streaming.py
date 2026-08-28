@@ -33,6 +33,7 @@ def _make_engine(config: dict) -> tts_module.TTSEngine:
     """Vytvoří TTSEngine bez spuštění workeru."""
     with patch.object(tts_module.TTSEngine, "_start_worker"):
         engine = tts_module.TTSEngine(config)
+    engine._elevenlabs_key = ""
     return engine
 
 

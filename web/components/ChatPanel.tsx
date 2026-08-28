@@ -4,7 +4,6 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useEV, type Message, type MessageMode } from '@/store/ev'
 import { Icons } from './Icons'
-import HeroPanel from './HeroPanel'
 import ProactiveSuggestions from './ProactiveSuggestions'
 import EVOrb from './EVOrb'
 
@@ -25,7 +24,7 @@ const QUICK_ACTIONS = [
 ] as const
 
 const MODE_BADGE: Record<MessageMode, { label: string; color: string; bg: string }> = {
-  copilot: { label: 'Copilot', color: 'var(--accent-light)', bg: 'rgba(99,102,241,.12)' },
+  copilot: { label: 'Copilot', color: 'var(--accent-light)', bg: 'rgba(59,158,255,.12)' },
   akce:    { label: 'Akce',    color: 'var(--amber)', bg: 'rgba(251,191,36,.12)' },
   agent:   { label: 'Agent',   color: 'var(--purple)', bg: 'rgba(167,139,250,.12)' },
 }
@@ -312,7 +311,7 @@ function InstallProgressBar() {
   )
 }
 
-export default function ChatPanel() {
+export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   const [input, setInput] = useState('')
   const messages  = useEV(s => s.messages)
   const sendCmd   = useEV(s => s.sendCommand)
@@ -430,15 +429,27 @@ export default function ChatPanel() {
           <h2 className="font-display text-sm font-semibold" style={{ color: 'var(--text)' }}>Chat</h2>
           <p className="text-[11px]" style={{ color: 'var(--muted)' }}>Copilot · Agent · Akce</p>
         </div>
-        <button onClick={clearMsgs} className="btn-ghost px-3 py-1.5 text-xs font-mono">
-          Vymazat
-        </button>
+        <div className="flex items-center gap-2">
+          {onClose && (
+            <button type="button" onClick={onClose} className="btn-ghost px-3 py-1.5 text-xs font-mono" aria-label="Zavřít chat">
+              Zavřít
+            </button>
+          )}
+          <button onClick={clearMsgs} className="btn-ghost px-3 py-1.5 text-xs font-mono">
+            Vymazat
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
-          <HeroPanel onSend={sendCmd} />
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 py-10 text-center" data-testid="chat-empty">
+            <EVOrb size="md" state={orbState} />
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>
+              Napiš nebo řekni, co máme řešit.
+            </p>
+          </div>
         ) : (
           <div className="max-w-3xl mx-auto px-3 sm:px-5 pt-6 pb-4">
             {messages.map(m => <MessageBubble key={m.id} msg={m} />)}
@@ -496,7 +507,7 @@ export default function ChatPanel() {
         )}
 
         {uploadToast && (
-          <div className="px-3 py-2 rounded-lg text-xs font-mono" style={{ background: 'rgba(99,102,241,.15)', color: 'var(--accent-light)', border: '1px solid var(--border-accent)' }}>
+          <div className="px-3 py-2 rounded-lg text-xs font-mono" style={{ background: 'rgba(59,158,255,.15)', color: 'var(--accent-light)', border: '1px solid var(--border-accent)' }}>
             {uploadToast}
           </div>
         )}

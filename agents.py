@@ -161,7 +161,11 @@ class ProcessWatcherAgent(BaseAgent):
 
         for name in self.watch:
             is_running = any(name.lower() in r.lower() for r in running)
-            was_running = self._known.get(name, True)
+            was_running = self._known.get(name)
+            if was_running is None:
+                # First sight: don't pretend a missing process "just crashed".
+                self._known[name] = is_running
+                continue
 
             if was_running and not is_running:
                 self.emit(EventType.AGENT_ALERT, {

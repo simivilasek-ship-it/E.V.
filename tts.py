@@ -7,11 +7,13 @@ Jeden worker vlákno + queue → věty se přehrávají sériově,
 import asyncio
 import logging
 import queue
+import re
+import shutil
 import tempfile
 import subprocess
 import os
 import threading
-from typing import Optional
+from typing import Iterator, Optional
 
 try:
     import edge_tts
@@ -28,6 +30,251 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 _STOP_SENTINEL = object()  # speciální hodnota pro zastavení workeru
+
+# Stejné convert() API jako @elevenlabs/elevenlabs-js — klíč zůstává na serveru.
+# NOpBlnGInO9m6vDvFkFC je Grandpa Spuds Oxley (muž).
+# Lily zní tepleji a lidštěji než výchozí Sarah.
+ELEVENLABS_FEMALE_VOICE_ID = "pFZP5JQG7iQjIQuC4Bku"
+ELEVENLABS_VOICE_NAME = "Lily"
+ELEVENLABS_MODEL = "eleven_v3"
+ELEVENLABS_CONVERT_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+ELEVENLABS_OUTPUT_FORMATS = ("mp3_44100_192", "mp3_44100_128")
+ELEVENLABS_FALLBACK_MODEL = "eleven_multilingual_v2"
+ELEVENLABS_VOICE_SETTINGS = {
+    "stability": 0.15,
+    "similarity_boost": 0.85,
+    "style": 0.65,
+    "use_speaker_boost": True,
+}
+ELEVENLABS_STREAM_URL = ELEVENLABS_CONVERT_URL + "/stream"
+
+
+def _elevenlabs_api_key(config: Optional[dict] = None) -> str:
+    cfg = config or {}
+    return (
+        str(cfg.get("elevenlabs_api_key") or "").strip()
+        or os.environ.get("ELEVENLABS_API_KEY", "").strip()
+    )
+
+
+def elevenlabs_configured(config: Optional[dict] = None) -> bool:
+    return bool(_elevenlabs_api_key(config))
+
+
+def infer_tts_language(text: str) -> str:
+    """Čeština je výchozí; angličtina jen když text vypadá anglicky."""
+    raw = text or ""
+    if any(ch in raw for ch in "áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ"):
+        return "cs"
+    words = {w.strip(".,!?;:").lower() for w in raw.split()}
+    english = {"the", "and", "you", "hello", "please", "this", "that", "with"}
+    if words & english:
+        return "en"
+    return "cs"
+
+
+def prepare_speech_text(text: str, limit: int = 2500) -> str:
+    """Odstraní markdown a kód, ať TTS čte souvislou větu."""
+    raw = (text or "").strip()
+    if not raw:
+        return ""
+    raw = re.sub(r"```[\s\S]*?```", " ", raw)
+    raw = re.sub(r"`[^`]+`", " ", raw)
+    raw = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", raw)
+    raw = re.sub(r"https?://\S+", " ", raw)
+    raw = re.sub(r"[#*_>~]+", " ", raw)
+    raw = re.sub(r"\s+", " ", raw).strip()
+    if len(raw) > limit:
+        raw = raw[:limit].rsplit(" ", 1)[0] + "…"
+    return raw
+
+
+def humanize_elevenlabs_text(text: str) -> str:
+    """Nechá emoci na voice_settings. Tagy jen když už v textu jsou."""
+    spoken = prepare_speech_text(text)
+    if not spoken:
+        return ""
+    if spoken.lstrip().startswith("["):
+        return spoken
+    spoken = re.sub(r"!{2,}", "!", spoken)
+    spoken = re.sub(r"\.{4,}", "...", spoken)
+    spoken = spoken.replace(" - ", ", ")
+    return spoken
+
+
+def espeak_bin() -> Optional[str]:
+    return shutil.which("espeak-ng") or shutil.which("espeak")
+
+
+def espeak_available() -> bool:
+    return bool(espeak_bin())
+
+
+def _espeak_wav_bytes(text: str) -> bytes:
+    """Syntetizuje WAV přes espeak-ng (ženský český hlas, pokud je v systému)."""
+    binary = espeak_bin()
+    if not binary or not text:
+        return b""
+    lang = infer_tts_language(text)
+    voices = ("cs+f3", "cs+f2", "czech+f3", "cs") if lang == "cs" else ("en+f3", "en+f2", "en")
+    fd, path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    try:
+        last_err = b""
+        for voice in voices:
+            try:
+                result = subprocess.run(
+                    [binary, "-v", voice, "-s", "155", "-w", path, "--", text],
+                    capture_output=True,
+                    timeout=45,
+                )
+            except Exception as e:
+                logger.warning(f"espeak TTS: {e}")
+                return b""
+            if result.returncode == 0 and os.path.exists(path) and os.path.getsize(path) > 44:
+                with open(path, "rb") as fh:
+                    return fh.read()
+            last_err = result.stderr or result.stdout
+        if last_err:
+            logger.warning(f"espeak TTS selhal: {last_err[:200]!r}")
+        return b""
+    finally:
+        try:
+            os.unlink(path)
+        except Exception:
+            pass
+
+
+def _edge_tts_bytes(text: str, voice: str) -> bytes:
+    if not HAS_EDGE_TTS:
+        return b""
+
+    async def _collect() -> bytes:
+        communicate = edge_tts.Communicate(text, voice)
+        chunks: list[bytes] = []
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                chunks.append(chunk["data"])
+        return b"".join(chunks)
+
+    try:
+        return asyncio.run(_collect())
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(_collect())
+        finally:
+            loop.close()
+    except Exception as e:
+        logger.warning(f"edge-tts synthesize: {e}")
+        return b""
+
+
+def synthesize_speech(text: str, config: Optional[dict] = None) -> tuple[bytes, str]:
+    """Vrátí (audio_bytes, mime) pro přehrání v prohlížeči."""
+    cfg = config or {}
+    spoken = prepare_speech_text(text)
+    if not spoken:
+        raise ValueError("Prázdný text")
+
+    key = _elevenlabs_api_key(cfg)
+    if key:
+        try:
+            buf = bytearray()
+            voice_id = str(cfg.get("elevenlabs_voice_id") or "").strip() or ELEVENLABS_FEMALE_VOICE_ID
+            model_id = str(cfg.get("elevenlabs_model") or "").strip() or ELEVENLABS_MODEL
+            for chunk in iter_elevenlabs_audio(
+                spoken, api_key=key, voice_id=voice_id, model_id=model_id,
+            ):
+                buf.extend(chunk)
+            if buf:
+                return bytes(buf), "audio/mpeg"
+        except Exception as e:
+            logger.warning(f"ElevenLabs TTS selhal, zkouším zálohu: {e}")
+
+    if HAS_EDGE_TTS:
+        voice = str(cfg.get("tts_voice") or "cs-CZ-VlastaNeural")
+        data = _edge_tts_bytes(spoken, voice)
+        if data:
+            return data, "audio/mpeg"
+
+    wav = _espeak_wav_bytes(spoken)
+    if wav:
+        return wav, "audio/wav"
+
+    raise RuntimeError("Žádný TTS engine není dostupný")
+
+
+def active_tts_engine(config: Optional[dict] = None) -> str:
+    cfg = config or {}
+    if _elevenlabs_api_key(cfg):
+        return "elevenlabs"
+    if HAS_EDGE_TTS:
+        return "edge-tts"
+    if espeak_available():
+        return "espeak-ng"
+    if HAS_PYTTSX3:
+        return "pyttsx3"
+    return "none"
+
+
+def iter_elevenlabs_audio(
+    text: str,
+    *,
+    api_key: str,
+    voice_id: str = ELEVENLABS_FEMALE_VOICE_ID,
+    model_id: str = ELEVENLABS_MODEL,
+    language_code: Optional[str] = None,
+) -> Iterator[bytes]:
+    """Stream MP3 chunků z ElevenLabs textToSpeech.convert."""
+    import requests
+
+    models = [model_id]
+    if model_id != ELEVENLABS_FALLBACK_MODEL:
+        models.append(ELEVENLABS_FALLBACK_MODEL)
+    lang = language_code or infer_tts_language(text)
+    last_error: Exception | None = None
+
+    for mid in models:
+        tagged = mid == ELEVENLABS_MODEL
+        payload = {
+            "text": humanize_elevenlabs_text(text) if tagged else prepare_speech_text(text),
+            "model_id": mid,
+            "apply_text_normalization": "auto",
+            "voice_settings": dict(ELEVENLABS_VOICE_SETTINGS),
+        }
+        if tagged:
+            payload["language_code"] = lang
+        for fmt in ELEVENLABS_OUTPUT_FORMATS:
+            url = ELEVENLABS_CONVERT_URL.format(voice_id=voice_id) + f"?output_format={fmt}"
+            response = requests.post(
+                url,
+                headers={
+                    "xi-api-key": api_key,
+                    "Accept": "audio/mpeg",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                stream=True,
+                timeout=60,
+            )
+            status = getattr(response, "status_code", 200)
+            if status == 200:
+                for chunk in response.iter_content(chunk_size=4096):
+                    if chunk:
+                        yield chunk
+                return
+            try:
+                response.raise_for_status()
+            except Exception as e:
+                last_error = e
+                logger.warning(f"ElevenLabs {mid}/{fmt}: {e}")
+            if status in (401, 402):
+                break
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("ElevenLabs TTS nevrátil audio")
 
 
 class PiperTTS:
@@ -88,8 +335,16 @@ class TTSEngine:
     def __init__(self, config: dict):
         self.config = config
         self.enabled = config.get("tts_enabled", True)
-        self.voice   = config.get("tts_voice", "cs-CZ-AntoninNeural")
+        self.voice   = config.get("tts_voice", "cs-CZ-VlastaNeural")
         self.rate    = config.get("tts_rate", 170)
+        self._elevenlabs_key = _elevenlabs_api_key(config)
+        self._elevenlabs_voice = (
+            str(config.get("elevenlabs_voice_id") or "").strip()
+            or ELEVENLABS_FEMALE_VOICE_ID
+        )
+        self._elevenlabs_model = (
+            str(config.get("elevenlabs_model") or "").strip() or ELEVENLABS_MODEL
+        )
 
         self._queue:        queue.Queue = queue.Queue()
         self._current_proc: Optional[subprocess.Popen] = None
@@ -117,7 +372,7 @@ class TTSEngine:
                 self._pyttsx3_engine.setProperty("rate", self.rate)
                 for voice in self._pyttsx3_engine.getProperty("voices"):
                     if any(x in (voice.id + voice.name).lower()
-                           for x in ("czech", "cs-cz", "zuzana", "jakub")):
+                           for x in ("zuzana", "vlasta", "czech", "cs-cz")):
                         self._pyttsx3_engine.setProperty("voice", voice.id)
                         break
                 self._has_pyttsx3 = True
@@ -127,12 +382,11 @@ class TTSEngine:
         if self.enabled:
             self._start_worker()
 
-        if HAS_EDGE_TTS:
-            logger.info("TTS: edge-tts + worker fronta")
-        elif self._has_pyttsx3:
-            logger.info("TTS: pyttsx3 + worker fronta")
-        else:
+        engine = active_tts_engine(config)
+        if engine == "none" and not self._piper.available:
             logger.warning("TTS: žádný engine není dostupný")
+        else:
+            logger.info(f"TTS: {engine} + worker fronta")
 
     # ── Worker ────────────────────────────────────────
 
@@ -163,7 +417,10 @@ class TTSEngine:
                 self._queue.task_done()
 
     def _play(self, text: str) -> None:
-        """Volá se z worker vlákna. Pořadí: Piper → edge-tts → pyttsx3."""
+        """Volá se z worker vlákna. Pořadí: ElevenLabs → Piper → edge-tts → pyttsx3."""
+        if self._elevenlabs_key:
+            if self._speak_elevenlabs(text):
+                return
         # 1. Piper (nejrychlejší, offline)
         if self._piper.available:
             tmp = tempfile.mktemp(suffix=".wav")
@@ -195,30 +452,34 @@ class TTSEngine:
         # 3. pyttsx3 fallback
         if self._has_pyttsx3:
             self._speak_pyttsx3(text)
-        else:
-            logger.warning("TTS není dostupný")
+            return
+        # 4. espeak-ng (vždy na Fedoře / Linuxu, bez pip)
+        if self._speak_espeak(text):
+            return
+        logger.warning("TTS není dostupný")
 
     # ── Veřejné API ───────────────────────────────────
 
     def speak(self, text: str) -> None:
         """Neblokující — přidá text do fronty pro worker."""
-        if not self.enabled or not text:
+        spoken = prepare_speech_text(text)
+        if not self.enabled or not spoken:
             return
-        self._queue.put(text)
+        self._queue.put(spoken)
 
     def speak_streaming(self, generator) -> None:
         """
-        Přijme generátor chunků (z Ollama stream_ask) a přehrává věty
-        okamžitě po dokončení — odezva klesá z ~5s na ~1s.
-        Interpunkce: . ! ? ; a čárka před spojkami.
+        Přijme generátor chunků (z Ollama stream_ask) a přehrává řeč.
+        ElevenLabs dostane celou odpověď najednou — jinak se hlas seká po větách.
         """
         if not self.enabled:
             return
-        import re
-        _SENT_END = re.compile(
-            r'(?<=[.!?;])\s+'           # po tečce/vykřičníku/otazníku/středníku
-            r'|(?<=,)\s+(?=a\s|ale\s|nebo\s|takže\s|protože\s)'  # čárka před spojkou
-        )
+        if self._elevenlabs_key:
+            spoken = prepare_speech_text("".join(chunk or "" for chunk in generator))
+            if spoken:
+                self.speak(spoken)
+            return
+        _SENT_END = re.compile(r'(?<=[.!?])\s+')
         buffer = ""
         for chunk in generator:
             buffer += chunk
@@ -257,9 +518,54 @@ class TTSEngine:
             self._worker.join(timeout=3)
 
     def is_available(self) -> bool:
-        return self.enabled and (self._piper.available or HAS_EDGE_TTS or self._has_pyttsx3)
+        return self.enabled and (
+            bool(self._elevenlabs_key)
+            or self._piper.available
+            or HAS_EDGE_TTS
+            or self._has_pyttsx3
+            or espeak_available()
+        )
 
     # ── Interní přehrávání ────────────────────────────
+
+    def _speak_elevenlabs(self, text: str) -> bool:
+        """Přehrává MP3 z ElevenLabs (teplý ženský hlas Lily)."""
+        tmp = tempfile.mktemp(suffix=".mp3")
+        try:
+            with open(tmp, "wb") as fh:
+                for chunk in iter_elevenlabs_audio(
+                    text,
+                    api_key=self._elevenlabs_key,
+                    voice_id=self._elevenlabs_voice,
+                    model_id=self._elevenlabs_model,
+                ):
+                    fh.write(chunk)
+            if os.path.getsize(tmp) < 32:
+                return False
+            if os.name == "nt":
+                proc = subprocess.Popen(["cmd", "/c", "start", "/wait", "", tmp])
+            elif self._player == "ffplay":
+                proc = subprocess.Popen(
+                    ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", tmp]
+                )
+            elif self._player:
+                proc = subprocess.Popen([self._player, "-q", tmp])
+            else:
+                logger.error("Žádný audio přehrávač pro ElevenLabs")
+                return False
+            self._current_proc = proc
+            proc.wait()
+            self._current_proc = None
+            return True
+        except Exception as e:
+            logger.error(f"ElevenLabs TTS chyba: {e}")
+            return False
+        finally:
+            try:
+                os.unlink(tmp)
+            except Exception:
+                pass
+
 
     async def _speak_edge_tts_streaming(self, text: str) -> None:
         """Streamuje audio přímo do ffplay stdin — žádný dočasný soubor, nižší latence."""
@@ -345,6 +651,39 @@ class TTSEngine:
                 self._pyttsx3_engine.runAndWait()
         except Exception as e:
             logger.error(f"pyttsx3 chyba: {e}")
+
+    def _speak_espeak(self, text: str) -> bool:
+        wav = _espeak_wav_bytes(text)
+        if not wav:
+            return False
+        tmp = tempfile.mktemp(suffix=".wav")
+        try:
+            with open(tmp, "wb") as fh:
+                fh.write(wav)
+            if self._player == "ffplay":
+                cmd = ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", tmp]
+            elif shutil.which("aplay"):
+                cmd = ["aplay", "-q", tmp]
+            elif shutil.which("paplay"):
+                cmd = ["paplay", tmp]
+            elif self._player:
+                cmd = [self._player, tmp]
+            else:
+                logger.error("Žádný audio přehrávač pro espeak")
+                return False
+            proc = subprocess.Popen(cmd)
+            self._current_proc = proc
+            proc.wait()
+            self._current_proc = None
+            return True
+        except Exception as e:
+            logger.error(f"espeak přehrání: {e}")
+            return False
+        finally:
+            try:
+                os.unlink(tmp)
+            except Exception:
+                pass
 
     def _find_player(self) -> Optional[str]:
         for player in ("mpg123", "ffplay", "cvlc", "mplayer"):

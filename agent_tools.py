@@ -101,7 +101,7 @@ class ToolRegistry:
 
 COPILOT_TOOL_NAMES = (
     "open_app", "screenshot", "pc_overview", "get_time",
-    "weather", "search_web", "system_info",
+    "weather", "search_web", "system_info", "ask_cursor",
 )
 
 
@@ -174,6 +174,14 @@ def build_copilot_registry(executor, mcp_bridge=None) -> ToolRegistry:
         params=[],
         fn=lambda: ex.execute("system_info", {}),
         examples=["system_info()"],
+    ))
+
+    reg.register(Tool(
+        name="ask_cursor",
+        description="Předá úkol Cursor agentovi v aktuálním projektu (kód, opravy, soubory).",
+        params=[ToolParam("prompt", "Co má Cursor udělat")],
+        fn=lambda prompt: ex.execute("ask_cursor", {"prompt": prompt}),
+        examples=['ask_cursor(prompt="Oprav greeting, ať zní lidsky")'],
     ))
 
     return reg
@@ -347,6 +355,14 @@ def build_registry(executor, mcp_bridge=None) -> ToolRegistry:
         examples=['ui_task(task="Otevři gmail.com a přečti první nepřečtený e-mail")'],
     ))
 
+
+    reg.register(Tool(
+        name="ask_cursor",
+        description="Předá úkol Cursor agentovi v aktuálním projektu (kód, opravy, soubory).",
+        params=[ToolParam("prompt", "Co má Cursor udělat")],
+        fn=lambda prompt: ex.execute("ask_cursor", {"prompt": prompt}),
+        examples=['ask_cursor(prompt="Oprav greeting, ať zní lidsky")'],
+    ))
 
     reg.register(Tool(
         name="wiki_search",
